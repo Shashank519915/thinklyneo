@@ -1,9 +1,6 @@
 {
   "functions": {
-    "app/api/execute/crop-image/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/execute/gemini/route.ts": {
+    "app/workflow/[id]/page.tsx": {
       "maxDuration": 60
     }
   }
