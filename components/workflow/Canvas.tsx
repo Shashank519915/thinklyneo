@@ -37,6 +37,11 @@ const nodeTypes = {
   requestInputs: RequestInputsNode,
   cropImage: GenericNode,
   gemini: GenericNode,
+  gptImage2: GenericNode,
+  klingV3: GenericNode,
+  mergeVideo: GenericNode,
+  mergeAV: GenericNode,
+  extractAudio: GenericNode,
   response: ResponseNode,
 };
 
@@ -53,6 +58,16 @@ function getNodeColor(type: string | undefined): string {
       return "#F97316";
     case "gemini":
       return "#3B82F6";
+    case "gptImage2":
+      return "#A855F7";
+    case "klingV3":
+      return "#EF4444";
+    case "mergeVideo":
+      return "#14B8A6";
+    case "mergeAV":
+      return "#06B6D4";
+    case "extractAudio":
+      return "#F59E0B";
     case "response":
       return "#6366F1";
     default:
