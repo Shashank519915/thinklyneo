@@ -2,9 +2,9 @@
 @import "tailwindcss";
 
 :root {
-  --background: #F5F5F5;
-  --foreground: #111827;
-  --sidebar-bg: #FFFFFF;
+  --background: #FFFFFF;
+  --foreground: #09090b;
+  --sidebar-bg: #F9F9F9;
   --border-color: #E5E7EB;
   --node-bg: #FFFFFF;
   --brand-purple: #7C3AED;
@@ -20,6 +20,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-border: var(--border-color);
+  --color-card: var(--node-bg);
+  --color-muted: #F4F4F5;
+  --color-muted-foreground: #71717A;
+  --color-primary: var(--brand-purple);
+  --color-primary-foreground: #FFFFFF;
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
