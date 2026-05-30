@@ -388,7 +388,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
         <div
           data-handle-anchor="label"
-          className="mb-1.5 flex items-center text-xs text-gray-500 dark:text-zinc-400"
+          className="mb-1.5 flex items-center text-xs text-gray-500"
         >
           <span>{param.label}</span>
           {param.required && <span className="text-red-400 ml-0.5">*</span>}
@@ -441,12 +441,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     value={value}
                     onChange={(e) => updateInput(param.key, e.target.value)}
                     disabled={disabled}
-                    className="nodrag nowheel w-full resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] p-3 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white"
+                    className="nodrag nowheel w-full resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] p-3 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={() => setIsExpanded((prev) => ({ ...prev, [param.key]: !expanded }))}
-                    className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-700 dark:bg-zinc-700/80 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-white"
+                    className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-700"
                     title={expanded ? "Collapse" : "Expand"}
                   >
                     {expanded ? (
@@ -456,7 +456,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     )}
                   </button>
                 </div>
-                <div className="mt-1 text-right text-[10px] tabular-nums text-gray-400 dark:text-zinc-500">
+                <div className="mt-1 text-right text-[10px] tabular-nums text-gray-400">
                   {value ? String(value).length : 0}/4000
                 </div>
               </div>
@@ -469,7 +469,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 value={value}
                 onChange={(e) => updateInput(param.key, e.target.value)}
                 disabled={disabled}
-                className="nodrag nowheel w-full rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white h-10"
+                className="nodrag nowheel w-full rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 h-10"
               />
             )}
 
@@ -481,7 +481,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 value={value}
                 onChange={(e) => updateInput(param.key, Number(e.target.value))}
                 disabled={disabled}
-                className="nodrag nowheel w-full rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white h-10"
+                className="nodrag nowheel w-full rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 h-10"
               />
             )}
 
@@ -497,14 +497,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   disabled={disabled}
                   className="nodrag nowheel flex-1 h-1.5 cursor-pointer accent-[#7C3AED] disabled:opacity-50"
                 />
-                <span className="w-8 text-right text-[12px] font-semibold tabular-nums text-gray-700 dark:text-zinc-300">
+                <span className="w-8 text-right text-[12px] font-semibold tabular-nums text-gray-700">
                   {Number(value).toFixed(param.step && param.step < 1 ? 2 : 0)}
                 </span>
                 <button
                   type="button"
                   disabled={disabled}
                   onClick={() => updateInput(param.key, param.defaultValue ?? 0)}
-                  className="nodrag h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:opacity-30 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+                  className="nodrag h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:opacity-30"
                   title="Reset to default"
                 >
                   <LucideIcons.RotateCcw className="w-3.5 h-3.5" />
@@ -518,7 +518,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   value={value || (nodeData[param.key] ?? "")}
                   onChange={(e) => updateInput(param.key, e.target.value)}
                   disabled={disabled}
-                  className="nodrag nowheel w-full h-10 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-white appearance-none pr-10 cursor-pointer"
+                  className="nodrag nowheel w-full h-10 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 appearance-none pr-10 cursor-pointer"
                 >
                   <option value="" disabled>Select option...</option>
                   {param.options?.map((opt: any) => (
@@ -536,11 +536,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.type === "file-upload" && (
               <div className="space-y-2">
                 {value ? (
-                  <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800 overflow-hidden p-2 flex items-center gap-3">
+                  <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] overflow-hidden p-2 flex items-center gap-3">
                     {value.startsWith("data:image") || value.startsWith("http") && (value.includes(".jpg") || value.includes(".png") || value.includes(".jpeg") || value.includes(".webp") || value.match(/cropImage|gemini|execute/i)) ? (
                       <img src={value} alt="Upload preview" className="w-12 h-12 object-contain bg-white rounded border border-gray-200" />
                     ) : (
-                      <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded text-gray-500 dark:bg-zinc-700">
+                      <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded text-gray-500">
                         {param.key.includes("video") ? (
                           <LucideIcons.Video className="w-5 h-5" />
                         ) : param.key.includes("audio") ? (
@@ -550,7 +550,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         )}
                       </div>
                     )}
-                    <span className="truncate flex-1 text-xs font-mono select-all pr-8 dark:text-white">
+                    <span className="truncate flex-1 text-xs font-mono select-all pr-8">
                       {value.startsWith("data:") ? "base64 file buffer" : value.split("/").pop()}
                     </span>
                     <button
@@ -564,7 +564,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     </button>
                   </div>
                 ) : (
-                  <label className={`nodrag flex min-h-[2.5rem] items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800 px-3 text-[12px] text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
+                  <label className={`nodrag flex min-h-[2.5rem] items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] px-3 text-[12px] text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
                     {uploadingField === param.key ? (
                       <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
@@ -587,7 +587,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               <div className="space-y-2">
                 <div className="grid grid-cols-4 gap-2">
                   {((value as string[]) || []).map((url, idx) => (
-                    <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden dark:bg-zinc-800 dark:border-zinc-700">
+                    <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden">
                       <img src={url} alt="" className="w-full h-full object-cover" />
                       <button
                         type="button"
@@ -599,7 +599,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       </button>
                     </div>
                   ))}
-                  <label className={`nodrag aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800 text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
+                  <label className={`nodrag aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
                     <LucideIcons.Plus className="w-4 h-4" />
                     <span className="text-[10px]">Add</span>
                     <input
@@ -626,21 +626,21 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   return (
     <div
       data-locked={isLocked ? "true" : undefined}
-      className={`w-[380px] max-w-[380px] rounded-xl border bg-white shadow-2xl transition-all duration-300 dark:bg-zinc-900 overflow-visible ${
+      className={`w-[380px] max-w-[380px] rounded-xl border bg-white shadow-2xl transition-all duration-300 overflow-visible ${
         isExecuting ? "node-executing border-green-500" : ""
       } ${
         isLocked
-          ? "border-yellow-400 dark:border-yellow-500"
+          ? "border-yellow-400"
           : nodeError
-          ? "border-red-300 dark:border-red-500"
-          : "border-gray-200 dark:border-zinc-700"
+          ? "border-red-300"
+          : "border-gray-200"
       } ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ overflow: "visible", width: "380px" }}
     >
       {/* Header */}
-      <div className="flex items-start justify-between border-b border-gray-100 px-4 py-3 dark:border-zinc-800">
+      <div className="flex items-start justify-between border-b border-gray-100 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <div className="w-full min-w-0 cursor-grab select-none truncate text-sm font-medium text-gray-900 dark:text-white">
+          <div className="w-full min-w-0 cursor-grab select-none truncate text-sm font-medium text-gray-900">
             {definition.name}
           </div>
         </div>
@@ -661,14 +661,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       {/* Mode Toggle (GPT-Image-2 / Kling v3) */}
       {hasModeTab && (
         <div className="px-4 pt-3">
-          <div className="nodrag flex w-full items-center rounded-[18px] border border-gray-200 bg-gray-100 p-1 dark:border-zinc-800 dark:bg-[#1F1F1F]">
+          <div className="nodrag flex w-full items-center rounded-[18px] border border-gray-200 bg-gray-100 p-1">
             <button
               type="button"
               onClick={() => handleModeChange("text")}
               className={`flex-1 rounded-[14px] px-3 py-1.5 text-center text-xs font-medium transition-all ${
                 modeTab === "text"
-                  ? "bg-gray-900 text-white shadow-md dark:bg-white dark:text-gray-900"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  ? "bg-gray-900 text-white shadow-md"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               {modeLabels[0]}
@@ -678,8 +678,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               onClick={() => handleModeChange("image")}
               className={`flex-1 rounded-[14px] px-3 py-1.5 text-center text-xs font-medium transition-all ${
                 modeTab === "image"
-                  ? "bg-gray-900 text-white shadow-md dark:bg-white dark:text-gray-900"
-                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  ? "bg-gray-900 text-white shadow-md"
+                  : "text-gray-500 hover:text-gray-700"
               }`}
             >
               {modeLabels[1]}
@@ -690,7 +690,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
       {/* Error state */}
       {nodeError && (
-        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600 dark:bg-red-900/20 dark:border-red-900/30 dark:text-red-400">
+        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">
           {sanitizeError(nodeError)}
         </div>
       )}
@@ -715,7 +715,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     }`}
                     aria-hidden="true"
                   />
-                  <span className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-zinc-300 font-medium">
+                  <span className="text-xs text-gray-400 group-hover:text-gray-600 font-medium">
                     Settings
                   </span>
                 </button>
@@ -743,7 +743,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           return (
             <div
               key={out.key}
-              className="pt-4 border-t border-gray-100 dark:border-zinc-800"
+              className="pt-4 border-t border-gray-100"
             >
               <div className="relative" style={{ overflow: "visible" }}>
                 <div
@@ -770,13 +770,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 <div>
                   <div
                     data-handle-anchor="label"
-                    className="mb-1.5 text-xs text-gray-500 dark:text-zinc-400 font-medium"
+                    className="mb-1.5 text-xs text-gray-500 font-medium"
                   >
                     {out.label}
                   </div>
 
                   {displayValue ? (
-                    <div className="nodrag nowheel rounded-lg border border-gray-200 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800 p-2 min-h-[120px] max-h-[220px] overflow-y-auto nowheel">
+                    <div className="nodrag nowheel rounded-lg border border-gray-200 bg-[#F5F5F5] p-2 min-h-[120px] max-h-[220px] overflow-y-auto nowheel">
                       {out.type === "image" && (
                         <div className="flex flex-col gap-2">
                           <img
@@ -814,7 +814,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       )}
 
                       {out.type === "text" && (
-                        <p className="select-text text-[13px] text-gray-900 leading-relaxed whitespace-pre-wrap dark:text-white">
+                        <p className="select-text text-[13px] text-gray-900 leading-relaxed whitespace-pre-wrap">
                           {String(displayValue)}
                         </p>
                       )}
@@ -832,8 +832,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       )}
                     </div>
                   ) : (
-                    <div className="nodrag nowheel rounded-lg border border-gray-200 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800 min-h-[120px] p-2">
-                      <div className="text-center text-xs text-gray-400 dark:text-zinc-500 py-10">
+                    <div className="nodrag nowheel rounded-lg border border-gray-200 bg-[#F5F5F5] min-h-[120px] p-2">
+                      <div className="text-center text-xs text-gray-400 py-10">
                         No output yet
                       </div>
                     </div>
@@ -846,7 +846,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       </div>
 
       {/* Credit Estimate label */}
-      <div className="px-4 pb-3 flex items-center justify-end gap-1 text-[10px] text-gray-400 dark:text-zinc-500">
+      <div className="px-4 pb-3 flex items-center justify-end gap-1 text-[10px] text-gray-400">
         <LucideIcons.Coins className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
         <span>~{(definition.credits.base / 1000000).toFixed(2)}M</span>
       </div>
