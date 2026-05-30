@@ -6,12 +6,26 @@ import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import NodeHeaderActions from "./NodeHeaderActions";
-import { cropImageDefinition, openrouterLlmDefinition, type NodeDefinition } from "@galaxy/shared";
+import {
+  cropImageDefinition,
+  openrouterLlmDefinition,
+  gptImage2Definition,
+  klingV3Definition,
+  mergeVideoDefinition,
+  mergeAVDefinition,
+  extractAudioDefinition,
+  type NodeDefinition,
+} from "@galaxy/shared";
 
 // Map React Flow type strings to their shared configurations
 const DEFINITIONS: Record<string, NodeDefinition> = {
   cropImage: cropImageDefinition,
   gemini: openrouterLlmDefinition,
+  gptImage2: gptImage2Definition,
+  klingV3: klingV3Definition,
+  mergeVideo: mergeVideoDefinition,
+  mergeAV: mergeAVDefinition,
+  extractAudio: extractAudioDefinition,
 };
 
 // Dynamic icon resolver
@@ -57,6 +71,38 @@ function getColorTheme(color: string) {
         border: "border-green-200",
         accent: "accent-green-500",
         accentHover: "hover:accent-green-600",
+      };
+    case "red":
+      return {
+        bg: "bg-red-50",
+        text: "text-red-500",
+        border: "border-red-200",
+        accent: "accent-red-500",
+        accentHover: "hover:accent-red-600",
+      };
+    case "teal":
+      return {
+        bg: "bg-teal-50",
+        text: "text-teal-600",
+        border: "border-teal-200",
+        accent: "accent-teal-500",
+        accentHover: "hover:accent-teal-600",
+      };
+    case "cyan":
+      return {
+        bg: "bg-cyan-50",
+        text: "text-cyan-500",
+        border: "border-cyan-200",
+        accent: "accent-cyan-500",
+        accentHover: "hover:accent-cyan-600",
+      };
+    case "amber":
+      return {
+        bg: "bg-amber-50",
+        text: "text-amber-500",
+        border: "border-amber-200",
+        accent: "accent-amber-500",
+        accentHover: "hover:accent-amber-600",
       };
     default:
       return {
