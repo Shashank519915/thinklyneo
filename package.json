@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "pnpm --filter @galaxy/shared build && next build",
     "start": "next start",
     "sync-shared": "node scripts/sync-shared.js"
   },
