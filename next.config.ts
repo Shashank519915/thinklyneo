@@ -18,6 +18,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:3001/api/:path*",
+      },
+    ];
+  },
 };
 
 /** Default export consumed by `next build`; relaxes `next/image` HTTPS hosts and raises server action payload cap. */
