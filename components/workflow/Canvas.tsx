@@ -229,6 +229,17 @@ function CanvasInner() {
 
       if (!valid) return;
 
+      // Prevent target handles (except multi-image "in:images") from accepting multiple incoming connections
+      if (connection.targetHandle !== "in:images") {
+        const hasExistingConnection = edges.some(
+          (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+        );
+        if (hasExistingConnection) {
+          console.warn("Single connection enforced for target handle:", connection.targetHandle);
+          return;
+        }
+      }
+
       const cycleCheck = validateNewEdge(nodes, edges, {
         source: connection.source ?? "",
         target: connection.target ?? "",

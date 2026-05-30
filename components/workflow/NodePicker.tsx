@@ -18,15 +18,45 @@ import { type Node } from "@xyflow/react";
 const RECENT_NODES = [
   {
     id: "gemini",
-    label: "Gemini 3.1 Pro",
+    label: "OpenRouter LLM",
     nodeType: "gemini",
-    icon: <Sparkles className="h-4 w-4 text-gray-700" />,
+    icon: <Sparkles className="h-4 w-4 text-purple-600" />,
   },
   {
     id: "cropImage",
     label: "Crop Image",
     nodeType: "cropImage",
-    icon: <Crop className="h-4 w-4 text-gray-700" />,
+    icon: <Crop className="h-4 w-4 text-orange-500" />,
+  },
+  {
+    id: "gptImage2",
+    label: "GPT-Image-2",
+    nodeType: "gptImage2",
+    icon: <Image className="h-4 w-4 text-pink-500" />,
+  },
+  {
+    id: "klingV3",
+    label: "Kling v3 (Video)",
+    nodeType: "klingV3",
+    icon: <Video className="h-4 w-4 text-red-500" />,
+  },
+  {
+    id: "mergeVideo",
+    label: "Merge Video",
+    nodeType: "mergeVideo",
+    icon: <Video className="h-4 w-4 text-teal-500" />,
+  },
+  {
+    id: "mergeAV",
+    label: "Merge A/V",
+    nodeType: "mergeAV",
+    icon: <Video className="h-4 w-4 text-cyan-500" />,
+  },
+  {
+    id: "extractAudio",
+    label: "Extract Audio",
+    nodeType: "extractAudio",
+    icon: <Mic className="h-4 w-4 text-amber-500" />,
   },
 ];
 
@@ -68,7 +98,9 @@ function createNode(nodeType: string): Node {
 
   if (nodeType === "cropImage") {
     return {
-      id, type: "cropImage", position,
+      id,
+      type: "cropImage",
+      position,
       data: {
         label: "Crop Image",
         inputs: { inputImage: null, x: 0, y: 0, w: 100, h: 100 },
@@ -77,15 +109,87 @@ function createNode(nodeType: string): Node {
     };
   }
 
+  if (nodeType === "gptImage2") {
+    return {
+      id,
+      type: "gptImage2",
+      position,
+      data: {
+        label: "GPT-Image-2",
+        inputs: { prompt: "", negativePrompt: "", aspectRatio: "1:1" },
+        output: null,
+      },
+    };
+  }
+
+  if (nodeType === "klingV3") {
+    return {
+      id,
+      type: "klingV3",
+      position,
+      data: {
+        label: "Kling v3",
+        inputs: { prompt: "", inputImage: null, aspectRatio: "16:9", duration: "5s" },
+        output: null,
+      },
+    };
+  }
+
+  if (nodeType === "mergeVideo") {
+    return {
+      id,
+      type: "mergeVideo",
+      position,
+      data: {
+        label: "Merge Video",
+        inputs: { videoUrl1: "", videoUrl2: "", videoUrl3: "" },
+        output: null,
+      },
+    };
+  }
+
+  if (nodeType === "mergeAV") {
+    return {
+      id,
+      type: "mergeAV",
+      position,
+      data: {
+        label: "Merge A/V",
+        inputs: { videoUrl: "", audioUrl: "" },
+        output: null,
+      },
+    };
+  }
+
+  if (nodeType === "extractAudio") {
+    return {
+      id,
+      type: "extractAudio",
+      position,
+      data: {
+        label: "Extract Audio",
+        inputs: { videoUrl: "" },
+        output: null,
+      },
+    };
+  }
+
   return {
-    id, type: "gemini", position,
+    id,
+    type: "gemini",
+    position,
     data: {
-      label: "Gemini 3.1 Pro",
-      model: "gemini-2.5-flash",
+      label: "OpenRouter LLM",
       inputs: {
-        prompt: null, systemPrompt: null, images: [],
-        video: null, audio: null, file: null,
-        temperature: 1.0, maxTokens: 2048, topP: 0.95,
+        prompt: "",
+        systemPrompt: "",
+        images: [],
+        video: null,
+        audio: null,
+        file: null,
+        temperature: 1.0,
+        maxTokens: 2048,
+        topP: 0.95,
       },
       output: null,
     },
