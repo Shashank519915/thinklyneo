@@ -26,8 +26,7 @@ import { useWorkflowStore } from "@/store/workflow-store";
 import { isValidConnection, validateNewEdge } from "@/lib/execution";
 import { generateEdgeId, getSourceHandleColor } from "@/lib/utils";
 import RequestInputsNode from "./nodes/RequestInputsNode";
-import CropImageNode from "./nodes/CropImageNode";
-import GeminiNode from "./nodes/GeminiNode";
+import GenericNode from "./nodes/GenericNode";
 import ResponseNode from "./nodes/ResponseNode";
 import AnimatedEdge from "./edges/AnimatedEdge";
 import BottomToolbar from "./BottomToolbar";
@@ -36,8 +35,8 @@ import { Map, Minimize2, Play, X } from "lucide-react";
 
 const nodeTypes = {
   requestInputs: RequestInputsNode,
-  cropImage: CropImageNode,
-  gemini: GeminiNode,
+  cropImage: GenericNode,
+  gemini: GenericNode,
   response: ResponseNode,
 };
 

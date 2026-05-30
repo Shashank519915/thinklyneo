@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "sync-shared": "xcopy /E /Y ..\\galaxy-temp-backend\\shared shared"
+    "sync-shared": "node scripts/sync-shared.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.4",
