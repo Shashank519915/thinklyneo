@@ -83,6 +83,33 @@ export default function WorkflowPage() {
   const [savePhase, setSavePhase] = useState<WorkflowSaveToastPhase>("idle");
   const [saveToastCycle, setSaveToastCycle] = useState(0);
 
+  // ──── Credits & Balance state ────────────────────────────────────
+  const [balance, setBalance] = useState<number | null>(null);
+
+  const fetchBalance = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/credits/balance");
+      const data = await resp.json();
+      if (data.balance !== undefined) {
+        setBalance(data.balance);
+      }
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchBalance();
+    };
+    window.addEventListener("nextflow:refresh-history", handleRefresh);
+    return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
+  }, [fetchBalance]);
+
   // ──── Server-Orchestrated Execution State ────────────────────────
   // Instead of per-node SSE subscribers, we have a SINGLE orchestrator subscription
   const [orchestratorState, setOrchestratorState] = useState<{
@@ -134,6 +161,7 @@ export default function WorkflowPage() {
         if (!resp.ok) {
           const errData = await resp.json().catch(() => ({ error: "Execute failed" }));
           console.error("[NextFlow] Execute API error:", errData.error);
+          window.alert(errData.error || "Execute failed");
           isRunningRef.current = false;
           setIsRunning(false);
           setCurrentRunScope(null);
@@ -153,6 +181,7 @@ export default function WorkflowPage() {
 
         setCurrentRunId(runId);
         setOrchestratorState({ orchestratorRunId, publicAccessToken });
+        fetchBalance(); // Refresh balance immediately to reflect the hold
 
         console.log(`[NextFlow] Run ${runId} started. Orchestrator: ${orchestratorRunId}`);
       } catch (err) {
@@ -912,7 +941,7 @@ export default function WorkflowPage() {
               <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                 <span className="text-gray-500">Bal</span>
-                <span className="tabular-nums">0.00</span>
+                <span className="tabular-nums">{balance !== null ? (balance / 1000000).toFixed(2) : "0.00"}</span>
                 <span className="text-gray-500">M</span>
               </span>
             </span>

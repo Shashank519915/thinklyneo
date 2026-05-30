@@ -88,8 +88,12 @@ interface WorkflowRun {
     finishedAt?: string;
     durationMs?: number;
     inputs?: Record<string, unknown>;
-    output?: string | null;
+    output?: any;
     error?: string;
+    providerUsed?: string | null;
+    providerAttempts?: Array<{ providerId: string; status: "success" | "failed"; error?: string; durationMs: number }> | null;
+    logs?: string | null;
+    creditCost?: number | null;
   }[];
 }
 

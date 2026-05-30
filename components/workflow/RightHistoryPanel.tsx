@@ -21,6 +21,10 @@ interface NodeRunData {
   inputs?: Record<string, unknown>;
   output?: unknown;
   error?: string;
+  providerUsed?: string | null;
+  providerAttempts?: Array<{ providerId: string; status: "success" | "failed"; error?: string; durationMs: number }> | null;
+  logs?: string | null;
+  creditCost?: number | null;
 }
 
 interface RunHistoryItem {
@@ -465,6 +469,20 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
           Duration:{" "}
           <span className="font-medium tabular-nums text-gray-700">{formatDuration(nr.durationMs)}</span>
         </span>
+        <span>
+          Cost:{" "}
+          <span className="font-medium text-gray-700">
+            {nr.creditCost !== undefined && nr.creditCost !== null
+              ? `${(nr.creditCost / 1000000).toFixed(2)}M`
+              : "0.00M"}
+          </span>
+        </span>
+        {nr.providerUsed && (
+          <span>
+            Provider:{" "}
+            <span className="font-medium text-indigo-600">{nr.providerUsed}</span>
+          </span>
+        )}
       </div>
 
       {isRequest ? (
@@ -512,6 +530,41 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
             <OutputDetail output={nr.output} />
           </div>
         </>
+      )}
+
+      {nr.providerAttempts && nr.providerAttempts.length > 0 && (
+        <div className="border-t border-gray-100 pt-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Attempts</p>
+          <div className="space-y-1">
+            {nr.providerAttempts.map((attempt, idx) => (
+              <div key={idx} className="flex flex-col gap-0.5 bg-gray-50 px-2 py-1.5 rounded border border-gray-200 text-[10px]">
+                <div className="flex items-center justify-between font-medium">
+                  <span className="text-gray-700 font-semibold">{attempt.providerId}</span>
+                  <div className="flex items-center gap-1.5 shrink-0 font-mono text-[9px]">
+                    <span className={attempt.status === "success" ? "text-green-600 font-bold" : "text-red-500"}>
+                      {attempt.status.toUpperCase()}
+                    </span>
+                    <span className="text-gray-400">({attempt.durationMs}ms)</span>
+                  </div>
+                </div>
+                {attempt.error && (
+                  <p className="text-[9px] text-red-500 font-normal leading-normal whitespace-pre-wrap break-words mt-0.5">
+                    Error: {attempt.error}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {nr.logs && (
+        <div className="border-t border-gray-100 pt-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Execution Logs</p>
+          <pre className="max-h-36 overflow-y-auto rounded-md bg-neutral-900 px-3 py-2 font-mono text-[9px] text-neutral-200 leading-snug whitespace-pre-wrap break-words">
+            {nr.logs}
+          </pre>
+        </div>
       )}
 
       {nr.error && (
@@ -643,7 +696,10 @@ function RunItem({
             <p className="text-[11px] text-gray-400 mt-0.5">
               {isLive
                 ? "In progress…"
-                : `Credits: ${run.durationMs ? `${((run.durationMs / 1000) * 0.001).toFixed(2)}M` : "0M"}`}
+                : `Credits: ${(() => {
+                    const totalCost = run.nodeRuns.reduce((sum, nr) => sum + (nr.creditCost ?? 0), 0);
+                    return `${(totalCost / 1000000).toFixed(2)}M`;
+                  })()}`}
             </p>
           </div>
         </div>
