@@ -93,8 +93,8 @@ function AddToRequestToggle({ muted, disabled, onMutedChange }: AddToRequestTogg
   );
 }
 
-export default function GenericNode({ id, data }: NodeProps) {
-  const definition = DEFINITIONS[data.type as string] || DEFINITIONS[data.model as string] || cropImageDefinition;
+export default function GenericNode({ id, data, type }: NodeProps) {
+  const definition = DEFINITIONS[type as string] || DEFINITIONS[data.type as string] || DEFINITIONS[data.model as string] || cropImageDefinition;
   const theme = getColorTheme(definition.color);
 
   const nodeData = data as any;
