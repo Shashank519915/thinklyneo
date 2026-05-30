@@ -1,0 +1,1086 @@
+"use client";
+
+/**
+ * @fileoverview `/workflow/[id]` client page: loads/persists graph JSON, debounced autosave,
+ * wires server-orchestrated DAG execution via single Trigger.dev SSE stream,
+ * export/import, and history/preview chrome.
+ *
+ * Architecture v2 (Server-Orchestrated):
+ * - handleRun → POST /api/workflows/[id]/execute → gets orchestratorRunId + token
+ * - OrchestratorSubscriber component subscribes to orchestrator's metadata via useRealtimeRun
+ * - metadata.nodeStates drives canvas node states (running, completed, failed, skipped)
+ * - On refresh: reads orchestratorRunId from history API → re-subscribes to same SSE
+ */
+
+import { useEffect, useState, useRef, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useWorkflowStore } from "@/store/workflow-store";
+import LeftSidebar from "@/components/workflow/LeftSidebar";
+import RightHistoryPanel from "@/components/workflow/RightHistoryPanel";
+import Canvas from "@/components/workflow/Canvas";
+import { type Node, type Edge } from "@xyflow/react";
+import { Download, Upload } from "lucide-react";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { workflowFilePayloadSchema } from "@/lib/validation";
+import { SpinningLogo } from "@/components/SpinningLogo";
+import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
+import WorkflowSaveToast, {
+  type WorkflowSaveToastPhase,
+} from "@/components/workflow/WorkflowSaveToast";
+import { useRealtimeRun } from "@trigger.dev/react-hooks";
+
+/**
+ * Primary workflow editor route: synchronises React Flow graph with Neon via PATCH,
+ * triggers server-side orchestrated DAG execution, and surfaces save / run / preview affordances.
+ */
+export default function WorkflowPage() {
+  const params = useParams();
+  const router = useRouter();
+  const workflowId = params.id as string;
+
+  const {
+    setNodes,
+    setEdges,
+    setWorkflowId,
+    setWorkflowName,
+    nodes,
+    edges,
+    isHistoryPanelOpen,
+    setIsHistoryPanelOpen,
+    isRunning,
+    setIsRunning,
+    setCurrentRunId,
+    currentRunId,
+    setNodeExecuting,
+    setNodeOutput,
+    setNodeError,
+    clearExecutionState,
+    addRunHistory,
+    setCurrentRunScope,
+    nodeOutputs,
+    selectedNodeIds,
+    updateNodeData,
+    workflowName,
+    clearPreviewRun,
+    previewRunId,
+    previewRunTimestamp,
+    clearCanvasNodeData,
+  } = useWorkflowStore();
+
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editNameValue, setEditNameValue] = useState(workflowName);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  const saveGenRef = useRef(0);
+  const reconciliationTriggeredRef = useRef(false);
+  // Synchronous mutex — prevents double-click / concurrent run starts before setIsRunning(true) re-renders
+  const isRunningRef = useRef(false);
+
+  const [savePhase, setSavePhase] = useState<WorkflowSaveToastPhase>("idle");
+  const [saveToastCycle, setSaveToastCycle] = useState(0);
+
+  // ──── Server-Orchestrated Execution State ────────────────────────
+  // Instead of per-node SSE subscribers, we have a SINGLE orchestrator subscription
+  const [orchestratorState, setOrchestratorState] = useState<{
+    orchestratorRunId: string;
+    publicAccessToken: string;
+  } | null>(null);
+
+  /**
+   * Triggers a server-side orchestrated DAG execution.
+   * Calls POST /api/workflows/[id]/execute which creates the run and starts the orchestrator.
+   * Returns { runId, orchestratorRunId, publicAccessToken } for SSE subscription.
+   */
+  const handleRun = useCallback(
+    async (scope: "full" | "single" | "partial", targetIds?: string[]) => {
+      if (isRunning || isRunningRef.current) return;
+      isRunningRef.current = true;
+
+      // Exit any active preview before starting a new run
+      clearPreviewRun();
+      clearExecutionState();
+      clearCanvasNodeData();
+      setIsRunning(true);
+      setCurrentRunScope(scope);
+
+      // Collect input values from Request-Inputs node
+      const inputValues: Record<string, unknown> = {};
+      const requestNode = nodesRef.current.find((n) => n.type === "requestInputs");
+      if (requestNode) {
+        const fields = (
+          requestNode.data as { fields?: Array<{ id: string; value: unknown }> }
+        ).fields ?? [];
+        for (const f of fields) {
+          inputValues[f.id] = f.value;
+        }
+      }
+
+      let existingOutputs = {};
+      if (scope === "single" || scope === "partial") {
+        existingOutputs = useWorkflowStore.getState().nodeOutputs;
+      }
+
+      try {
+        const resp = await fetch(`/api/workflows/${workflowId}/execute`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scope, inputValues, nodeIds: targetIds, existingOutputs }),
+        });
+
+        if (!resp.ok) {
+          const errData = await resp.json().catch(() => ({ error: "Execute failed" }));
+          console.error("[NextFlow] Execute API error:", errData.error);
+          isRunningRef.current = false;
+          setIsRunning(false);
+          setCurrentRunScope(null);
+          return;
+        }
+
+        const data = await resp.json();
+        const { runId, orchestratorRunId, publicAccessToken } = data.data ?? {};
+
+        if (!runId || !orchestratorRunId || !publicAccessToken) {
+          console.error("[NextFlow] Missing execute response data:", data);
+          isRunningRef.current = false;
+          setIsRunning(false);
+          setCurrentRunScope(null);
+          return;
+        }
+
+        setCurrentRunId(runId);
+        setOrchestratorState({ orchestratorRunId, publicAccessToken });
+
+        console.log(`[NextFlow] Run ${runId} started. Orchestrator: ${orchestratorRunId}`);
+      } catch (err) {
+        console.error("[NextFlow] Execute failed:", err);
+        isRunningRef.current = false;
+        setIsRunning(false);
+        setCurrentRunScope(null);
+      }
+    },
+    [isRunning, workflowId, clearPreviewRun, clearExecutionState, clearCanvasNodeData, setIsRunning, setCurrentRunId, setCurrentRunScope]
+  );
+
+  const handleCancelRun = useCallback(async () => {
+    if (!isRunning) return;
+    try {
+      const resp = await fetch(`/api/workflows/${workflowId}/cancel`, {
+        method: "POST",
+      });
+      if (resp.ok) {
+        console.log("[NextFlow] Run cancelled successfully.");
+        // The orchestrator stream will likely close automatically, 
+        // but we can proactively clear the local state just in case.
+        isRunningRef.current = false;
+        setIsRunning(false);
+        setCurrentRunId(null);
+        setCurrentRunScope(null);
+        setOrchestratorState(null);
+        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+      }
+    } catch (err) {
+      console.error("[NextFlow] Cancel failed:", err);
+    }
+  }, [isRunning, workflowId, setIsRunning, setCurrentRunId, setCurrentRunScope]);
+
+  // Alias for event handler compatibility
+  const runWorkflow = handleRun;
+
+  /**
+   * Called by OrchestratorSubscriber when orchestrator metadata updates with new node states.
+   * Diffs against previous states to emit targeted state changes to Zustand.
+   */
+  /**
+   * Called by OrchestratorSubscriber when orchestrator metadata updates with new node states.
+   * Diffs against previous states to emit targeted state changes to Zustand.
+   */
+  const handleNodeStatesUpdate = useCallback(
+    (nodeStates: Record<string, { status: string; output?: unknown; error?: string }>) => {
+      for (const [nodeId, state] of Object.entries(nodeStates)) {
+        switch (state.status) {
+          case "running":
+            setNodeExecuting(nodeId, true);
+            break;
+          case "completed":
+            setNodeExecuting(nodeId, false);
+            setNodeOutput(nodeId, state.output);
+            // Update node data for canvas preview
+            if (typeof state.output === "string") {
+              updateNodeData(nodeId, { output: state.output, error: null } as any);
+            } else {
+              // Check if response node to write structured output to result.value
+              const node = nodesRef.current.find((n) => n.id === nodeId);
+              if (node?.type === "response" && state.output && typeof state.output === "object") {
+                const currentResults = (node.data as any).results || [];
+                const updatedResults = currentResults.map((r: any) => ({
+                  ...r,
+                  value: (state.output as Record<string, unknown>)[r.id] ?? null,
+                }));
+                updateNodeData(nodeId, { results: updatedResults, error: null } as any);
+              } else {
+                updateNodeData(nodeId, { error: null } as any);
+              }
+            }
+            break;
+          case "failed":
+            setNodeExecuting(nodeId, false);
+            setNodeError(nodeId, state.error ?? "Unknown error");
+            updateNodeData(nodeId, { error: state.error ?? "Unknown error" } as any);
+            break;
+          case "skipped":
+            setNodeExecuting(nodeId, false);
+            setNodeError(nodeId, state.error ?? "Skipped due to upstream failure");
+            updateNodeData(nodeId, { error: state.error ?? "Skipped due to upstream failure" } as any);
+            break;
+          case "pending":
+            // No action needed
+            break;
+        }
+      }
+    },
+    [setNodeExecuting, setNodeOutput, setNodeError, updateNodeData]
+  );
+
+  /**
+   * Called by OrchestratorSubscriber when the orchestrator task completes (COMPLETED/FAILED/CRASHED).
+   * Finalizes local state and refreshes history.
+   */
+  const handleOrchestratorComplete = useCallback(
+    (finalStatus: string, output?: unknown) => {
+      const completedRunId = currentRunId; // capture before clearing
+      isRunningRef.current = false;
+      setIsRunning(false);
+      setCurrentRunId(null);
+      setCurrentRunScope(null);
+      setOrchestratorState(null);
+
+      // Clear canvas execution state (stop all pulsation)
+      clearExecutionState();
+
+      if (completedRunId && finalStatus === "failed") {
+        console.warn(`[NextFlow] Orchestrator failed/crashed. Reconciling run ${completedRunId}...`);
+        fetch(`/api/workflows/${workflowId}/runs/${completedRunId}/reconcile`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ finalStatus: "failed" }),
+        })
+          .then(() => {
+            window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+          })
+          .catch((err) => console.error("[NextFlow] Reconcile failed:", err));
+      }
+
+      // Auto-arrange and refresh history
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new CustomEvent("nextflow:auto-arrange"));
+        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+      });
+    },
+    [workflowId, currentRunId, setIsRunning, setCurrentRunId, setCurrentRunScope, clearExecutionState]
+  );
+
+
+
+  /**
+   * Mount-time restore: detects any run still marked `running` in the DB and re-subscribes
+   * to the orchestrator's SSE stream. No DAG re-execution needed — the orchestrator handles it all.
+   */
+  const restoreLiveRun = useCallback(async () => {
+    try {
+      const historyResp = await fetch(`/api/workflows/${workflowId}/history`);
+      const historyData = await historyResp.json();
+      const runsList: Array<{
+        id: string;
+        scope: string;
+        status: string;
+        orchestratorRunId: string | null;
+        startedAt: string;
+        nodeRuns: Array<{
+          nodeId: string;
+          nodeName: string;
+          status: string;
+          output: unknown;
+          error?: string | null;
+        }>;
+      }> = historyData.data ?? [];
+
+      const runningRun = runsList.find((r) => r.status === "running");
+      if (!runningRun) return;
+
+      if (!runningRun.orchestratorRunId) {
+        // Legacy run without orchestrator — finalize it
+        console.log(`[NextFlow] Run ${runningRun.id} has no orchestrator — finalizing.`);
+        try {
+          await fetch(`/api/workflows/${workflowId}/node-runs`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              runId: runningRun.id,
+              nodeRuns: [],
+              finalStatus: "partial",
+            }),
+          });
+        } catch {}
+        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        return;
+      }
+
+      console.log(
+        `[NextFlow] Active run found: ${runningRun.id}. Restoring SSE to orchestrator ${runningRun.orchestratorRunId}...`
+      );
+
+      // Hydrate completed node outputs into canvas
+      for (const nr of runningRun.nodeRuns) {
+        if (nr.status === "success" && nr.output !== null && nr.output !== undefined) {
+          let resolvedOutput: unknown = nr.output;
+          if (nr.output && typeof nr.output === "object") {
+            const o = nr.output as Record<string, unknown>;
+            if ("outputUrl" in o) resolvedOutput = o.outputUrl;
+            else if ("response" in o) resolvedOutput = o.response;
+          }
+          setNodeOutput(nr.nodeId, resolvedOutput);
+          if (typeof resolvedOutput === "string") {
+            updateNodeData(nr.nodeId, { output: resolvedOutput } as { output: string });
+          }
+        } else if (nr.status === "failed") {
+          setNodeError(nr.nodeId, nr.error ?? "Failed");
+          updateNodeData(nr.nodeId, { error: nr.error ?? "Failed" } as any);
+        } else if (nr.status === "skipped") {
+          setNodeError(nr.nodeId, nr.error ?? "Skipped due to upstream failure");
+          updateNodeData(nr.nodeId, { error: nr.error ?? "Skipped due to upstream failure" } as any);
+        } else if (nr.status === "running") {
+          setNodeExecuting(nr.nodeId, true);
+        }
+      }
+
+      // Mint a fresh token for the orchestrator run
+      const tokenResp = await fetch(`/api/workflows/${workflowId}/node-runs/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orchestratorRunId: runningRun.orchestratorRunId,
+        }),
+      });
+
+      if (!tokenResp.ok) {
+        console.warn("[NextFlow] Failed to mint orchestrator token — run may have ended.");
+        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        return;
+      }
+
+      const tokenData = await tokenResp.json();
+      const { publicAccessToken } = tokenData.data ?? {};
+
+      if (!publicAccessToken) {
+        console.warn("[NextFlow] No token returned for orchestrator.");
+        return;
+      }
+
+      // Restore running state
+      isRunningRef.current = true;
+      setIsRunning(true);
+      setCurrentRunId(runningRun.id);
+      setCurrentRunScope(runningRun.scope as "full" | "partial" | "single");
+      setOrchestratorState({
+        orchestratorRunId: runningRun.orchestratorRunId,
+        publicAccessToken,
+      });
+
+      console.log(`[NextFlow] SSE restored to orchestrator ${runningRun.orchestratorRunId}`);
+    } catch (err) {
+      console.error("[NextFlow] SSE restore failed:", err);
+    }
+  }, [
+    workflowId,
+    setIsRunning,
+    setCurrentRunId,
+    setCurrentRunScope,
+    setNodeOutput,
+    setNodeError,
+    setNodeExecuting,
+    updateNodeData,
+  ]);
+
+  useEffect(() => {
+    if (!loading && !reconciliationTriggeredRef.current) {
+      reconciliationTriggeredRef.current = true;
+      restoreLiveRun();
+    }
+  }, [loading, restoreLiveRun]);
+
+  // Re-subscribe or reconcile when tab becomes active / visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        if (isRunning) {
+          restoreLiveRun();
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isRunning, restoreLiveRun]);
+
+  useEffect(() => {
+    if (savePhase !== "saved") return;
+    const t = setTimeout(() => setSavePhase("leaving"), 2000);
+    return () => clearTimeout(t);
+  }, [savePhase]);
+
+  const viewingPillActive = isRunning || !!previewRunId;
+  type ViewingPillPhase = "hidden" | "visible" | "leaving";
+  const [viewingPillPhase, setViewingPillPhase] =
+    useState<ViewingPillPhase>("hidden");
+
+  useEffect(() => {
+    if (viewingPillActive) {
+      setViewingPillPhase("visible");
+      return;
+    }
+    setViewingPillPhase((prev) => (prev === "hidden" ? "hidden" : "leaving"));
+  }, [viewingPillActive]);
+
+  useEffect(() => {
+    if (viewingPillPhase !== "leaving") return;
+    const t = window.setTimeout(() => setViewingPillPhase("hidden"), 200);
+    return () => clearTimeout(t);
+  }, [viewingPillPhase]);
+
+  const viewingPillDisplayRef = useRef({
+    isRunning: false,
+    currentRunId: null as string | null,
+    previewRunId: null as string | null,
+    previewRunTimestamp: null as string | null,
+  });
+
+  useEffect(() => {
+    if (viewingPillPhase === "visible") {
+      viewingPillDisplayRef.current = {
+        isRunning,
+        currentRunId,
+        previewRunId,
+        previewRunTimestamp,
+      };
+    }
+  }, [viewingPillPhase, isRunning, currentRunId, previewRunId, previewRunTimestamp]);
+
+  /**
+   * Prevents PATCHing malformed graphs during navigation races (requires both anchored nodes present).
+   */
+  const canPersistWorkflowGraph = useCallback((n: typeof nodes) => {
+    if (n.length < 2) return false;
+    let hasRequest = false;
+    let hasResponse = false;
+    for (const node of n) {
+      if (node.type === "requestInputs") hasRequest = true;
+      if (node.type === "response") hasResponse = true;
+    }
+    return hasRequest && hasResponse;
+  }, []);
+
+  /** Sums static per-node estimates (placeholder millions) for the floating cost chip — display only. */
+  const estimateWorkflowCostDisplay = (): string => {
+    const sum = sumWorkflowEstimateMillions(nodes);
+    if (sum === 0) return "0.00";
+    return sum.toFixed(2);
+  };
+
+  // Keep edit value in sync when workflowName loads from API
+  useEffect(() => { setEditNameValue(workflowName); }, [workflowName]);
+  useEffect(() => { if (isEditingName) nameInputRef.current?.focus(); }, [isEditingName]);
+
+  /** Persists inline workflow rename through PATCH and coordinates `WorkflowSaveToast` generation tokens. */
+  const handleNameSave = async () => {
+    const trimmed = editNameValue.trim();
+    setIsEditingName(false);
+    if (!trimmed || trimmed === workflowName) { setEditNameValue(workflowName); return; }
+    setWorkflowName(trimmed);
+    const myId = ++saveGenRef.current;
+    setSavePhase("saving");
+    setSaveToastCycle((c) => c + 1);
+    try {
+      const resp = await fetch(`/api/workflows/${workflowId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (myId !== saveGenRef.current) return;
+      if (resp.ok) setSavePhase("saved");
+      else setSavePhase("idle");
+    } catch {
+      if (myId !== saveGenRef.current) return;
+      setSavePhase("idle");
+    }
+  };
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+    edgesRef.current = edges;
+  }, [nodes, edges]);
+
+  // LinkedIn console.log
+  useEffect(() => {
+    console.log(
+      "[NextFlow] Candidate LinkedIn: " +
+        (process.env.NEXT_PUBLIC_LINKEDIN_URL ||
+          "https://www.linkedin.com/in/shashank-anand")
+    );
+  }, []);
+
+  /**
+   * Bootstraps editor state whenever `workflowId` changes.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    clearPreviewRun();
+    setLoading(true);
+    setNodes([]);
+    setEdges([]);
+    const fetchWorkflow = async () => {
+      try {
+        const resp = await fetch(`/api/workflows/${workflowId}`);
+        const data = await resp.json();
+        if (!data.data || cancelled) return;
+
+        const wf = data.data;
+        setWorkflowId(workflowId);
+        setWorkflowName(wf.name);
+
+        const rawNodes = wf.nodes as Node[];
+        if (!Array.isArray(rawNodes)) {
+          console.error("workflow.nodes is not an array:", workflowId);
+          return;
+        }
+
+        // Strip runtime outputs and errors from node data so the canvas always opens in plain edit mode
+        const cleanNodes = rawNodes.map((node) => {
+          const d = node.data as Record<string, unknown>;
+          const cleaned: Record<string, unknown> = { ...d };
+          if ("output" in cleaned) {
+            cleaned.output = null;
+          }
+          cleaned.error = null;
+          if (cleaned.inputs && typeof cleaned.inputs === "object") {
+            const inputs = cleaned.inputs as Record<string, unknown>;
+            const cleanedInputs = { ...inputs };
+            if ("images" in cleanedInputs) cleanedInputs.images = [];
+            if ("inputImage" in cleanedInputs && node.type === "cropImage") {
+              cleanedInputs.inputImage = null;
+            }
+            cleaned.inputs = cleanedInputs;
+          }
+          if (node.type === "response" && Array.isArray(cleaned.results)) {
+            cleaned.results = (cleaned.results as Array<Record<string, unknown>>).map((r) => ({
+              ...r,
+              value: null,
+            }));
+          }
+          return { ...node, data: cleaned };
+        });
+
+        if (cancelled) return;
+        setNodes(cleanNodes);
+        setEdges(Array.isArray(wf.edges) ? (wf.edges as Edge[]) : []);
+        clearPreviewRun();
+      } catch (err) {
+        console.error("Failed to load workflow:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchWorkflow();
+    return () => {
+      cancelled = true;
+    };
+  }, [workflowId, setWorkflowId, setWorkflowName, setNodes, setEdges, clearPreviewRun, canPersistWorkflowGraph]);
+
+  /**
+   * Debounced graph persistence (~1s trailing).
+   */
+  useEffect(() => {
+    if (loading) return;
+    if (!canPersistWorkflowGraph(nodes)) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      if (!canPersistWorkflowGraph(nodesRef.current)) return;
+      const myId = ++saveGenRef.current;
+      setSavePhase("saving");
+      setSaveToastCycle((c) => c + 1);
+      try {
+        const resp = await fetch(`/api/workflows/${workflowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nodes: nodesRef.current,
+            edges: edgesRef.current,
+          }),
+        });
+        if (myId !== saveGenRef.current) return;
+        if (resp.ok) setSavePhase("saved");
+        else setSavePhase("idle");
+      } catch {
+        if (myId !== saveGenRef.current) return;
+        setSavePhase("idle");
+      }
+    }, 1000);
+    return () => {
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    };
+  }, [nodes, edges, loading, workflowId, canPersistWorkflowGraph]);
+
+  /** Bridges per-node "Run" buttons → `handleRun` in `single` scope via `CustomEvent`. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ nodeId: string }>;
+      const nodeId = customEvent.detail.nodeId;
+      if (nodeId) {
+        runWorkflow("single", [nodeId]);
+      }
+    };
+    window.addEventListener("nextflow:run-node", handler);
+    return () => window.removeEventListener("nextflow:run-node", handler);
+  }, [runWorkflow]);
+
+  /** Bridges bottom toolbar "Run selected" → `single` vs `partial` scopes based on selection cardinality. */
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent<{ nodeIds: string[] }>;
+      const nodeIds = customEvent.detail.nodeIds;
+      if (nodeIds?.length === 1) {
+        runWorkflow("single", nodeIds);
+      } else if (nodeIds?.length > 1) {
+        runWorkflow("partial", nodeIds);
+      }
+    };
+    window.addEventListener("nextflow:run-selected", handler);
+    return () => window.removeEventListener("nextflow:run-selected", handler);
+  }, [runWorkflow]);
+
+
+  /** Downloads validated export JSON (`workflowFilePayloadSchema`) after server GET `/export`. */
+  const handleExportWorkflow = useCallback(async () => {
+    if (loading) return;
+    try {
+      const resp = await fetch(`/api/workflows/${workflowId}/export`);
+      const data = await resp.json();
+      if (!resp.ok) {
+        window.alert(typeof data.error === "string" ? data.error : "Export failed");
+        return;
+      }
+      const check = workflowFilePayloadSchema.safeParse(data);
+      if (!check.success) {
+        window.alert("Export data was not in the expected format.");
+        return;
+      }
+      const { downloadJson } = await import("@/lib/utils");
+      const safeName = (workflowName || "workflow").replace(/\s+/g, "-").toLowerCase();
+      downloadJson(check.data, `${safeName}.json`);
+    } catch {
+      window.alert("Export failed");
+    }
+  }, [workflowId, workflowName, loading]);
+
+  /**
+   * Hidden file input flow → `POST /api/workflows/import` with raw JSON text; navigates to new workflow id.
+   */
+  const handleImportWorkflow = useCallback(() => {
+    if (loading) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json,.json";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      input.value = "";
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const resp = await fetch("/api/workflows/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ json: text }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+          const err = typeof data.error === "string" ? data.error : "Import failed";
+          const issues = Array.isArray(data.issues)
+            ? data.issues
+              .map((item: { path?: unknown; message?: string }) => {
+                const p = Array.isArray(item.path)
+                  ? (item.path as (string | number)[]).filter((x) => x !== "").join(".")
+                  : "";
+                return p ? `${p}: ${item.message ?? ""}` : (item.message ?? "");
+              })
+              .filter(Boolean)
+              .join("\n")
+            : "";
+          window.alert(issues ? `${err}\n\n${issues}` : err);
+          return;
+        }
+        if (data.data?.id) {
+          router.push(`/workflow/${data.data.id}`);
+        } else {
+          window.alert("Import completed but the server did not return a workflow id.");
+        }
+      } catch {
+        window.alert("Import failed");
+      }
+    };
+    input.click();
+  }, [loading, router]);
+
+  const importExportButtons = (
+    <>
+      <div className="group relative">
+        <button
+          type="button"
+          onClick={handleExportWorkflow}
+          disabled={loading}
+          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Export workflow"
+        >
+          <Download className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
+          Export workflow
+        </span>
+      </div>
+      <div className="group relative">
+        <button
+          type="button"
+          onClick={handleImportWorkflow}
+          disabled={loading}
+          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Import workflow"
+        >
+          <Upload className="h-3.5 w-3.5" aria-hidden />
+        </button>
+        <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
+          Import workflow
+        </span>
+      </div>
+    </>
+  );
+
+  const viewingPillVisual =
+    viewingPillPhase === "leaving"
+      ? viewingPillDisplayRef.current
+      : {
+          isRunning,
+          currentRunId,
+          previewRunId,
+          previewRunTimestamp,
+        };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[#F5F5F5]">
+      <WorkflowSaveToast
+        phase={savePhase}
+        enterCycle={saveToastCycle}
+        onLeaveComplete={() => setSavePhase("idle")}
+      />
+
+      {/* Left Sidebar */}
+      <LeftSidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+      />
+
+      {/* Canvas area — full height, no header strip */}
+      <div className="flex flex-1 min-w-0 overflow-hidden relative">
+        {/* Canvas fills remaining space, shrinks when history panel opens */}
+        <div className="flex flex-col flex-1 min-w-0 relative overflow-hidden h-full">
+          {loading ? (
+            <div className="flex flex-1 min-h-0 items-center justify-center bg-[#F5F5F5]">
+              <div className="flex flex-col items-center gap-3">
+                <SpinningLogo size="md" />
+                <p className="text-[13px] text-gray-500">Loading workflow...</p>
+              </div>
+            </div>
+          ) : (
+            <div className="workflow-page-canvas-enter flex flex-1 min-h-0 flex-col relative overflow-hidden">
+          <Canvas />
+
+        {/* ── Floating top-left panel — sidebar toggle (when collapsed) + back button + workflow name ── */}
+        <div className="pointer-events-none absolute left-4 top-[11px] z-50">
+          <div className="pointer-events-auto flex flex-col gap-2">
+            <div className="inline-flex items-center gap-2">
+              {/* Sidebar re-open button — only visible when sidebar is collapsed */}
+              {sidebarCollapsed && (
+                <button
+                  onClick={() => setSidebarCollapsed(false)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-[18px] border border-gray-200 bg-white shadow-md text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
+                  title="Open Sidebar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+                </button>
+              )}
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/85 px-2 py-1.5 shadow-md backdrop-blur">
+                {/* Back button */}
+                <button
+                  onClick={() => router.push("/dashboard")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 transition-colors flex-shrink-0"
+                  title="Back to Dashboard"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                </button>
+                {/* Editable workflow name */}
+                <input
+                  ref={nameInputRef}
+                  placeholder="Untitled"
+                  maxLength={120}
+                  value={isEditingName ? editNameValue : workflowName}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  onFocus={() => { setIsEditingName(true); setEditNameValue(workflowName); }}
+                  onBlur={handleNameSave}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleNameSave();
+                    if (e.key === "Escape") { setEditNameValue(workflowName); setIsEditingName(false); }
+                  }}
+                  className="h-8 w-[120px] sm:w-[160px] bg-transparent text-[14px] font-normal text-gray-900 outline-none placeholder:text-gray-400"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+          {/* ── Floating top-right — viewing run pill, Est, Bal, Run, History; Import/Export stacked under Run or under History ── */}
+          <div className="absolute top-[11px] right-4 z-10 flex items-start gap-2 pointer-events-auto">
+            <div className="flex items-center gap-2">
+            {/* Live run or history preview — white pill (live takes precedence if both were set) */}
+            {viewingPillPhase !== "hidden" && (
+              <span
+                className={cn(
+                  "inline-flex max-w-[min(100vw-8rem,18rem)] sm:max-w-none",
+                  viewingPillPhase === "leaving"
+                    ? "wf-viewing-pill--leave"
+                    : "wf-viewing-pill--enter"
+                )}
+              >
+                {viewingPillVisual.isRunning ? (
+                  <button
+                    type="button"
+                    title="Click to reconnect to live run stream"
+                    onClick={() => restoreLiveRun()}
+                    className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />
+                    <span className="shrink-0">Viewing live run</span>
+                    <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums" title={viewingPillVisual.currentRunId ?? undefined}>
+                      {viewingPillVisual.currentRunId
+                        ? viewingPillVisual.currentRunId.length > 14
+                          ? `${viewingPillVisual.currentRunId.slice(0, 8)}…`
+                          : viewingPillVisual.currentRunId
+                        : "…"}
+                    </span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-indigo-400" aria-hidden><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                  </button>
+                ) : (
+                  <span className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur">
+                    <span className="shrink-0">Viewing run</span>
+                    <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums" title={viewingPillVisual.previewRunId ?? undefined}>
+                      {viewingPillVisual.previewRunId && viewingPillVisual.previewRunId.length > 14
+                        ? `${viewingPillVisual.previewRunId.slice(0, 8)}…`
+                        : viewingPillVisual.previewRunId}
+                    </span>
+                    {viewingPillVisual.previewRunTimestamp && (
+                      <span className="hidden sm:inline shrink-0 text-gray-400 font-normal">
+                        · {formatRelativeTime(viewingPillVisual.previewRunTimestamp)}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </span>
+            )}
+            {/* Est tokens badge */}
+            <span className="hidden sm:inline-flex">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                <span className="text-gray-500">Est</span>
+                <span className="tabular-nums">~{estimateWorkflowCostDisplay()}</span>
+                <span className="text-gray-500">M</span>
+              </span>
+            </span>
+
+            {/* Bal badge */}
+            <span className="hidden sm:inline-flex">
+              <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                <span className="text-gray-500">Bal</span>
+                <span className="tabular-nums">0.00</span>
+                <span className="text-gray-500">M</span>
+              </span>
+            </span>
+            </div>
+
+            {/* Run + Import/Export when execution history panel is open */}
+            <div className="flex flex-col items-center gap-1">
+              <div className="flex items-center gap-1">
+                {/* Run / Spinner Button */}
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => !isRunning && runWorkflow("full")}
+                    disabled={isRunning}
+                    className={`flex h-8 w-9 items-center justify-center rounded-lg border shadow-sm transition-all ${
+                      isRunning 
+                        ? "border-[#818cf8] bg-[#818cf8] text-white/90 cursor-not-allowed" 
+                        : "border-[#6366f1] bg-[#6366f1] text-white hover:bg-[#4f46e5] hover:border-[#4f46e5]"
+                    }`}
+                  >
+                    {isRunning ? (
+                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                    )}
+                  </button>
+                  <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
+                    {isRunning ? "Running..." : "Run Workflow"}
+                  </span>
+                </div>
+
+                {/* Cancel Button (appears from right) */}
+                {isRunning && (
+                  <div className="group relative animate-in fade-in slide-in-from-right-2 duration-300">
+                    <button
+                      type="button"
+                      onClick={handleCancelRun}
+                      className="flex h-8 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                    </button>
+                    <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
+                      Cancel Run
+                    </span>
+                  </div>
+                )}
+              </div>
+              {isHistoryPanelOpen ? importExportButtons : null}
+            </div>
+
+            {/* Execution History + Import/Export when panel closed */}
+            {!isHistoryPanelOpen && (
+              <div className="flex flex-col items-center gap-1">
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsHistoryPanelOpen(true)}
+                    className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm transition-all hover:bg-gray-100"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  </button>
+                  <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
+                    Execution History
+                  </span>
+                </div>
+                {importExportButtons}
+              </div>
+            )}
+          </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right History Panel — flex sibling so it pushes canvas left */}
+        {isHistoryPanelOpen && (
+          <RightHistoryPanel workflowId={workflowId} />
+        )}
+      </div>
+
+      {/* Single Orchestrator SSE Subscriber — replaces the old per-node RealtimeSubscriber array */}
+      {orchestratorState && (
+        <OrchestratorSubscriber
+          orchestratorRunId={orchestratorState.orchestratorRunId}
+          publicAccessToken={orchestratorState.publicAccessToken}
+          onNodeStatesUpdate={handleNodeStatesUpdate}
+          onComplete={handleOrchestratorComplete}
+        />
+      )}
+    </div>
+  );
+}
+
+// ──── Orchestrator SSE Subscriber Component ──────────────────────────────
+
+interface OrchestratorSubscriberProps {
+  orchestratorRunId: string;
+  publicAccessToken: string;
+  onNodeStatesUpdate: (
+    nodeStates: Record<string, { status: string; output?: unknown; error?: string }>
+  ) => void;
+  onComplete: (finalStatus: string, output?: unknown) => void;
+}
+
+/**
+ * Invisible component that subscribes to the orchestrator task's SSE stream via `useRealtimeRun`.
+ * Reads `run.metadata.nodeStates` to drive canvas node states and `run.status` for completion.
+ *
+ * Replaces the entire `activeSubscribers` + `RealtimeSubscriber` + `resolversRef` pattern
+ * with a single, durable SSE connection.
+ */
+function OrchestratorSubscriber({
+  orchestratorRunId,
+  publicAccessToken,
+  onNodeStatesUpdate,
+  onComplete,
+}: OrchestratorSubscriberProps) {
+  const { run, error } = useRealtimeRun(orchestratorRunId, {
+    accessToken: publicAccessToken,
+  });
+
+  const firedCompleteRef = useRef(false);
+  const prevNodeStatesRef = useRef<string>("");
+
+  // Process metadata updates (node states)
+  useEffect(() => {
+    if (!run?.metadata) return;
+    const nodeStates = (run.metadata as Record<string, unknown>)["nodeStates"];
+    if (!nodeStates || typeof nodeStates !== "object") return;
+
+    // Only emit if changed (compare JSON to avoid re-renders)
+    const statesJson = JSON.stringify(nodeStates);
+    if (statesJson === prevNodeStatesRef.current) return;
+    prevNodeStatesRef.current = statesJson;
+
+    onNodeStatesUpdate(
+      nodeStates as Record<string, { status: string; output?: unknown; error?: string }>
+    );
+  }, [run?.metadata, onNodeStatesUpdate]);
+
+  // Handle SSE connection errors
+  useEffect(() => {
+    if (error && !firedCompleteRef.current) {
+      console.error("[OrchestratorSubscriber] SSE error:", error);
+      // Don't fire complete on transient SSE errors — the orchestrator may still be running
+    }
+  }, [error]);
+
+  // Handle orchestrator completion
+  useEffect(() => {
+    if (!run || firedCompleteRef.current) return;
+
+    // Known "still active" statuses — anything else is terminal
+    const ACTIVE_STATUSES = new Set([
+      "PENDING_VERSION", "QUEUED", "DEQUEUED", "EXECUTING", "WAITING", "DELAYED",
+    ]);
+
+    if (run.status === "COMPLETED") {
+      firedCompleteRef.current = true;
+      const finalStatus =
+        ((run.metadata as Record<string, unknown>)?.["finalStatus"] as string) ?? "success";
+      onComplete(finalStatus, run.output);
+    } else if (!ACTIVE_STATUSES.has(run.status)) {
+      // Terminal non-success: FAILED, CRASHED, CANCELED, SYSTEM_FAILURE, TIMED_OUT, EXPIRED, etc.
+      firedCompleteRef.current = true;
+      const metaStatus = ((run.metadata as Record<string, unknown>)?.["finalStatus"] as string);
+      onComplete(metaStatus || "failed", run.output);
+    }
+  }, [run, onComplete]);
+
+  return null;
+}

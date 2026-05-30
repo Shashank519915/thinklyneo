@@ -1,0 +1,312 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+:root {
+  --background: #F5F5F5;
+  --foreground: #111827;
+  --sidebar-bg: #FFFFFF;
+  --border-color: #E5E7EB;
+  --node-bg: #FFFFFF;
+  --brand-purple: #7C3AED;
+  --brand-purple-hover: #6D28D9;
+  --handle-orange: #F97316;
+  --handle-blue: #3B82F6;
+  --handle-green: #10B981;
+  --handle-pink: #EC4899;
+  --handle-amber: #F59E0B;
+  --handle-indigo: #6366F1;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+/* Node executing glow animation */
+@keyframes nodeGlow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 2px rgba(124, 58, 237, 0.5),
+      0 0 8px 2px rgba(124, 58, 237, 0.15),
+      0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(124, 58, 237, 0.7),
+      0 0 20px 6px rgba(124, 58, 237, 0.25),
+      0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+  }
+}
+
+.node-executing {
+  animation: nodeGlow 2s ease-in-out infinite !important;
+  will-change: box-shadow;
+}
+
+/* Edge animated dash */
+@keyframes edgeDash {
+  to {
+    stroke-dashoffset: -48;
+  }
+}
+
+.edge-animated {
+  animation: edgeDash 1.5s linear infinite;
+}
+
+/* Edge executing — faster dash to match node glow pulse */
+.edge-executing {
+  animation: edgeDash 0.6s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(124, 58, 237, 0.5));
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  font-family: 'Inter', system-ui, sans-serif !important;
+}
+
+/* Purple ring when a node is selected — override React Flow's default blue box-shadow */
+.react-flow__node.selected > div:first-child:not(.node-executing) {
+  box-shadow: 0 0 0 1.5px #7C3AED, 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1) !important;
+  border-color: #a78bfa !important;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease !important;
+}
+
+/* Suppress selection ring entirely when the node is locked */
+.react-flow__node.selected > div[data-locked="true"]:not(.node-executing) {
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1) !important;
+  border-color: #facc15 !important;
+}
+
+/* Locked nodes are non-draggable so React Flow removes the .draggable class (and its pointer-events:all).
+   Restore pointer events so buttons/menus inside the node still work. */
+.react-flow__node:has(> div[data-locked="true"]) {
+  pointer-events: all !important;
+}
+
+/* Smooth deselect — unselected nodes restore default shadow */
+.react-flow__node:not(.selected) > div:first-child {
+  transition: box-shadow 0.35s ease, border-color 0.35s ease !important;
+}
+
+.react-flow__handle {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  border-width: 2px !important;
+}
+
+/* Node add animation */
+@keyframes nodeAdd {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.node-add-animation {
+  animation: nodeAdd 200ms ease-out forwards;
+}
+
+/* History panel slide in */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.slide-in-right {
+  animation: slideInRight 200ms ease-out forwards;
+}
+
+/* Node picker fade + scale */
+@keyframes fadeScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.fade-scale-in {
+  animation: fadeScaleIn 150ms ease-out forwards;
+}
+
+/* React Flow background override */
+.react-flow__background {
+  background-color: #F5F5F5 !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Prevent text selection during drag */
+.react-flow__pane {
+  user-select: none;
+}
+
+/* Connected input disabled state */
+.input-connected {
+  opacity: 0.4 !important;
+  pointer-events: none !important;
+}
+
+/* Sign-in / Sign-up: content fades in when ClerkLoaded mounts */
+@keyframes authClerkLoadedIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-clerk-loaded-enter {
+  animation: authClerkLoadedIn 0.5s ease-out both;
+}
+
+/* Workflow canvas: fade/slide in when API load completes (see page.tsx) */
+.workflow-page-canvas-enter {
+  animation: authClerkLoadedIn 0.5s ease-out both;
+}
+
+/* Workflow PATCH save toast — fade + subtle vertical motion */
+@keyframes wf-save-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wf-save-fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wf-save-fade-out-reduced {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.wf-save-toast--enter {
+  animation: wf-save-fade-in 0.28s ease-out both;
+}
+
+.wf-save-toast--leave {
+  animation: wf-save-fade-out 0.28s ease-out both;
+}
+
+/* Workflow toolbar: viewing run / preview chip */
+@keyframes wf-viewing-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wf-viewing-pill-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-2px) scale(0.98);
+  }
+}
+
+.wf-viewing-pill--enter {
+  animation: wf-viewing-pill-in 0.2s ease-out both;
+}
+
+.wf-viewing-pill--leave {
+  animation: wf-viewing-pill-out 0.2s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-clerk-loaded-enter,
+  .workflow-page-canvas-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .wf-save-toast--enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .wf-save-toast--leave {
+    animation: wf-save-fade-out-reduced 0.2s ease-out both;
+  }
+
+  .wf-viewing-pill--enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .wf-viewing-pill--leave {
+    animation: wf-save-fade-out-reduced 0.15s ease-out both;
+    transform: none;
+  }
+}

@@ -1,0 +1,9 @@
+packages:
+  - "."
+  - "shared"
+
+allowBuilds:
+  "@clerk/shared": true
+  "esbuild": true
+  "protobufjs": true
+  "sharp": true
