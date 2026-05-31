@@ -759,7 +759,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <span className="text-[10px] text-gray-400 cursor-pointer select-none">
                         Upload requirements
                       </span>
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-[11px] text-gray-700 shadow-md whitespace-nowrap z-[9999] origin-top">
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 pointer-events-none scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 group-hover/tooltip:pointer-events-auto transition-all duration-200 bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-[11px] text-gray-700 shadow-md whitespace-nowrap z-[9999] origin-top">
                         Max images: 10
                       </div>
                     </div>
