@@ -103,10 +103,12 @@ interface WorkflowStore {
   edges: Edge[];
   workflowId: string | null;
   workflowName: string;
+  readOnly: boolean;
 
   // Setters
   setWorkflowId: (id: string) => void;
   setWorkflowName: (name: string) => void;
+  setReadOnly: (ro: boolean) => void;
   setNodes: (nodes: Node[]) => void;
   setEdges: (edges: Edge[]) => void;
   onNodesChange: (changes: NodeChange[]) => void;
@@ -223,9 +225,11 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   edges: [],
   workflowId: null,
   workflowName: "Untitled Workflow",
+  readOnly: false,
 
   setWorkflowId: (id) => set({ workflowId: id }),
   setWorkflowName: (name) => set({ workflowName: name }),
+  setReadOnly: (ro) => set({ readOnly: ro }),
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),

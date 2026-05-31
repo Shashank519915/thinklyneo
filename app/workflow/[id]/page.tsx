@@ -821,8 +821,8 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                 </div>
                 
                 {/* Render Canvas in non-editable mode */}
-                <div className="flex-1 w-full h-full relative overflow-hidden pointer-events-none">
-                  <Canvas />
+                <div className="flex-1 w-full h-full relative overflow-hidden">
+                  <Canvas readOnly={true} />
                 </div>
               </div>
             )}

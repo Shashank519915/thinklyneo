@@ -150,7 +150,7 @@ function RunPill({
 }
 
 /** React Flow tree with store wiring (nodes/edges, undo, select mode panning vs marquee per `selectionOnDrag`). */
-function CanvasInner() {
+function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
   const {
     nodes,
     edges,
@@ -170,8 +170,15 @@ function CanvasInner() {
     setViewportCenter,
     selectModeActive,
     setSelectModeActive,
+    setReadOnly,
   } = useWorkflowStore();
   const workflowIdStore = useWorkflowStore((s) => s.workflowId);
+
+  // Synchronize readOnly prop to Zustand store
+  useEffect(() => {
+    setReadOnly(readOnly);
+    return () => setReadOnly(false);
+  }, [readOnly, setReadOnly]);
 
   const { screenToFlowPosition, fitView } = useReactFlow();
   const [minimapOpen, setMinimapOpen] = useState(true);
@@ -346,6 +353,7 @@ function CanvasInner() {
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (readOnly) return;
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -484,7 +492,7 @@ function CanvasInner() {
         nodes={nodes}
         edges={edges}
         isValidConnection={isValidConnectionCallback}
-        onNodesChange={(changes) => {
+        onNodesChange={readOnly ? undefined : (changes) => {
           // Push history before any remove changes (Delete/Backspace key path)
           const hasRemove = changes.some(
             (c) => c.type === "remove" &&
@@ -503,8 +511,8 @@ function CanvasInner() {
           });
           onNodesChange(filtered);
         }}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onEdgesChange={readOnly ? undefined : onEdgesChange}
+        onConnect={readOnly ? undefined : onConnect}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
@@ -513,17 +521,22 @@ function CanvasInner() {
         panOnScroll
         zoomOnScroll
         // In select mode: disable pan-on-drag, enable selection rectangle on drag
-        panOnDrag={selectModeActive ? false : true}
-        selectionOnDrag={selectModeActive}
+        panOnDrag={readOnly ? true : (selectModeActive ? false : true)}
+        selectionOnDrag={readOnly ? false : selectModeActive}
         selectionMode={SelectionMode.Partial}
         onMoveEnd={updateViewportCenter}
-        onNodeDragStart={() => pushHistory()}
-        onSelectionChange={onSelectionChange}
-        deleteKeyCode={["Backspace", "Delete"]}
-        multiSelectionKeyCode="Shift"
+        onNodeDragStart={readOnly ? undefined : () => pushHistory()}
+        onSelectionChange={readOnly ? undefined : onSelectionChange}
+        deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+        multiSelectionKeyCode={readOnly ? null : "Shift"}
         fitViewOptions={{ padding: 0.1 }}
         style={{ background: "#F5F5F5" }}
         proOptions={{ hideAttribution: true }}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        elementsSelectable={!readOnly}
+        nodesFocusable={!readOnly}
+        edgesFocusable={!readOnly}
       >
         <Background
           variant={BackgroundVariant.Dots}
@@ -573,21 +586,25 @@ function CanvasInner() {
       )}
 
       {/* Bottom-left controls bar */}
-      <div className="absolute bottom-4 left-4 z-10">
-        <ControlsBar />
-      </div>
+      {!readOnly && (
+        <div className="absolute bottom-4 left-4 z-10">
+          <ControlsBar />
+        </div>
+      )}
 
       {/* Bottom-centre toolbar (sticky note + add node button) */}
-      <BottomToolbar />
+      {!readOnly && <BottomToolbar />}
 
       {/* Run N nodes pill — floats above top-left of selected nodes bounding box */}
-      <RunPill
-        selectedNodeIds={selectedNodeIds}
-        nodes={nodes}
-        isRunning={isRunning}
-        selectModeActive={selectModeActive}
-        selectionFinalized={selectionFinalized}
-      />
+      {!readOnly && (
+        <RunPill
+          selectedNodeIds={selectedNodeIds}
+          nodes={nodes}
+          isRunning={isRunning}
+          selectModeActive={selectModeActive}
+          selectionFinalized={selectionFinalized}
+        />
+      )}
 
       {/* Preview mode banner and info button are rendered in page.tsx (above the Canvas) */}
     </div>
@@ -595,10 +612,10 @@ function CanvasInner() {
 }
 
 /** Wraps `<ReactFlowProvider>` around `CanvasInner` so hooks like `useReactFlow()` resolve correctly. */
-export default function Canvas() {
+export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
   return (
     <ReactFlowProvider>
-      <CanvasInner />
+      <CanvasInner readOnly={readOnly} />
     </ReactFlowProvider>
   );
 }

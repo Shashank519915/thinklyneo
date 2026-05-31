@@ -144,7 +144,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const theme = getColorTheme(definition.color);
 
   const nodeData = data as any;
-  const { updateNodeData, deleteNode, setNodes, setEdges, edges, nodes, previewRunId, previewNodeOutputs } =
+  const { updateNodeData, deleteNode, setNodes, setEdges, edges, nodes, previewRunId, previewNodeOutputs, readOnly } =
     useWorkflowStore();
   const { isPreviewMode, isDimmed, isExecuting, output, error } = useNodePreview(id);
 
@@ -187,7 +187,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     previewRunId !== null ? { previewOutputsByNodeId: previewNodeOutputs } : undefined;
 
   const updateInput = (key: string, val: any) => {
-    if (isLocked) return;
+    if (isLocked || readOnly) return;
     if (key === "model") {
       updateNodeData(id, { model: val } as any);
     } else {
@@ -275,7 +275,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   };
 
   const handleFileUpload = async (key: string, files: FileList | null, isArray = false) => {
-    if (!files?.length || isLocked) return;
+    if (!files?.length || isLocked || readOnly) return;
     setUploadingField(key);
 
     try {
@@ -355,7 +355,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   };
 
   const removeFileValue = (key: string, indexToRemove?: number) => {
-    if (isLocked) return;
+    if (isLocked || readOnly) return;
     const currentInputs = nodeData.inputs || {};
     if (indexToRemove !== undefined) {
       const arr = [...(currentInputs[key] || [])];
@@ -383,7 +383,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       }
     }
 
-    const disabled = isLocked || isWired || requestMuteByHandle[handleId];
+    const disabled = readOnly || isLocked || isWired || requestMuteByHandle[handleId];
     const expanded = !!isExpanded[param.key];
 
     return (
@@ -426,13 +426,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.required && <span className="text-red-400 ml-0.5">*</span>}
             {param.handle && (
               <span className="ml-auto">
-                <AddToRequestToggle
-                  muted={!!requestMuteByHandle[handleId]}
-                  disabled={isLocked}
-                  onMutedChange={(m) =>
-                    setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                  }
-                />
+                {!readOnly && (
+                  <AddToRequestToggle
+                    muted={!!requestMuteByHandle[handleId]}
+                    disabled={isLocked}
+                    onMutedChange={(m) =>
+                      setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
+                    }
+                  />
+                )}
               </span>
             )}
           </div>
@@ -617,15 +619,17 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     <span className="truncate flex-1 text-xs font-mono select-all pr-8">
                       {value.startsWith("data:") ? "base64 file buffer" : value.split("/").pop()}
                     </span>
-                    <button
-                      type="button"
-                      disabled={isLocked}
-                      onClick={() => removeFileValue(param.key)}
-                      className="nodrag absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 disabled:opacity-30"
-                      title="Clear file"
-                    >
-                      <LucideIcons.Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        disabled={isLocked}
+                        onClick={() => removeFileValue(param.key)}
+                        className="nodrag absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 disabled:opacity-30"
+                        title="Clear file"
+                      >
+                        <LucideIcons.Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="relative">
@@ -694,86 +698,96 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </span>
                   
                   <div className="flex-1">
-                    <div className="relative">
-                      <button
-                        type="button"
-                        disabled={disabled || ((value as string[]) || []).length >= 10}
-                        onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
-                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                        title="Upload image"
-                      >
-                        {uploadingField === param.key ? (
-                          <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <LucideIcons.Upload className="h-3.5 w-3.5" />
-                        )}
-                        <span className="capitalize">
-                          {uploadingField === param.key ? "Uploading..." : "Upload image"}
-                        </span>
-                      </button>
-                      <input
-                        id={`file-input-${param.key}`}
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        disabled={disabled || ((value as string[]) || []).length >= 10}
-                        onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
-                      />
+                    {!readOnly ? (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                          title="Upload image"
+                        >
+                          {uploadingField === param.key ? (
+                            <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <LucideIcons.Upload className="h-3.5 w-3.5" />
+                          )}
+                          <span className="capitalize">
+                            {uploadingField === param.key ? "Uploading..." : "Upload image"}
+                          </span>
+                        </button>
+                        <input
+                          id={`file-input-${param.key}`}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
+                        />
 
-                      {/* Popover modal */}
-                      {activeUploadPopup === param.key && (
-                        <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
-                          <p className="text-xs text-gray-500 leading-normal font-normal">
-                            Add a file from your device or select one from your library
-                          </p>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
-                            onClick={() => setActiveUploadPopup(null)}
-                          >
-                            <LucideIcons.ImagePlus className="h-4 w-4" />
-                            <span>Select Asset</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
-                            onClick={() => {
-                              setActiveUploadPopup(null);
-                              const input = document.getElementById(`file-input-${param.key}`);
-                              if (input) input.click();
-                            }}
-                          >
-                            <LucideIcons.Plus className="h-4 w-4" />
-                            <span>Upload</span>
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                        {/* Popover modal */}
+                        {activeUploadPopup === param.key && (
+                          <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
+                            <p className="text-xs text-gray-500 leading-normal font-normal">
+                              Add a file from your device or select one from your library
+                            </p>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
+                              onClick={() => setActiveUploadPopup(null)}
+                            >
+                              <LucideIcons.ImagePlus className="h-4 w-4" />
+                              <span>Select Asset</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
+                              onClick={() => {
+                                setActiveUploadPopup(null);
+                                const input = document.getElementById(`file-input-${param.key}`);
+                                if (input) input.click();
+                              }}
+                            >
+                              <LucideIcons.Plus className="h-4 w-4" />
+                              <span>Upload</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      ((value as string[]) || []).length === 0 && (
+                        <div className="text-xs text-gray-400 italic">No images uploaded</div>
+                      )
+                    )}
                     
                     {/* Tooltip trigger */}
-                    <div className="relative mt-1 flex items-center gap-1 group/tooltip w-fit">
-                      <span className="inline-flex cursor-pointer">
-                        <LucideIcons.Info className="h-3 w-3 text-gray-400" />
-                      </span>
-                      <span className="text-[10px] text-gray-400 cursor-pointer select-none">
-                        Upload requirements
-                      </span>
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 pointer-events-none scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 group-hover/tooltip:pointer-events-auto transition-all duration-200 bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-[11px] text-gray-700 shadow-md whitespace-nowrap z-[9999] origin-top">
-                        Max images: 10
+                    {!readOnly && (
+                      <div className="relative mt-1 flex items-center gap-1 group/tooltip w-fit">
+                        <span className="inline-flex cursor-pointer">
+                          <LucideIcons.Info className="h-3 w-3 text-gray-400" />
+                        </span>
+                        <span className="text-[10px] text-gray-400 cursor-pointer select-none">
+                          Upload requirements
+                        </span>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 pointer-events-none scale-95 group-hover/tooltip:opacity-100 group-hover/tooltip:scale-100 group-hover/tooltip:pointer-events-auto transition-all duration-200 bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-[11px] text-gray-700 shadow-md whitespace-nowrap z-[9999] origin-top">
+                          Max images: 10
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {param.handle && (
                     <span className="mt-1">
-                      <AddToRequestToggle
-                        muted={!!requestMuteByHandle[handleId]}
-                        disabled={isLocked}
-                        onMutedChange={(m) =>
-                          setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                        }
-                      />
+                      {!readOnly && (
+                        <AddToRequestToggle
+                          muted={!!requestMuteByHandle[handleId]}
+                          disabled={isLocked}
+                          onMutedChange={(m) =>
+                            setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
+                          }
+                        />
+                      )}
                     </span>
                   )}
                 </div>
@@ -784,14 +798,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     {((value as string[]) || []).map((url, idx) => (
                       <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
                         <img src={url} alt="" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          disabled={isLocked}
-                          onClick={() => removeFileValue(param.key, idx)}
-                          className="nodrag absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 hover:bg-red-600 text-white rounded-md p-0.5 disabled:opacity-30"
-                        >
-                          <LucideIcons.X className="w-2.5 h-2.5" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            type="button"
+                            disabled={isLocked}
+                            onClick={() => removeFileValue(param.key, idx)}
+                            className="nodrag absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 hover:bg-red-600 text-white rounded-md p-0.5 disabled:opacity-30"
+                          >
+                            <LucideIcons.X className="w-2.5 h-2.5" />
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -828,18 +844,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {definition.name}
           </div>
         </div>
-        <NodeHeaderActions
-          nodeId={id}
-          description={`Execute a ${definition.name} operation inside the workflow.`}
-          isExecuting={isExecuting}
-          isLocked={isLocked}
-          onRun={handleSingleRun}
-          onReset={handleReset}
-          onLockToggle={handleLockToggle}
-          onDuplicate={handleDuplicate}
-          onDuplicateWithEdges={handleDuplicateWithEdges}
-          onDelete={() => deleteNode(id)}
-        />
+        {!readOnly && (
+          <NodeHeaderActions
+            nodeId={id}
+            description={`Execute a ${definition.name} operation inside the workflow.`}
+            isExecuting={isExecuting}
+            isLocked={isLocked}
+            onRun={handleSingleRun}
+            onReset={handleReset}
+            onLockToggle={handleLockToggle}
+            onDuplicate={handleDuplicate}
+            onDuplicateWithEdges={handleDuplicateWithEdges}
+            onDelete={() => deleteNode(id)}
+          />
+        )}
       </div>
 
       {/* Mode Toggle (GPT-Image-2 / Kling v3) */}

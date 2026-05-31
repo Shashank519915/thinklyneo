@@ -30,7 +30,7 @@ export default function RequestInputsNode({
   data,
 }: NodeProps) {
   const nodeData = data as unknown as RequestInputsData;
-  const { updateNodeData } = useWorkflowStore();
+  const { updateNodeData, readOnly } = useWorkflowStore();
   const { isPreviewMode, isDimmed, isExecuting, error, runFieldIds, output } = useNodePreview(id);
   const nodeError = error as string | null;
 
@@ -144,31 +144,33 @@ export default function RequestInputsNode({
             </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-1">
-          {/* Add field dropdown */}
-          <div className="relative group/add">
-            <button className="nodrag flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100">
-              <Plus className="w-4 h-4" />
-            </button>
-            <div className="pointer-events-none group-hover/add:pointer-events-auto absolute right-0 top-full pt-1 hidden group-hover/add:block z-50 min-w-[140px]">
-              <div className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                <button
-                  className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
-                  onMouseDown={() => addField("text_field")}
-                >
-                  + Text field
-                </button>
-                <button
-                  className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
-                  onMouseDown={() => addField("image_field")}
-                >
-                  + Image field
-                </button>
+        
+        {!readOnly && (
+          <div className="flex items-center gap-1">
+            {/* Add field dropdown */}
+            <div className="relative group/add">
+              <button className="nodrag flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100">
+                <Plus className="w-4 h-4" />
+              </button>
+              <div className="pointer-events-none group-hover/add:pointer-events-auto absolute right-0 top-full pt-1 hidden group-hover/add:block z-50 min-w-[140px]">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  <button
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                    onMouseDown={() => addField("text_field")}
+                  >
+                    + Text field
+                  </button>
+                  <button
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50"
+                    onMouseDown={() => addField("image_field")}
+                  >
+                    + Image field
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Error state */}
@@ -206,11 +208,13 @@ export default function RequestInputsNode({
             <div className="w-full">
               {/* Field label row */}
               <div className="mb-2 flex w-full items-center gap-2">
-                <div className="nodrag cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing">
-                  <GripVertical className="w-3.5 h-3.5" />
-                </div>
+                {!readOnly && (
+                  <div className="nodrag cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing">
+                    <GripVertical className="w-3.5 h-3.5" />
+                  </div>
+                )}
 
-                {editingFieldId === field.id ? (
+                {editingFieldId === field.id && !readOnly ? (
                   <input
                     autoFocus
                     type="text"
@@ -225,46 +229,51 @@ export default function RequestInputsNode({
                   />
                 ) : (
                   <span
-                    className="group/label flex min-w-0 flex-1 items-center gap-1 text-[12px] font-medium text-gray-900 cursor-pointer"
+                    className={`group/label flex min-w-0 flex-1 items-center gap-1 text-[12px] font-medium text-gray-900 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
                     title={field.label}
+                    onClick={() => !readOnly && startEditLabel(field)}
                   >
                     <span className="truncate">{field.label}</span>
-                    <Pencil
-                      className="w-3 h-3 shrink-0 opacity-0 group-hover/label:opacity-100 text-gray-400"
-                    />
+                    {!readOnly && (
+                      <Pencil
+                        className="w-3 h-3 shrink-0 opacity-0 group-hover/label:opacity-100 text-gray-400"
+                      />
+                    )}
                   </span>
                 )}
 
-                <div className="ml-auto flex items-center gap-1">
-                  <button
-                    className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    title="Edit label"
-                    onClick={() => startEditLabel(field)}
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
-                    title="Delete"
-                    onClick={() => removeField(field.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+                {!readOnly && (
+                  <div className="ml-auto flex items-center gap-1">
+                    <button
+                      className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      title="Edit label"
+                      onClick={() => startEditLabel(field)}
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
+                      title="Delete"
+                      onClick={() => removeField(field.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Field input */}
               {field.type === "text_field" ? (
                 <div className="relative">
                   <textarea
-                    placeholder="Enter text..."
+                    placeholder={readOnly ? "No text configured" : "Enter text..."}
                     rows={3}
                     value={isPreviewMode ? (getFieldDisplayValue(field) ?? "") : (field.value ?? "")}
-                    readOnly={isPreviewMode}
-                    onChange={(e) => !isPreviewMode && updateField(field.id, { value: e.target.value })}
-                    className={`nodrag nowheel w-full min-w-0 resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-[#7C3AED] focus:shadow-[0_0_0_1px_#7C3AED] ${isPreviewMode ? "cursor-default" : ""}`}
+                    readOnly={isPreviewMode || readOnly}
+                    onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })}
+                    className={`nodrag nowheel w-full min-w-0 resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-[#7C3AED] focus:shadow-[0_0_0_1px_#7C3AED] ${isPreviewMode || readOnly ? "cursor-default resize-none" : ""}`}
                   />
-                  {!isPreviewMode && (
+                  {!isPreviewMode && !readOnly && (
                     <button
                       type="button"
                       className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 hover:bg-gray-300"
@@ -288,7 +297,8 @@ export default function RequestInputsNode({
                           style={{ width: 80, height: 60 }}
                         />
                         {/* Only show replace/remove in edit mode */}
-                        {!isPreviewMode && (
+                         {/* Only show replace/remove in edit mode */}
+                        {!isPreviewMode && !readOnly && (
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1.5">
                             {/* Replace button */}
                             <label
@@ -314,7 +324,7 @@ export default function RequestInputsNode({
                           </div>
                         )}
                       </div>
-                    ) : !isPreviewMode ? (
+                    ) : !isPreviewMode && !readOnly ? (
                       <label className="nodrag flex flex-col items-center justify-center gap-1.5 w-full h-20 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] transition-colors cursor-pointer">
                         <Upload className="w-4 h-4 text-gray-400" />
                         <span className="text-[12px] text-gray-400">

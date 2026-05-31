@@ -32,6 +32,7 @@ export default function ResponseNode({ id, data }: NodeProps) {
     nodeErrors,
     previewNodeOutputs,
     previewNodeErrors,
+    readOnly,
   } = useWorkflowStore();
   const { isPreviewMode, isDimmed, isExecuting, output, error } = useNodePreview(id);
   const nodeError = error as string | null;
@@ -140,23 +141,27 @@ export default function ResponseNode({ id, data }: NodeProps) {
                   >
                     {result.label}
                   </span>
-                  <button
-                    className="nodrag flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-                    title="Rename"
-                    onClick={() => {
-                      const newLabel = prompt("Rename result slot:", result.label);
-                      if (newLabel?.trim()) updateResultLabel(result.id, newLabel.trim());
-                    }}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                  <button
-                    className="nodrag flex-shrink-0 rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-500"
-                    title="Disconnect"
-                    onClick={() => removeResult(result.id)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        className="nodrag flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                        title="Rename"
+                        onClick={() => {
+                          const newLabel = prompt("Rename result slot:", result.label);
+                          if (newLabel?.trim()) updateResultLabel(result.id, newLabel.trim());
+                        }}
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button
+                        className="nodrag flex-shrink-0 rounded p-1 text-gray-400 hover:bg-red-100 hover:text-red-500"
+                        title="Disconnect"
+                        onClick={() => removeResult(result.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Output display */}
@@ -216,22 +221,24 @@ export default function ResponseNode({ id, data }: NodeProps) {
           })}
           
           {/* Default drop zone for new connections */}
-          <div className="relative overflow-visible mt-3">
-            <Handle
-              type="target"
-              position={Position.Left}
-              id="result"
-              style={{
-                background: "#E5E7EB",
-                border: "2px solid #9CA3AF",
-                width: 14,
-                height: 14,
-                left: -21,
-                top: 10,
-              }}
-            />
-            <div className="text-[12px] text-gray-500 italic pl-2 py-1">Drop edge here to add field...</div>
-          </div>
+          {!readOnly && (
+            <div className="relative overflow-visible mt-3">
+              <Handle
+                type="target"
+                position={Position.Left}
+                id="result"
+                style={{
+                  background: "#E5E7EB",
+                  border: "2px solid #9CA3AF",
+                  width: 14,
+                  height: 14,
+                  left: -21,
+                  top: 10,
+                }}
+              />
+              <div className="text-[12px] text-gray-500 italic pl-2 py-1">Drop edge here to add field...</div>
+            </div>
+          )}
         </div>
       </div>
     </div>
