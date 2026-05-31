@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
@@ -155,6 +155,23 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState<Record<string, boolean>>({});
+  const [activeUploadPopup, setActiveUploadPopup] = useState<string | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeUploadPopup && !activeDropdown) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (activeUploadPopup && !target.closest(".upload-popup-container")) {
+        setActiveUploadPopup(null);
+      }
+      if (activeDropdown && !target.closest(".custom-select-container")) {
+        setActiveDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [activeUploadPopup, activeDropdown]);
 
   const hasModeTab = type === "gptImage2" || type === "klingV3";
   const modeLabels = type === "gptImage2" ? ["Text to Image", "Image to Image"] : ["Text to Video", "Image to Video"];
@@ -529,23 +546,54 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             )}
 
             {param.type === "select" && (
-              <div className="relative">
-                <select
-                  value={value || (nodeData[param.key] ?? "")}
-                  onChange={(e) => updateInput(param.key, e.target.value)}
+              <div className="relative custom-select-container">
+                <button
+                  type="button"
                   disabled={disabled}
-                  className="nodrag nowheel w-full h-10 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 appearance-none pr-10 cursor-pointer"
+                  onClick={() => setActiveDropdown(activeDropdown === param.key ? null : param.key)}
+                  className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer"
                 >
-                  <option value="" disabled>Select option...</option>
-                  {param.options?.map((opt: any) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                  <LucideIcons.ChevronDown className="h-4 w-4 text-gray-500 opacity-50" aria-hidden="true" />
-                </div>
+                  <span className="truncate">
+                    {param.options?.find((opt: any) => opt.value === value)?.label || value || "Select option..."}
+                  </span>
+                  <LucideIcons.ChevronDown className="h-4 w-4 text-gray-500 opacity-50 shrink-0" aria-hidden="true" />
+                </button>
+
+                {/* Dropdown Menu Popup */}
+                {activeDropdown === param.key && (
+                  <div className="absolute left-0 top-full mt-1.5 z-50 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl text-left">
+                    {param.key === "size" && (
+                      <div className="text-[10px] text-gray-400 font-semibold px-4 py-1.5 uppercase tracking-wider select-none">
+                        Custom
+                      </div>
+                    )}
+                    <div className="max-h-[260px] overflow-y-auto nowheel flex flex-col gap-0.5">
+                      {param.options?.map((opt: any) => {
+                        const isSelected = opt.value === value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              updateInput(param.key, opt.value);
+                              setActiveDropdown(null);
+                            }}
+                            className={`flex items-center gap-1.5 w-full px-3 py-2 text-[13px] font-medium transition-colors rounded-xl text-left ${
+                              isSelected
+                                ? "bg-gray-100/60 text-gray-900"
+                                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                              {isSelected && <LucideIcons.Check className="w-3.5 h-3.5 text-gray-900 stroke-[2.5]" />}
+                            </span>
+                            <span className="truncate">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -580,21 +628,58 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     </button>
                   </div>
                 ) : (
-                  <label className={`nodrag flex min-h-[2.5rem] items-center justify-center gap-2 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] px-3 text-[12px] text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
-                    {uploadingField === param.key ? (
-                      <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <LucideIcons.Upload className="w-3.5 h-3.5" />
-                    )}
-                    <span>{uploadingField === param.key ? "Uploading..." : `Upload ${param.label.toLowerCase()}`}</span>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                    >
+                      {uploadingField === param.key ? (
+                        <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <LucideIcons.Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span>{uploadingField === param.key ? "Uploading..." : `Upload ${param.label.toLowerCase()}`}</span>
+                    </button>
                     <input
+                      id={`file-input-${param.key}`}
                       type="file"
-                      disabled={isLocked}
+                      disabled={disabled}
                       accept={param.key.includes("image") ? "image/*" : param.key.includes("video") ? "video/*" : param.key.includes("audio") ? "audio/*" : "*"}
-                      className="sr-only"
+                      className="hidden"
                       onChange={(e) => void handleFileUpload(param.key, e.target.files)}
                     />
-                  </label>
+
+                    {/* Popover modal */}
+                    {activeUploadPopup === param.key && (
+                      <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
+                        <p className="text-xs text-gray-500 leading-normal font-normal">
+                          Add a file from your device or select one from your library
+                        </p>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
+                          onClick={() => setActiveUploadPopup(null)}
+                        >
+                          <LucideIcons.ImagePlus className="h-4 w-4" />
+                          <span>Select Asset</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
+                          onClick={() => {
+                            setActiveUploadPopup(null);
+                            const input = document.getElementById(`file-input-${param.key}`);
+                            if (input) input.click();
+                          }}
+                        >
+                          <LucideIcons.Plus className="h-4 w-4" />
+                          <span>Upload</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -613,10 +698,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <button
                         type="button"
                         disabled={disabled || ((value as string[]) || []).length >= 10}
-                        onClick={() => {
-                          const input = document.getElementById(`file-input-${param.key}`);
-                          if (input) input.click();
-                        }}
+                        onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
                         className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                         title="Upload image"
                       >
@@ -638,6 +720,35 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         disabled={disabled || ((value as string[]) || []).length >= 10}
                         onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
                       />
+
+                      {/* Popover modal */}
+                      {activeUploadPopup === param.key && (
+                        <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
+                          <p className="text-xs text-gray-500 leading-normal font-normal">
+                            Add a file from your device or select one from your library
+                          </p>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
+                            onClick={() => setActiveUploadPopup(null)}
+                          >
+                            <LucideIcons.ImagePlus className="h-4 w-4" />
+                            <span>Select Asset</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
+                            onClick={() => {
+                              setActiveUploadPopup(null);
+                              const input = document.getElementById(`file-input-${param.key}`);
+                              if (input) input.click();
+                            }}
+                          >
+                            <LucideIcons.Plus className="h-4 w-4" />
+                            <span>Upload</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Tooltip trigger */}
@@ -648,7 +759,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <span className="text-[10px] text-gray-400 cursor-pointer select-none">
                         Upload requirements
                       </span>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-[11px] text-gray-700 shadow-lg whitespace-nowrap z-[9999]">
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 pointer-events-none scale-95 group-hover:opacity-100 group-hover:scale-100 group-hover:pointer-events-auto transition-all duration-200 bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-[11px] text-gray-700 shadow-md whitespace-nowrap z-[9999] origin-top">
                         Max images: 10
                       </div>
                     </div>
