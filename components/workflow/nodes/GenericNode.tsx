@@ -374,14 +374,23 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const value = nodeData.inputs?.[param.key] ?? param.defaultValue ?? "";
 
     // Hide inputImage and uploadedImages if mode is text
-    if ((param.key === "inputImage" || param.key === "uploadedImages") && modeTab === "text") return null;
+    if ((param.key === "inputImage" || param.key === "uploadedImages") && hasModeTab && modeTab === "text") return null;
 
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
     if (isWired) {
-      const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
-      if (inboundEdge) {
-        wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
+      if (param.type === "image-array") {
+        const inboundEdges = (edges ?? []).filter((e) => e.target === id && e.targetHandle === handleId);
+        if (inboundEdges.length > 0) {
+          wiredValue = inboundEdges
+            .map((e) => resolvePropagatedEdgeValue(e, nodes ?? [], edgeResolveOpts))
+            .filter((v) => v !== undefined && v !== null);
+        }
+      } else {
+        const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
+        if (inboundEdge) {
+          wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
+        }
       }
     }
 
@@ -448,7 +457,34 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
               Connected upstream
             </p>
-            {param.type === "file-upload" || param.type === "image-array" ? (
+            {param.type === "image-array" ? (
+              Array.isArray(wiredValue) && wiredValue.length > 0 ? (
+                <div className="flex flex-col gap-2 mt-1">
+                  <div className="flex flex-wrap gap-2">
+                    {wiredValue.map((url, idx) => (
+                      <div key={idx} className="relative w-12 h-12 border border-gray-200 rounded overflow-hidden bg-white">
+                        <img src={String(url)} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
+                    {wiredValue.map((url, idx) => (
+                      <a
+                        key={idx}
+                        href={String(url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="truncate text-[10px] text-blue-500 hover:underline font-mono"
+                      >
+                        {String(url)}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <span className="italic text-xs">Waiting for images...</span>
+              )
+            ) : param.type === "file-upload" ? (
               wiredValue ? (
                 <div className="flex items-center gap-2 mt-1">
                   {typeof wiredValue === "string" && (wiredValue.startsWith("http") || wiredValue.startsWith("data:image")) ? (

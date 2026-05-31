@@ -200,9 +200,22 @@ function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" |
   if (nr.output !== null && nr.output !== undefined) {
     const imgUrl = extractDisplayableImageUrl(nr.output);
     if (imgUrl) return { text: "[Image output]", kind: "ok" };
-    const s = typeof nr.output === "string" ? nr.output : JSON.stringify(nr.output);
-    if (looksLikeOpaquePayload(s)) return { text: "[Output hidden — large/binary]", kind: "ok" };
-    const t = s.length > 100 ? `${s.slice(0, 100)}…` : s;
+    
+    let rawText = "";
+    if (typeof nr.output === "object" && !Array.isArray(nr.output) && nr.output !== null) {
+      const obj = nr.output as Record<string, unknown>;
+      const keys = Object.keys(obj);
+      if (keys.length === 1 && typeof obj[keys[0]] === "string") {
+        rawText = obj[keys[0]] as string;
+      } else {
+        rawText = JSON.stringify(nr.output);
+      }
+    } else {
+      rawText = typeof nr.output === "string" ? nr.output : JSON.stringify(nr.output);
+    }
+    
+    if (looksLikeOpaquePayload(rawText)) return { text: "[Output hidden — large/binary]", kind: "ok" };
+    const t = rawText.length > 100 ? `${rawText.slice(0, 100)}…` : rawText;
     return { text: t, kind: "ok" };
   }
   return { text: "—", kind: "empty" };

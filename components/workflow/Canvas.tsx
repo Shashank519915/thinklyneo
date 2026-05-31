@@ -37,6 +37,7 @@ const nodeTypes = {
   requestInputs: RequestInputsNode,
   cropImage: GenericNode,
   gemini: GenericNode,
+  openRouter: GenericNode,
   gptImage2: GenericNode,
   klingV3: GenericNode,
   mergeVideo: GenericNode,
@@ -57,6 +58,7 @@ function getNodeColor(type: string | undefined): string {
     case "cropImage":
       return "#F97316";
     case "gemini":
+    case "openRouter":
       return "#3B82F6";
     case "gptImage2":
       return "#A855F7";
