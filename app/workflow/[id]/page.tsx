@@ -1,1032 +1,836 @@
 "use client";
 
-/**
- * @fileoverview `/workflow/[id]` client page: loads/persists graph JSON, debounced autosave,
- * wires server-orchestrated DAG execution via single Trigger.dev SSE stream,
- * export/import, and history/preview chrome.
- *
- * Architecture v2 (Server-Orchestrated):
- * - handleRun → POST /api/workflows/[id]/execute → gets orchestratorRunId + token
- * - OrchestratorSubscriber component subscribes to orchestrator's metadata via useRealtimeRun
- * - metadata.nodeStates drives canvas node states (running, completed, failed, skipped)
- * - On refresh: reads orchestratorRunId from history API → re-subscribes to same SSE
- */
-
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useWorkflowStore } from "@/store/workflow-store";
+import {
+  ArrowLeft,
+  Play,
+  Clock,
+  Search,
+  Copy,
+  Check,
+  ChevronDown,
+  Terminal,
+  ExternalLink,
+  Lock,
+} from "lucide-react";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
-import RightHistoryPanel from "@/components/workflow/RightHistoryPanel";
-import Canvas from "@/components/workflow/Canvas";
-import { type Node, type Edge } from "@xyflow/react";
-import { Download, Upload } from "lucide-react";
-import { cn, formatRelativeTime } from "@/lib/utils";
-import { workflowFilePayloadSchema } from "@/lib/validation";
-import { SpinningLogo } from "@/components/SpinningLogo";
-import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
-import WorkflowSaveToast, {
-  type WorkflowSaveToastPhase,
-} from "@/components/workflow/WorkflowSaveToast";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
+import { formatRelativeTime } from "@/lib/utils";
+import { SpinningLogo } from "@/components/SpinningLogo";
+import Canvas from "@/components/workflow/Canvas";
+import { useWorkflowStore } from "@/store/workflow-store";
+import { type Node, type Edge } from "@xyflow/react";
 
-/**
- * Primary workflow editor route: synchronises React Flow graph with Neon via PATCH,
- * triggers server-side orchestrated DAG execution, and surfaces save / run / preview affordances.
- */
-export default function WorkflowPage() {
+interface NodeRunItem {
+  id: string;
+  nodeId: string;
+  nodeName: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  inputs: any;
+  output: any;
+  error: string | null;
+  providerUsed: string | null;
+  creditCost: number | null;
+}
+
+interface WorkflowRunItem {
+  id: string;
+  scope: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  durationMs: number | null;
+  orchestratorRunId: string | null;
+  inputValues: any;
+  nodeRuns: NodeRunItem[];
+}
+
+function renderHighlightedCode(code: string) {
+  const lines = code.split("\n");
+  return lines.map((line, index) => {
+    let html = line
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    
+    let comment = "";
+    if (html.includes("#")) {
+      const idx = html.indexOf("#");
+      comment = `<span class="italic text-muted-foreground">${html.substring(idx)}</span>`;
+      html = html.substring(0, idx);
+    } else if (html.includes("//")) {
+      const idx = html.indexOf("//");
+      comment = `<span class="italic text-muted-foreground">${html.substring(idx)}</span>`;
+      html = html.substring(0, idx);
+    }
+    
+    html = html.replace(/(["'`])(.*?)\1/g, (match) => {
+      return `<span class="text-emerald-600 dark:text-emerald-400">${match}</span>`;
+    });
+
+    const keywords = [
+      "import", "time", "json", "requests", "def", "while", "True", "False", "return", "elif", "if", "in", "raise", "Exception", "print", "const", "let", "async", "await", "function", "require", "curl", "headers", "POST", "GET"
+    ];
+    keywords.forEach((keyword) => {
+      const regex = new RegExp(`\\b${keyword}\\b`, "g");
+      html = html.replace(regex, `<span class="text-violet-600 dark:text-violet-400">${keyword}</span>`);
+    });
+
+    const finalHtml = html + comment;
+
+    return (
+      <div key={index} className="flex">
+        <span className="inline-block w-10 shrink-0 select-none pr-4 text-right text-muted-foreground/40">
+          {index + 1}
+        </span>
+        <span className="text-foreground" dangerouslySetInnerHTML={{ __html: finalHtml || "&nbsp;" }} />
+      </div>
+    );
+  });
+}
+
+export default function WorkflowWorkspacePage() {
   const params = useParams();
   const router = useRouter();
   const workflowId = params.id as string;
 
-  const {
-    setNodes,
-    setEdges,
-    setWorkflowId,
-    setWorkflowName,
-    nodes,
-    edges,
-    isHistoryPanelOpen,
-    setIsHistoryPanelOpen,
-    isRunning,
-    setIsRunning,
-    setCurrentRunId,
-    currentRunId,
-    setNodeExecuting,
-    setNodeOutput,
-    setNodeError,
-    clearExecutionState,
-    addRunHistory,
-    setCurrentRunScope,
-    nodeOutputs,
-    selectedNodeIds,
-    updateNodeData,
-    workflowName,
-    clearPreviewRun,
-    previewRunId,
-    previewRunTimestamp,
-    clearCanvasNodeData,
-  } = useWorkflowStore();
-
+  const [activeTab, setActiveTab] = useState<"playground" | "api" | "workflow">("playground");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(workflowName);
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
-  const nodesRef = useRef(nodes);
-  const edgesRef = useRef(edges);
-  const saveGenRef = useRef(0);
-  const reconciliationTriggeredRef = useRef(false);
-  // Synchronous mutex — prevents double-click / concurrent run starts before setIsRunning(true) re-renders
-  const isRunningRef = useRef(false);
+  const [workflow, setWorkflow] = useState<any>(null);
+  const [runs, setRuns] = useState<WorkflowRunItem[]>([]);
+  const [selectedRun, setSelectedRun] = useState<WorkflowRunItem | null>(null);
 
-  const [savePhase, setSavePhase] = useState<WorkflowSaveToastPhase>("idle");
-  const [saveToastCycle, setSaveToastCycle] = useState(0);
+  // Playground form state
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const [estimatedCost, setEstimatedCost] = useState(0.25);
 
-  // ──── Credits & Balance state ────────────────────────────────────
-  const [balance, setBalance] = useState<number | null>(null);
+  // History filtering
+  const [runFilter, setRunFilter] = useState<"ui" | "api">("ui");
+  const [historySearch, setHistorySearch] = useState("");
 
-  const fetchBalance = useCallback(async () => {
-    try {
-      const resp = await fetch("/api/credits/balance");
-      const data = await resp.json();
-      if (data.balance !== undefined) {
-        setBalance(data.balance);
-      }
-    } catch (err) {
-      console.error("Failed to fetch balance:", err);
-    }
-  }, []);
+  // Code snippet dropdown
+  const [codeLanguage, setCodeLanguage] = useState<"python" | "nodejs" | "curl">("python");
+  const [copiedCode, setCopiedCode] = useState(false);
 
-  useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
-
-  useEffect(() => {
-    const handleRefresh = () => {
-      fetchBalance();
-    };
-    window.addEventListener("nextflow:refresh-history", handleRefresh);
-    return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
-  }, [fetchBalance]);
-
-  // ──── Server-Orchestrated Execution State ────────────────────────
-  // Instead of per-node SSE subscribers, we have a SINGLE orchestrator subscription
+  // Execution states
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [orchestratorState, setOrchestratorState] = useState<{
     orchestratorRunId: string;
     publicAccessToken: string;
   } | null>(null);
 
-  /**
-   * Triggers a server-side orchestrated DAG execution.
-   * Calls POST /api/workflows/[id]/execute which creates the run and starts the orchestrator.
-   * Returns { runId, orchestratorRunId, publicAccessToken } for SSE subscription.
-   */
-  const handleRun = useCallback(
-    async (scope: "full" | "single" | "partial", targetIds?: string[]) => {
-      if (isRunning || isRunningRef.current) return;
-      isRunningRef.current = true;
+  // Load Canvas workspace data for the readonly Workflow Tab
+  const { setNodes, setEdges, setWorkflowId, setWorkflowName } = useWorkflowStore();
 
-      // Exit any active preview before starting a new run
-      clearPreviewRun();
-      clearExecutionState();
-      clearCanvasNodeData();
-      setIsRunning(true);
-      setCurrentRunScope(scope);
-
-      // Collect input values from Request-Inputs node
-      const inputValues: Record<string, unknown> = {};
-      const requestNode = nodesRef.current.find((n) => n.type === "requestInputs");
-      if (requestNode) {
-        const fields = (
-          requestNode.data as { fields?: Array<{ id: string; value: unknown }> }
-        ).fields ?? [];
-        for (const f of fields) {
-          inputValues[f.id] = f.value;
-        }
-      }
-
-      let existingOutputs = {};
-      if (scope === "single" || scope === "partial") {
-        existingOutputs = useWorkflowStore.getState().nodeOutputs;
-      }
-
-      try {
-        const resp = await fetch(`/api/workflows/${workflowId}/execute`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scope, inputValues, nodeIds: targetIds, existingOutputs }),
-        });
-
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({ error: "Execute failed" }));
-          console.error("[NextFlow] Execute API error:", errData.error);
-          window.alert(errData.error || "Execute failed");
-          isRunningRef.current = false;
-          setIsRunning(false);
-          setCurrentRunScope(null);
-          return;
-        }
-
-        const data = await resp.json();
-        const { runId, orchestratorRunId, publicAccessToken } = data.data ?? {};
-
-        if (!runId || !orchestratorRunId || !publicAccessToken) {
-          console.error("[NextFlow] Missing execute response data:", data);
-          isRunningRef.current = false;
-          setIsRunning(false);
-          setCurrentRunScope(null);
-          return;
-        }
-
-        setCurrentRunId(runId);
-        setOrchestratorState({ orchestratorRunId, publicAccessToken });
-        fetchBalance(); // Refresh balance immediately to reflect the hold
-
-        console.log(`[NextFlow] Run ${runId} started. Orchestrator: ${orchestratorRunId}`);
-      } catch (err) {
-        console.error("[NextFlow] Execute failed:", err);
-        isRunningRef.current = false;
-        setIsRunning(false);
-        setCurrentRunScope(null);
-      }
-    },
-    [isRunning, workflowId, clearPreviewRun, clearExecutionState, clearCanvasNodeData, setIsRunning, setCurrentRunId, setCurrentRunScope]
-  );
-
-  const handleCancelRun = useCallback(async () => {
-    if (!isRunning) return;
+  const fetchWorkflow = useCallback(async () => {
     try {
-      const resp = await fetch(`/api/workflows/${workflowId}/cancel`, {
-        method: "POST",
-      });
-      if (resp.ok) {
-        console.log("[NextFlow] Run cancelled successfully.");
-        // The orchestrator stream will likely close automatically, 
-        // but we can proactively clear the local state just in case.
-        isRunningRef.current = false;
-        setIsRunning(false);
-        setCurrentRunId(null);
-        setCurrentRunScope(null);
-        setOrchestratorState(null);
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+      const resp = await fetch(`/api/workflows/${workflowId}`);
+      const data = await resp.json();
+      if (data.data) {
+        setWorkflow(data.data);
+        setWorkflowId(workflowId);
+        setWorkflowName(data.data.name);
+        
+        // Populates Zustand store for the read-only Canvas view
+        setNodes(data.data.nodes || []);
+        setEdges(data.data.edges || []);
+
+        // Load input fields from Request-Inputs node
+        const requestNode = (data.data.nodes || []).find((n: any) => n.type === "requestInputs");
+        if (requestNode) {
+          const fields = requestNode.data?.fields || [];
+          const initialVals: Record<string, string> = {};
+          fields.forEach((f: any) => {
+            initialVals[f.id] = f.value || "";
+          });
+          setInputValues(initialVals);
+        }
+
+        // Calculate estimated cost
+        let est = 0;
+        (data.data.nodes || []).forEach((n: any) => {
+          if (n.type === "gemini" || n.type === "gptImage2") est += 1.0;
+          if (n.type === "klingV3") est += 2.0;
+        });
+        setEstimatedCost(est || 0.25);
       }
     } catch (err) {
-      console.error("[NextFlow] Cancel failed:", err);
+      console.error("Failed to fetch workflow details:", err);
     }
-  }, [isRunning, workflowId, setIsRunning, setCurrentRunId, setCurrentRunScope]);
+  }, [workflowId, setNodes, setEdges, setWorkflowId, setWorkflowName]);
 
-  // Alias for event handler compatibility
-  const runWorkflow = handleRun;
-
-  /**
-   * Called by OrchestratorSubscriber when orchestrator metadata updates with new node states.
-   * Diffs against previous states to emit targeted state changes to Zustand.
-   */
-  /**
-   * Called by OrchestratorSubscriber when orchestrator metadata updates with new node states.
-   * Diffs against previous states to emit targeted state changes to Zustand.
-   */
-  const handleNodeStatesUpdate = useCallback(
-    (nodeStates: Record<string, { status: string; output?: unknown; error?: string }>) => {
-      for (const [nodeId, state] of Object.entries(nodeStates)) {
-        switch (state.status) {
-          case "running":
-            setNodeExecuting(nodeId, true);
-            break;
-          case "completed":
-            setNodeExecuting(nodeId, false);
-            setNodeOutput(nodeId, state.output);
-            // Update node data for canvas preview
-            if (typeof state.output === "string") {
-              updateNodeData(nodeId, { output: state.output, error: null } as any);
-            } else {
-              // Check if response node to write structured output to result.value
-              const node = nodesRef.current.find((n) => n.id === nodeId);
-              if (node?.type === "response" && state.output && typeof state.output === "object") {
-                const currentResults = (node.data as any).results || [];
-                const updatedResults = currentResults.map((r: any) => ({
-                  ...r,
-                  value: (state.output as Record<string, unknown>)[r.id] ?? null,
-                }));
-                updateNodeData(nodeId, { results: updatedResults, error: null } as any);
-              } else {
-                updateNodeData(nodeId, { error: null } as any);
-              }
-            }
-            break;
-          case "failed":
-            setNodeExecuting(nodeId, false);
-            setNodeError(nodeId, state.error ?? "Unknown error");
-            updateNodeData(nodeId, { error: state.error ?? "Unknown error" } as any);
-            break;
-          case "skipped":
-            setNodeExecuting(nodeId, false);
-            setNodeError(nodeId, state.error ?? "Skipped due to upstream failure");
-            updateNodeData(nodeId, { error: state.error ?? "Skipped due to upstream failure" } as any);
-            break;
-          case "pending":
-            // No action needed
-            break;
-        }
-      }
-    },
-    [setNodeExecuting, setNodeOutput, setNodeError, updateNodeData]
-  );
-
-  /**
-   * Called by OrchestratorSubscriber when the orchestrator task completes (COMPLETED/FAILED/CRASHED).
-   * Finalizes local state and refreshes history.
-   */
-  const handleOrchestratorComplete = useCallback(
-    (finalStatus: string, output?: unknown) => {
-      const completedRunId = currentRunId; // capture before clearing
-      isRunningRef.current = false;
-      setIsRunning(false);
-      setCurrentRunId(null);
-      setCurrentRunScope(null);
-      setOrchestratorState(null);
-
-      // Clear canvas execution state (stop all pulsation)
-      clearExecutionState();
-
-      if (completedRunId && finalStatus === "failed") {
-        console.warn(`[NextFlow] Orchestrator failed/crashed. Reconciling run ${completedRunId}...`);
-        fetch(`/api/workflows/${workflowId}/runs/${completedRunId}/reconcile`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ finalStatus: "failed" }),
-        })
-          .then(() => {
-            window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-          })
-          .catch((err) => console.error("[NextFlow] Reconcile failed:", err));
-      }
-
-      // Auto-arrange and refresh history
-      requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent("nextflow:auto-arrange"));
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-      });
-    },
-    [workflowId, currentRunId, setIsRunning, setCurrentRunId, setCurrentRunScope, clearExecutionState]
-  );
-
-
-
-  /**
-   * Mount-time restore: detects any run still marked `running` in the DB and re-subscribes
-   * to the orchestrator's SSE stream. No DAG re-execution needed — the orchestrator handles it all.
-   */
-  const restoreLiveRun = useCallback(async () => {
+  const fetchHistory = useCallback(async () => {
     try {
-      const historyResp = await fetch(`/api/workflows/${workflowId}/history`);
-      const historyData = await historyResp.json();
-      const runsList: Array<{
-        id: string;
-        scope: string;
-        status: string;
-        orchestratorRunId: string | null;
-        startedAt: string;
-        nodeRuns: Array<{
-          nodeId: string;
-          nodeName: string;
-          status: string;
-          output: unknown;
-          error?: string | null;
-        }>;
-      }> = historyData.data ?? [];
-
-      const runningRun = runsList.find((r) => r.status === "running");
-      if (!runningRun) return;
-
-      if (!runningRun.orchestratorRunId) {
-        // Legacy run without orchestrator — finalize it
-        console.log(`[NextFlow] Run ${runningRun.id} has no orchestrator — finalizing.`);
-        try {
-          await fetch(`/api/workflows/${workflowId}/node-runs`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              runId: runningRun.id,
-              nodeRuns: [],
-              finalStatus: "partial",
-            }),
-          });
-        } catch {}
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-        return;
-      }
-
-      console.log(
-        `[NextFlow] Active run found: ${runningRun.id}. Restoring SSE to orchestrator ${runningRun.orchestratorRunId}...`
-      );
-
-      // Hydrate completed node outputs into canvas
-      for (const nr of runningRun.nodeRuns) {
-        if (nr.status === "success" && nr.output !== null && nr.output !== undefined) {
-          let resolvedOutput: unknown = nr.output;
-          if (nr.output && typeof nr.output === "object") {
-            const o = nr.output as Record<string, unknown>;
-            if ("outputUrl" in o) resolvedOutput = o.outputUrl;
-            else if ("response" in o) resolvedOutput = o.response;
-          }
-          setNodeOutput(nr.nodeId, resolvedOutput);
-          if (typeof resolvedOutput === "string") {
-            updateNodeData(nr.nodeId, { output: resolvedOutput } as { output: string });
-          }
-        } else if (nr.status === "failed") {
-          setNodeError(nr.nodeId, nr.error ?? "Failed");
-          updateNodeData(nr.nodeId, { error: nr.error ?? "Failed" } as any);
-        } else if (nr.status === "skipped") {
-          setNodeError(nr.nodeId, nr.error ?? "Skipped due to upstream failure");
-          updateNodeData(nr.nodeId, { error: nr.error ?? "Skipped due to upstream failure" } as any);
-        } else if (nr.status === "running") {
-          setNodeExecuting(nr.nodeId, true);
+      const resp = await fetch(`/api/workflows/${workflowId}/history`);
+      const data = await resp.json();
+      if (data.data) {
+        setRuns(data.data);
+        // By default, select the latest run to display outputs if available
+        if (data.data.length > 0 && !selectedRun) {
+          setSelectedRun(data.data[0]);
         }
       }
+    } catch (err) {
+      console.error("Failed to fetch history:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [workflowId, selectedRun]);
 
-      // Mint a fresh token for the orchestrator run
-      const tokenResp = await fetch(`/api/workflows/${workflowId}/node-runs/token`, {
+  useEffect(() => {
+    fetchWorkflow();
+    fetchHistory();
+  }, [workflowId]);
+
+  // Check if response node is connected
+  const hasResponseConnection = useCallback(() => {
+    if (!workflow) return false;
+    const edges = workflow.edges || [];
+    return edges.some((e: any) => e.target === "response");
+  }, [workflow]);
+
+  // Starts workflow execution run
+  const handleStartRun = async () => {
+    if (isRunning) return;
+    setIsRunning(true);
+    setSelectedRun(null);
+
+    try {
+      const resp = await fetch(`/api/workflows/${workflowId}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          orchestratorRunId: runningRun.orchestratorRunId,
+          scope: "full",
+          inputValues,
         }),
       });
 
-      if (!tokenResp.ok) {
-        console.warn("[NextFlow] Failed to mint orchestrator token — run may have ended.");
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-        return;
-      }
-
-      const tokenData = await tokenResp.json();
-      const { publicAccessToken } = tokenData.data ?? {};
-
-      if (!publicAccessToken) {
-        console.warn("[NextFlow] No token returned for orchestrator.");
-        return;
-      }
-
-      // Restore running state
-      isRunningRef.current = true;
-      setIsRunning(true);
-      setCurrentRunId(runningRun.id);
-      setCurrentRunScope(runningRun.scope as "full" | "partial" | "single");
-      setOrchestratorState({
-        orchestratorRunId: runningRun.orchestratorRunId,
-        publicAccessToken,
-      });
-
-      console.log(`[NextFlow] SSE restored to orchestrator ${runningRun.orchestratorRunId}`);
-    } catch (err) {
-      console.error("[NextFlow] SSE restore failed:", err);
-    }
-  }, [
-    workflowId,
-    setIsRunning,
-    setCurrentRunId,
-    setCurrentRunScope,
-    setNodeOutput,
-    setNodeError,
-    setNodeExecuting,
-    updateNodeData,
-  ]);
-
-  useEffect(() => {
-    if (!loading && !reconciliationTriggeredRef.current) {
-      reconciliationTriggeredRef.current = true;
-      restoreLiveRun();
-    }
-  }, [loading, restoreLiveRun]);
-
-  // Re-subscribe or reconcile when tab becomes active / visible
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-        if (isRunning) {
-          restoreLiveRun();
-        }
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isRunning, restoreLiveRun]);
-
-  useEffect(() => {
-    if (savePhase !== "saved") return;
-    const t = setTimeout(() => setSavePhase("leaving"), 2000);
-    return () => clearTimeout(t);
-  }, [savePhase]);
-
-  const viewingPillActive = isRunning || !!previewRunId;
-  type ViewingPillPhase = "hidden" | "visible" | "leaving";
-  const [viewingPillPhase, setViewingPillPhase] =
-    useState<ViewingPillPhase>("hidden");
-
-  useEffect(() => {
-    if (viewingPillActive) {
-      setViewingPillPhase("visible");
-      return;
-    }
-    setViewingPillPhase((prev) => (prev === "hidden" ? "hidden" : "leaving"));
-  }, [viewingPillActive]);
-
-  useEffect(() => {
-    if (viewingPillPhase !== "leaving") return;
-    const t = window.setTimeout(() => setViewingPillPhase("hidden"), 200);
-    return () => clearTimeout(t);
-  }, [viewingPillPhase]);
-
-  const viewingPillDisplayRef = useRef({
-    isRunning: false,
-    currentRunId: null as string | null,
-    previewRunId: null as string | null,
-    previewRunTimestamp: null as string | null,
-  });
-
-  useEffect(() => {
-    if (viewingPillPhase === "visible") {
-      viewingPillDisplayRef.current = {
-        isRunning,
-        currentRunId,
-        previewRunId,
-        previewRunTimestamp,
-      };
-    }
-  }, [viewingPillPhase, isRunning, currentRunId, previewRunId, previewRunTimestamp]);
-
-  /**
-   * Prevents PATCHing malformed graphs during navigation races (requires both anchored nodes present).
-   */
-  const canPersistWorkflowGraph = useCallback((n: typeof nodes) => {
-    if (n.length < 2) return false;
-    let hasRequest = false;
-    let hasResponse = false;
-    for (const node of n) {
-      if (node.type === "requestInputs") hasRequest = true;
-      if (node.type === "response") hasResponse = true;
-    }
-    return hasRequest && hasResponse;
-  }, []);
-
-  /** Sums static per-node estimates (placeholder millions) for the floating cost chip — display only. */
-  const estimateWorkflowCostDisplay = (): string => {
-    const sum = sumWorkflowEstimateMillions(nodes);
-    if (sum === 0) return "0.00";
-    return sum.toFixed(2);
-  };
-
-  // Keep edit value in sync when workflowName loads from API
-  useEffect(() => { setEditNameValue(workflowName); }, [workflowName]);
-  useEffect(() => { if (isEditingName) nameInputRef.current?.focus(); }, [isEditingName]);
-
-  /** Persists inline workflow rename through PATCH and coordinates `WorkflowSaveToast` generation tokens. */
-  const handleNameSave = async () => {
-    const trimmed = editNameValue.trim();
-    setIsEditingName(false);
-    if (!trimmed || trimmed === workflowName) { setEditNameValue(workflowName); return; }
-    setWorkflowName(trimmed);
-    const myId = ++saveGenRef.current;
-    setSavePhase("saving");
-    setSaveToastCycle((c) => c + 1);
-    try {
-      const resp = await fetch(`/api/workflows/${workflowId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
-      });
-      if (myId !== saveGenRef.current) return;
-      if (resp.ok) setSavePhase("saved");
-      else setSavePhase("idle");
-    } catch {
-      if (myId !== saveGenRef.current) return;
-      setSavePhase("idle");
-    }
-  };
-
-  useEffect(() => {
-    nodesRef.current = nodes;
-    edgesRef.current = edges;
-  }, [nodes, edges]);
-
-  // LinkedIn console.log
-  useEffect(() => {
-    console.log(
-      "[NextFlow] Candidate LinkedIn: " +
-        (process.env.NEXT_PUBLIC_LINKEDIN_URL ||
-          "https://www.linkedin.com/in/shashank-anand")
-    );
-  }, []);
-
-  /**
-   * Bootstraps editor state whenever `workflowId` changes.
-   */
-  useEffect(() => {
-    let cancelled = false;
-
-    clearPreviewRun();
-    setLoading(true);
-    setNodes([]);
-    setEdges([]);
-    const fetchWorkflow = async () => {
-      try {
-        const resp = await fetch(`/api/workflows/${workflowId}`);
-        const data = await resp.json();
-        if (!data.data || cancelled) return;
-
-        const wf = data.data;
-        setWorkflowId(workflowId);
-        setWorkflowName(wf.name);
-
-        const rawNodes = wf.nodes as Node[];
-        if (!Array.isArray(rawNodes)) {
-          console.error("workflow.nodes is not an array:", workflowId);
-          return;
-        }
-
-        // Strip runtime outputs and errors from node data so the canvas always opens in plain edit mode
-        const cleanNodes = rawNodes.map((node) => {
-          const d = node.data as Record<string, unknown>;
-          const cleaned: Record<string, unknown> = { ...d };
-          if ("output" in cleaned) {
-            cleaned.output = null;
-          }
-          cleaned.error = null;
-          if (cleaned.inputs && typeof cleaned.inputs === "object") {
-            const inputs = cleaned.inputs as Record<string, unknown>;
-            const cleanedInputs = { ...inputs };
-            if ("images" in cleanedInputs) cleanedInputs.images = [];
-            if ("inputImage" in cleanedInputs && node.type === "cropImage") {
-              cleanedInputs.inputImage = null;
-            }
-            cleaned.inputs = cleanedInputs;
-          }
-          if (node.type === "response" && Array.isArray(cleaned.results)) {
-            cleaned.results = (cleaned.results as Array<Record<string, unknown>>).map((r) => ({
-              ...r,
-              value: null,
-            }));
-          }
-          return { ...node, data: cleaned };
-        });
-
-        if (cancelled) return;
-        setNodes(cleanNodes);
-        setEdges(Array.isArray(wf.edges) ? (wf.edges as Edge[]) : []);
-        clearPreviewRun();
-      } catch (err) {
-        console.error("Failed to load workflow:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchWorkflow();
-    return () => {
-      cancelled = true;
-    };
-  }, [workflowId, setWorkflowId, setWorkflowName, setNodes, setEdges, clearPreviewRun, canPersistWorkflowGraph]);
-
-  /**
-   * Debounced graph persistence (~1s trailing).
-   */
-  useEffect(() => {
-    if (loading) return;
-    if (!canPersistWorkflowGraph(nodes)) return;
-    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(async () => {
-      if (!canPersistWorkflowGraph(nodesRef.current)) return;
-      const myId = ++saveGenRef.current;
-      setSavePhase("saving");
-      setSaveToastCycle((c) => c + 1);
-      try {
-        const resp = await fetch(`/api/workflows/${workflowId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nodes: nodesRef.current,
-            edges: edgesRef.current,
-          }),
-        });
-        if (myId !== saveGenRef.current) return;
-        if (resp.ok) setSavePhase("saved");
-        else setSavePhase("idle");
-      } catch {
-        if (myId !== saveGenRef.current) return;
-        setSavePhase("idle");
-      }
-    }, 1000);
-    return () => {
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    };
-  }, [nodes, edges, loading, workflowId, canPersistWorkflowGraph]);
-
-  /** Bridges per-node "Run" buttons → `handleRun` in `single` scope via `CustomEvent`. */
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const customEvent = e as CustomEvent<{ nodeId: string }>;
-      const nodeId = customEvent.detail.nodeId;
-      if (nodeId) {
-        runWorkflow("single", [nodeId]);
-      }
-    };
-    window.addEventListener("nextflow:run-node", handler);
-    return () => window.removeEventListener("nextflow:run-node", handler);
-  }, [runWorkflow]);
-
-  /** Bridges bottom toolbar "Run selected" → `single` vs `partial` scopes based on selection cardinality. */
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const customEvent = e as CustomEvent<{ nodeIds: string[] }>;
-      const nodeIds = customEvent.detail.nodeIds;
-      if (nodeIds?.length === 1) {
-        runWorkflow("single", nodeIds);
-      } else if (nodeIds?.length > 1) {
-        runWorkflow("partial", nodeIds);
-      }
-    };
-    window.addEventListener("nextflow:run-selected", handler);
-    return () => window.removeEventListener("nextflow:run-selected", handler);
-  }, [runWorkflow]);
-
-
-  /** Downloads validated export JSON (`workflowFilePayloadSchema`) after server GET `/export`. */
-  const handleExportWorkflow = useCallback(async () => {
-    if (loading) return;
-    try {
-      const resp = await fetch(`/api/workflows/${workflowId}/export`);
-      const data = await resp.json();
       if (!resp.ok) {
-        window.alert(typeof data.error === "string" ? data.error : "Export failed");
+        const err = await resp.json().catch(() => ({ error: "Failed to trigger run" }));
+        alert(err.error || "Failed to trigger run");
+        setIsRunning(false);
         return;
       }
-      const check = workflowFilePayloadSchema.safeParse(data);
-      if (!check.success) {
-        window.alert("Export data was not in the expected format.");
-        return;
-      }
-      const { downloadJson } = await import("@/lib/utils");
-      const safeName = (workflowName || "workflow").replace(/\s+/g, "-").toLowerCase();
-      downloadJson(check.data, `${safeName}.json`);
-    } catch {
-      window.alert("Export failed");
+
+      const data = await resp.json();
+      const { runId, orchestratorRunId, publicAccessToken } = data.data ?? {};
+
+      setCurrentRunId(runId);
+      setOrchestratorState({ orchestratorRunId, publicAccessToken });
+    } catch (err) {
+      console.error("Failed to run workflow:", err);
+      setIsRunning(false);
     }
-  }, [workflowId, workflowName, loading]);
+  };
 
-  /**
-   * Hidden file input flow → `POST /api/workflows/import` with raw JSON text; navigates to new workflow id.
-   */
-  const handleImportWorkflow = useCallback(() => {
-    if (loading) return;
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/json,.json";
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      input.value = "";
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const resp = await fetch("/api/workflows/import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ json: text }),
-        });
-        const data = await resp.json();
-        if (!resp.ok) {
-          const err = typeof data.error === "string" ? data.error : "Import failed";
-          const issues = Array.isArray(data.issues)
-            ? data.issues
-              .map((item: { path?: unknown; message?: string }) => {
-                const p = Array.isArray(item.path)
-                  ? (item.path as (string | number)[]).filter((x) => x !== "").join(".")
-                  : "";
-                return p ? `${p}: ${item.message ?? ""}` : (item.message ?? "");
-              })
-              .filter(Boolean)
-              .join("\n")
-            : "";
-          window.alert(issues ? `${err}\n\n${issues}` : err);
-          return;
-        }
-        if (data.data?.id) {
-          router.push(`/workflow/${data.data.id}`);
-        } else {
-          window.alert("Import completed but the server did not return a workflow id.");
-        }
-      } catch {
-        window.alert("Import failed");
-      }
-    };
-    input.click();
-  }, [loading, router]);
-
-  const importExportButtons = (
-    <>
-      <div className="group relative">
-        <button
-          type="button"
-          onClick={handleExportWorkflow}
-          disabled={loading}
-          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Export workflow"
-        >
-          <Download className="h-3.5 w-3.5" aria-hidden />
-        </button>
-        <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-          Export workflow
-        </span>
-      </div>
-      <div className="group relative">
-        <button
-          type="button"
-          onClick={handleImportWorkflow}
-          disabled={loading}
-          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Import workflow"
-        >
-          <Upload className="h-3.5 w-3.5" aria-hidden />
-        </button>
-        <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-          Import workflow
-        </span>
-      </div>
-    </>
+  const handleOrchestratorUpdate = useCallback(
+    (nodeStates: Record<string, { status: string; output?: any; error?: string }>) => {
+      // Stream state update
+      console.log("[Playground] Real-time orchestrator update:", nodeStates);
+    },
+    []
   );
 
-  const viewingPillVisual =
-    viewingPillPhase === "leaving"
-      ? viewingPillDisplayRef.current
-      : {
-          isRunning,
-          currentRunId,
-          previewRunId,
-          previewRunTimestamp,
-        };
+  const handleOrchestratorComplete = useCallback(
+    (finalStatus: string) => {
+      setIsRunning(false);
+      setCurrentRunId(null);
+      setOrchestratorState(null);
+      // Reload history to fetch new outputs
+      fetchHistory();
+    },
+    [fetchHistory]
+  );
+
+  // Extract Response Node outputs for display
+  const getOutputData = () => {
+    const targetRun = selectedRun;
+    if (!targetRun) return null;
+
+    const responseNodeRun = targetRun.nodeRuns.find((nr) => nr.nodeId === "response" || nr.nodeName === "Output");
+    if (!responseNodeRun || responseNodeRun.status !== "success" || !responseNodeRun.output) {
+      // Check if there are other completed media nodes to show partial assets
+      const mediaNode = targetRun.nodeRuns
+        .slice()
+        .reverse()
+        .find((nr) => nr.status === "success" && nr.output && (nr.output.result || nr.output.outputUrl));
+      
+      if (mediaNode) {
+        return mediaNode.output;
+      }
+      return null;
+    }
+
+    return responseNodeRun.output;
+  };
+
+  const outputContent = getOutputData();
+
+  // Python, JS, cURL Script generator templates
+  const codeTemplates = {
+    python: `import requests
+import time
+import json
+
+api_key = "YOUR_API_KEY"
+url = "https://api.galaxy.ai/api/v1/runs"
+
+data = {
+    "workflowId": "${workflowId}",
+    "inputValues": ${JSON.stringify(inputValues, null, 4).replace(/\n/g, "\n    ")}
+}
+
+# Start execution
+response = requests.post(
+    url,
+    json=data,
+    headers={
+        'Content-Type': 'application/json',
+        'Authorization': f'Bearer {api_key}'
+    }
+)
+
+result = response.json()
+run_id = result['data']['runId']
+print(f"Run started: {run_id}")
+
+# Poll for status
+poll_url = f"https://api.galaxy.ai/api/v1/runs/{run_id}"
+while True:
+    response = requests.get(
+        poll_url,
+        headers={'Authorization': f'Bearer {api_key}'}
+    )
+    res_data = response.json()
+    status = res_data['data']['status']
+    
+    if status == 'success':
+        print("Completed successfully!")
+        print(json.dumps(res_data['data']['nodeRuns'], indent=2))
+        break
+    elif status in ['failed', 'canceled']:
+        print(f"Run ended with status: {status}")
+        break
+    time.sleep(5)`,
+
+    nodejs: `const fetch = require('node-fetch');
+
+const apiKey = 'YOUR_API_KEY';
+const url = 'https://api.galaxy.ai/api/v1/runs';
+const workflowId = '${workflowId}';
+
+async function startRun() {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': \`Bearer \${apiKey}\`
+    },
+    body: JSON.stringify({
+      workflowId,
+      inputValues: ${JSON.stringify(inputValues, null, 6).replace(/\n/g, "\n      ")}
+    })
+  });
+  const data = await response.json();
+  const runId = data.data.runId;
+  console.log(\`Run started: \${runId}\`);
+  pollResult(runId);
+}
+
+async function pollResult(runId) {
+  const pollUrl = \`https://api.galaxy.ai/api/v1/runs/\${runId}\`;
+  while (true) {
+    const response = await fetch(pollUrl, {
+      headers: { 'Authorization': \`Bearer \${apiKey}\` }
+    });
+    const result = await response.json();
+    const run = result.data;
+    if (run.status === 'success') {
+      console.log('Success!', JSON.stringify(run.nodeRuns, null, 2));
+      break;
+    } else if (run.status === 'failed') {
+      console.error('Run failed:', run.error);
+      break;
+    }
+    await new Promise(r => setTimeout(r, 5000));
+  }
+}
+
+startRun();`,
+
+    curl: `curl -X POST https://api.galaxy.ai/api/v1/runs \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -d '{
+    "workflowId": "${workflowId}",
+    "inputValues": ${JSON.stringify(inputValues, null, 6).replace(/\n/g, "\n    ")}
+  }'
+
+# Poll execution status
+curl -X GET https://api.galaxy.ai/api/v1/runs/RUN_ID \\
+  -H "Authorization: Bearer YOUR_API_KEY"`,
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(codeTemplates[codeLanguage]);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  // Filter history runs list
+  const filteredRuns = runs.filter((r) => {
+    const matchesSearch = r.id.toLowerCase().includes(historySearch.toLowerCase());
+    // In our backend, public API runs are triggered with an ApiKey linked,
+    // which has scope or keys in header. In local, we can check if scope exists.
+    const isApiRun = r.orchestratorRunId && !r.inputValues?.ClerkUser; // Mock indicator or scope checks
+    const matchesFilter = runFilter === "ui" ? true : true; // Keep list unified, can add dynamic indicator later
+    return matchesSearch;
+  });
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F5F5]">
-      <WorkflowSaveToast
-        phase={savePhase}
-        enterCycle={saveToastCycle}
-        onLeaveComplete={() => setSavePhase("idle")}
-      />
-
+    <div className="flex h-screen overflow-hidden bg-background">
       {/* Left Sidebar */}
       <LeftSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* Canvas area — full height, no header strip */}
-      <div className="flex flex-1 min-w-0 overflow-hidden relative">
-        {/* Canvas fills remaining space, shrinks when history panel opens */}
-        <div className="flex flex-col flex-1 min-w-0 relative overflow-hidden h-full">
-          {loading ? (
-            <div className="flex flex-1 min-h-0 items-center justify-center bg-[#F5F5F5]">
-              <div className="flex flex-col items-center gap-3">
-                <SpinningLogo size="md" />
-                <p className="text-[13px] text-gray-500">Loading workflow...</p>
-              </div>
-            </div>
-          ) : (
-            <div className="workflow-page-canvas-enter flex flex-1 min-h-0 flex-col relative overflow-hidden">
-          <Canvas />
-
-        {/* ── Floating top-left panel — sidebar toggle (when collapsed) + back button + workflow name ── */}
-        <div className="pointer-events-none absolute left-4 top-[11px] z-50">
-          <div className="pointer-events-auto flex flex-col gap-2">
-            <div className="inline-flex items-center gap-2">
-              {/* Sidebar re-open button — only visible when sidebar is collapsed */}
-              {sidebarCollapsed && (
-                <button
-                  onClick={() => setSidebarCollapsed(false)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-[18px] border border-gray-200 bg-white shadow-md text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-                  title="Open Sidebar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-                </button>
-              )}
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/85 px-2 py-1.5 shadow-md backdrop-blur">
-                {/* Back button */}
-                <button
-                  onClick={() => router.push("/dashboard")}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 transition-colors flex-shrink-0"
-                  title="Back to Dashboard"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                </button>
-                {/* Editable workflow name */}
-                <input
-                  ref={nameInputRef}
-                  placeholder="Untitled"
-                  maxLength={120}
-                  value={isEditingName ? editNameValue : workflowName}
-                  onChange={(e) => setEditNameValue(e.target.value)}
-                  onFocus={() => { setIsEditingName(true); setEditNameValue(workflowName); }}
-                  onBlur={handleNameSave}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleNameSave();
-                    if (e.key === "Escape") { setEditNameValue(workflowName); setIsEditingName(false); }
-                  }}
-                  className="h-8 w-[120px] sm:w-[160px] bg-transparent text-[14px] font-normal text-gray-900 outline-none placeholder:text-gray-400"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-          {/* ── Floating top-right — viewing run pill, Est, Bal, Run, History; Import/Export stacked under Run or under History ── */}
-          <div className="absolute top-[11px] right-4 z-10 flex items-start gap-2 pointer-events-auto">
-            <div className="flex items-center gap-2">
-            {/* Live run or history preview — white pill (live takes precedence if both were set) */}
-            {viewingPillPhase !== "hidden" && (
-              <span
-                className={cn(
-                  "inline-flex max-w-[min(100vw-8rem,18rem)] sm:max-w-none",
-                  viewingPillPhase === "leaving"
-                    ? "wf-viewing-pill--leave"
-                    : "wf-viewing-pill--enter"
-                )}
+      <div className="relative flex min-w-0 flex-1 overflow-hidden workflow-editor-layout">
+        <div className="flex h-full w-full flex-col overflow-hidden bg-background">
+          
+          {/* Header Row */}
+          <div className="shrink-0 border-b border-border pl-16 pr-6">
+            <div className="flex items-center gap-3 pb-4 pt-5">
+              <button
+                onClick={() => router.push("/dashboard?tab=workflows")}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-foreground transition-colors hover:bg-muted cursor-pointer"
+                title="Back to Flow"
               >
-                {viewingPillVisual.isRunning ? (
-                  <button
-                    type="button"
-                    title="Click to reconnect to live run stream"
-                    onClick={() => restoreLiveRun()}
-                    className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
-                  >
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />
-                    <span className="shrink-0">Viewing live run</span>
-                    <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums" title={viewingPillVisual.currentRunId ?? undefined}>
-                      {viewingPillVisual.currentRunId
-                        ? viewingPillVisual.currentRunId.length > 14
-                          ? `${viewingPillVisual.currentRunId.slice(0, 8)}…`
-                          : viewingPillVisual.currentRunId
-                        : "…"}
-                    </span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-indigo-400" aria-hidden><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-                  </button>
-                ) : (
-                  <span className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur">
-                    <span className="shrink-0">Viewing run</span>
-                    <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums" title={viewingPillVisual.previewRunId ?? undefined}>
-                      {viewingPillVisual.previewRunId && viewingPillVisual.previewRunId.length > 14
-                        ? `${viewingPillVisual.previewRunId.slice(0, 8)}…`
-                        : viewingPillVisual.previewRunId}
-                    </span>
-                    {viewingPillVisual.previewRunTimestamp && (
-                      <span className="hidden sm:inline shrink-0 text-gray-400 font-normal">
-                        · {formatRelativeTime(viewingPillVisual.previewRunTimestamp)}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </span>
-            )}
-            {/* Est tokens badge */}
-            <span className="hidden sm:inline-flex">
-              <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                <span className="text-gray-500">Est</span>
-                <span className="tabular-nums">~{estimateWorkflowCostDisplay()}</span>
-                <span className="text-gray-500">M</span>
-              </span>
-            </span>
-
-            {/* Bal badge */}
-            <span className="hidden sm:inline-flex">
-              <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                <span className="text-gray-500">Bal</span>
-                <span className="tabular-nums">{balance !== null ? (balance / 1000000).toFixed(2) : "0.00"}</span>
-                <span className="text-gray-500">M</span>
-              </span>
-            </span>
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h1 className="truncate text-lg font-semibold text-foreground">
+                {workflow?.name || "Loading..."}
+              </h1>
             </div>
-
-            {/* Run + Import/Export when execution history panel is open */}
-            <div className="flex flex-col items-center gap-1">
-              <div className="flex items-center gap-1">
-                {/* Run / Spinner Button */}
-                <div className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => !isRunning && runWorkflow("full")}
-                    disabled={isRunning}
-                    className={`flex h-8 w-9 items-center justify-center rounded-lg border shadow-sm transition-all ${
-                      isRunning 
-                        ? "border-[#818cf8] bg-[#818cf8] text-white/90 cursor-not-allowed" 
-                        : "border-[#6366f1] bg-[#6366f1] text-white hover:bg-[#4f46e5] hover:border-[#4f46e5]"
-                    }`}
-                  >
-                    {isRunning ? (
-                      <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
-                    )}
-                  </button>
-                  <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                    {isRunning ? "Running..." : "Run Workflow"}
-                  </span>
-                </div>
-
-                {/* Cancel Button (appears from right) */}
-                {isRunning && (
-                  <div className="group relative animate-in fade-in slide-in-from-right-2 duration-300">
-                    <button
-                      type="button"
-                      onClick={handleCancelRun}
-                      className="flex h-8 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
-                    </button>
-                    <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                      Cancel Run
-                    </span>
-                  </div>
-                )}
-              </div>
-              {isHistoryPanelOpen ? importExportButtons : null}
+            
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setActiveTab("playground")}
+                className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer border-0 ${
+                  activeTab === "playground"
+                    ? "border-primary text-foreground border-b-2 border-solid"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                Playground
+              </button>
+              <button
+                onClick={() => setActiveTab("api")}
+                className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer border-0 ${
+                  activeTab === "api"
+                    ? "border-primary text-foreground border-b-2 border-solid"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                API
+              </button>
+              <button
+                onClick={() => setActiveTab("workflow")}
+                className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer border-0 ${
+                  activeTab === "workflow"
+                    ? "border-primary text-foreground border-b-2 border-solid"
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                }`}
+              >
+                Workflow
+              </button>
             </div>
-
-            {/* Execution History + Import/Export when panel closed */}
-            {!isHistoryPanelOpen && (
-              <div className="flex flex-col items-center gap-1">
-                <div className="group relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsHistoryPanelOpen(true)}
-                    className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm transition-all hover:bg-gray-100"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                  </button>
-                  <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                    Execution History
-                  </span>
-                </div>
-                {importExportButtons}
-              </div>
-            )}
           </div>
-            </div>
-          )}
-        </div>
 
-        {/* Right History Panel — flex sibling so it pushes canvas left */}
-        {isHistoryPanelOpen && (
-          <RightHistoryPanel workflowId={workflowId} />
-        )}
+          <div className="flex-1 overflow-auto">
+            {/* ──── Tab 1: Playground ──── */}
+            {activeTab === "playground" && (
+              <div className="relative h-full overflow-y-auto p-4 sm:p-6 sm:pl-16">
+                <div className="grid h-[72vh] grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[480px_1fr]">
+                  
+                  {/* Inputs Column */}
+                  <div className="flex min-h-0 flex-col">
+                    <div className="rounded-[18px] border bg-card text-card-foreground shadow-sm flex h-full flex-col overflow-hidden">
+                      
+                      <div className="flex p-6 flex-row items-center justify-between space-y-0 px-5 py-4">
+                        <div>
+                          <h2 className="text-sm font-semibold text-foreground">Inputs</h2>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Configure the input fields for this workflow run
+                          </p>
+                        </div>
+                        <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                          Est. ~{estimatedCost.toFixed(2)}M
+                        </span>
+                      </div>
+                      
+                      <div className="shrink-0 bg-border h-[1px] w-full"></div>
+                      
+                      <div className="p-6 min-h-0 flex-1 overflow-y-auto px-5 py-5 space-y-4">
+                        {!hasResponseConnection() ? (
+                          <div className="py-10 text-center text-sm text-muted-foreground">
+                            No edge connected to Response node.<br />
+                            Please connect it in the workflow editor.
+                          </div>
+                        ) : Object.keys(inputValues).length === 0 ? (
+                          <div className="py-10 text-center text-sm text-muted-foreground">
+                            No settings needed. Ready to trigger.
+                          </div>
+                        ) : (
+                          Object.keys(inputValues).map((key) => (
+                            <div key={key} className="flex flex-col gap-1.5">
+                              <label htmlFor={`input-${key}`} className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                                {key.replace(/([A-Z])/g, " $1").replace("_", " ")}
+                              </label>
+                              <textarea
+                                id={`input-${key}`}
+                                rows={3}
+                                value={inputValues[key]}
+                                onChange={(e) => setInputValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                placeholder={`Enter ${key}...`}
+                              />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      
+                      {/* Run Action Container */}
+                      <div className="flex items-center p-6 flex-col gap-2 bg-muted/30 px-5 py-4">
+                        <button
+                          onClick={handleStartRun}
+                          disabled={isRunning || !hasResponseConnection()}
+                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg transition-all duration-300 w-full px-4 py-6 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {isRunning ? (
+                            <>
+                              <SpinningLogo size="sm" />
+                              Running...
+                            </>
+                          ) : (
+                            <>
+                              <Play className="w-5 h-5 mr-2" />
+                              Run
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  {/* Output Column */}
+                  <div className="flex min-h-0 min-w-0 flex-col">
+                    <div className="rounded-[18px] border bg-card text-card-foreground shadow-sm flex h-full flex-col overflow-hidden">
+                      <div className="flex p-6 flex-row items-center justify-between space-y-0 px-5 py-4">
+                        <div>
+                          <h2 className="text-sm font-semibold text-foreground">Output</h2>
+                          <p className="mt-0.5 text-xs text-muted-foreground">Results from workflow execution</p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 bg-border h-[1px] w-full"></div>
+                      
+                      <div className="min-h-0 flex-1 overflow-y-auto p-5 flex flex-col justify-center items-center">
+                        {!outputContent ? (
+                          <div className="flex flex-col items-center justify-center text-muted-foreground">
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                              <Play className="h-7 w-7 opacity-30" />
+                            </div>
+                            <p className="text-sm font-medium text-muted-foreground/70">No output yet</p>
+                            <p className="mt-1 text-xs text-muted-foreground/50">Run the workflow to see results here</p>
+                          </div>
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
+                            {/* Formatted Output rendering depending on media type */}
+                            {typeof outputContent === "string" && (outputContent.startsWith("http://") || outputContent.startsWith("https://")) ? (
+                              outputContent.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
+                                <img
+                                  src={outputContent}
+                                  alt="Generated asset result"
+                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
+                                />
+                              ) : outputContent.match(/\.(mp4|webm)/i) ? (
+                                <video
+                                  src={outputContent}
+                                  controls
+                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
+                                />
+                              ) : (
+                                <a
+                                  href={outputContent}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-card rounded-lg text-sm text-foreground hover:bg-muted"
+                                >
+                                  Download Asset <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )
+                            ) : outputContent.result && typeof outputContent.result === "string" && (outputContent.result.startsWith("http://") || outputContent.result.startsWith("https://")) ? (
+                              outputContent.result.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
+                                <img
+                                  src={outputContent.result}
+                                  alt="Generated asset result"
+                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
+                                />
+                              ) : outputContent.result.match(/\.(mp4|webm)/i) ? (
+                                <video
+                                  src={outputContent.result}
+                                  controls
+                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
+                                />
+                              ) : (
+                                <a
+                                  href={outputContent.result}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-card rounded-lg text-sm text-foreground hover:bg-muted"
+                                >
+                                  Download Result <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )
+                            ) : (
+                              <pre className="p-4 rounded-xl border border-border bg-muted/30 font-mono text-xs w-full max-h-[60vh] overflow-auto text-foreground">
+                                {JSON.stringify(outputContent, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* History Table at bottom */}
+                <div className="shrink-0 pt-4 sm:pt-6">
+                  <div className="rounded-[18px] border bg-card text-card-foreground shadow-sm">
+                    <div className="flex p-6 flex-row flex-wrap items-center gap-2 space-y-0 px-3 py-3 sm:px-5">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <h3 className="text-sm font-semibold text-foreground">Run History</h3>
+                      <span className="text-xs text-muted-foreground">({filteredRuns.length})</span>
+                      
+                      <div className="ml-auto flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex rounded-lg border border-border bg-muted/40 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => setRunFilter("ui")}
+                              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors border-0 cursor-pointer ${
+                                runFilter === "ui"
+                                  ? "bg-background text-foreground shadow-sm font-bold"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              UI Runs
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRunFilter("api")}
+                              className={`rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors border-0 cursor-pointer ${
+                                runFilter === "api"
+                                  ? "bg-background text-foreground shadow-sm font-bold"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              API Runs
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+                          <input
+                            type="text"
+                            placeholder="Search by Run ID..."
+                            value={historySearch}
+                            onChange={(e) => setHistorySearch(e.target.value)}
+                            className="flex rounded-[18px] border border-input bg-background px-3 h-8 py-1.5 pl-8 pr-3 text-xs w-full sm:w-48 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-0">
+                      <div className="relative w-full overflow-auto">
+                        <table className="w-full caption-bottom text-sm border-collapse">
+                          <thead className="[&_tr]:border-b">
+                            <tr className="border-b transition-colors hover:bg-muted/50 text-xs text-muted-foreground bg-muted/30">
+                              <th className="h-10 text-left align-middle px-5 py-2 font-medium">Date & Time</th>
+                              <th className="h-10 text-left align-middle px-3 py-2 font-medium">Status</th>
+                              <th className="h-10 text-left align-middle px-3 py-2 font-medium">Used Credits</th>
+                              <th className="h-10 text-right align-middle px-5 py-2 font-medium">Run ID</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {filteredRuns.length === 0 ? (
+                              <tr>
+                                <td className="p-4 align-middle px-5 py-10 text-center text-xs text-muted-foreground" colSpan={4}>
+                                  No runs found.
+                                </td>
+                              </tr>
+                            ) : (
+                              filteredRuns.map((r) => {
+                                const totalCost = r.nodeRuns.reduce((sum, nr) => sum + (nr.creditCost || 0), 0);
+                                const isSelected = selectedRun?.id === r.id;
+                                return (
+                                  <tr
+                                    key={r.id}
+                                    onClick={() => setSelectedRun(r)}
+                                    className={`border-b transition-colors cursor-pointer hover:bg-muted/10 ${
+                                      isSelected ? "bg-muted/30" : ""
+                                    }`}
+                                  >
+                                    <td className="px-5 py-3 text-xs font-medium text-foreground">
+                                      {new Date(r.startedAt).toLocaleString()}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs">
+                                      <span
+                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold capitalize ${
+                                          r.status === "success"
+                                            ? "bg-green-50 text-green-700 border border-green-200"
+                                            : r.status === "running"
+                                            ? "bg-blue-50 text-blue-700 border border-blue-200 animate-pulse"
+                                            : "bg-red-50 text-red-700 border border-red-200"
+                                        }`}
+                                      >
+                                        {r.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 py-3 text-xs font-medium text-foreground tabular-nums">
+                                      {(totalCost / 1000000).toFixed(2)}M
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-xs font-mono text-muted-foreground">
+                                      {r.id}
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ──── Tab 2: API ──── */}
+            {activeTab === "api" && (
+              <div className="flex h-full gap-6 overflow-hidden p-6">
+                
+                {/* Code snippets block */}
+                <div className="flex w-[45%] min-w-0 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-muted/30">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                    <div className="relative">
+                      <select
+                        value={codeLanguage}
+                        onChange={(e) => setCodeLanguage(e.target.value as any)}
+                        className="inline-flex items-center justify-center bg-background border border-border rounded-[18px] px-3 py-1 text-xs gap-2 outline-none cursor-pointer text-foreground"
+                      >
+                        <option value="python">Python</option>
+                        <option value="nodejs">Node.js</option>
+                        <option value="curl">cURL</option>
+                      </select>
+                    </div>
+                    <button
+                      onClick={copyToClipboard}
+                      className="inline-flex items-center justify-center gap-1.5 bg-transparent hover:bg-muted px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-foreground transition-colors cursor-pointer"
+                    >
+                      {copiedCode ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedCode ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <div className="flex-1 overflow-auto p-4 bg-muted/10">
+                    <pre className="font-mono text-[13px] leading-relaxed text-foreground select-all whitespace-pre-wrap">
+                      {renderHighlightedCode(codeTemplates[codeLanguage])}
+                    </pre>
+                  </div>
+                </div>
+
+                {/* API Docs layout column */}
+                <div className="min-w-0 flex-1 overflow-y-auto">
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">API Endpoint</h3>
+                      <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5">
+                        <span className="shrink-0 rounded bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700 dark:bg-green-500/10 dark:text-green-400">POST</span>
+                        <code className="truncate font-mono text-sm text-foreground">https://api.galaxy.ai/api/v1/runs</code>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">Response Format</h3>
+                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                        <p className="text-sm text-foreground">The start endpoint returns a <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">runId</code>. Poll <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /v1/runs/{"{runId}"}</code> to check status.</p>
+                        <div className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3">
+                          <pre className="whitespace-pre font-mono text-xs text-foreground/80">{"{\n  \"runId\": \"run_abc123...\"\n}"}</pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">Polling Response</h3>
+                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                        <p className="text-sm text-foreground">Poll <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /v1/runs/{"{runId}"}</code> until status is terminal:</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-muted text-muted-foreground">QUEUED</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-muted text-muted-foreground">RUNNING</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-green-100 text-green-700">COMPLETED</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-red-100 text-red-700">FAILED</span>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* ──── Tab 3: Workflow Canvas ──── */}
+            {activeTab === "workflow" && (
+              <div className="relative h-full w-full flex flex-col overflow-hidden">
+                <div className="absolute right-4 top-4 z-10">
+                  <button
+                    onClick={() => router.push(`/workflow/${workflowId}/canvas`)}
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-[18px] bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold px-4 py-2 border-0 cursor-pointer shadow-md"
+                  >
+                    Edit Workflow
+                  </button>
+                </div>
+                
+                {/* Render Canvas in non-editable mode */}
+                <div className="flex-1 w-full h-full relative overflow-hidden pointer-events-none">
+                  <Canvas />
+                </div>
+              </div>
+            )}
+            
+          </div>
+
+        </div>
       </div>
 
-      {/* Single Orchestrator SSE Subscriber — replaces the old per-node RealtimeSubscriber array */}
+      {/* SSE Real-time execution subscriber */}
       {orchestratorState && (
         <OrchestratorSubscriber
           orchestratorRunId={orchestratorState.orchestratorRunId}
           publicAccessToken={orchestratorState.publicAccessToken}
-          onNodeStatesUpdate={handleNodeStatesUpdate}
+          onNodeStatesUpdate={handleOrchestratorUpdate}
           onComplete={handleOrchestratorComplete}
         />
       )}
@@ -1034,80 +838,48 @@ export default function WorkflowPage() {
   );
 }
 
-// ──── Orchestrator SSE Subscriber Component ──────────────────────────────
-
-interface OrchestratorSubscriberProps {
+// Invisible subscription connector
+interface SubscriberProps {
   orchestratorRunId: string;
   publicAccessToken: string;
-  onNodeStatesUpdate: (
-    nodeStates: Record<string, { status: string; output?: unknown; error?: string }>
-  ) => void;
-  onComplete: (finalStatus: string, output?: unknown) => void;
+  onNodeStatesUpdate: (nodeStates: Record<string, { status: string; output?: any; error?: string }>) => void;
+  onComplete: (finalStatus: string) => void;
 }
 
-/**
- * Invisible component that subscribes to the orchestrator task's SSE stream via `useRealtimeRun`.
- * Reads `run.metadata.nodeStates` to drive canvas node states and `run.status` for completion.
- *
- * Replaces the entire `activeSubscribers` + `RealtimeSubscriber` + `resolversRef` pattern
- * with a single, durable SSE connection.
- */
 function OrchestratorSubscriber({
   orchestratorRunId,
   publicAccessToken,
   onNodeStatesUpdate,
   onComplete,
-}: OrchestratorSubscriberProps) {
-  const { run, error } = useRealtimeRun(orchestratorRunId, {
+}: SubscriberProps) {
+  const { run } = useRealtimeRun(orchestratorRunId, {
     accessToken: publicAccessToken,
   });
 
   const firedCompleteRef = useRef(false);
-  const prevNodeStatesRef = useRef<string>("");
 
-  // Process metadata updates (node states)
   useEffect(() => {
     if (!run?.metadata) return;
     const nodeStates = (run.metadata as Record<string, unknown>)["nodeStates"];
-    if (!nodeStates || typeof nodeStates !== "object") return;
-
-    // Only emit if changed (compare JSON to avoid re-renders)
-    const statesJson = JSON.stringify(nodeStates);
-    if (statesJson === prevNodeStatesRef.current) return;
-    prevNodeStatesRef.current = statesJson;
-
-    onNodeStatesUpdate(
-      nodeStates as Record<string, { status: string; output?: unknown; error?: string }>
-    );
+    if (nodeStates) {
+      onNodeStatesUpdate(nodeStates as any);
+    }
   }, [run?.metadata, onNodeStatesUpdate]);
 
-  // Handle SSE connection errors
-  useEffect(() => {
-    if (error && !firedCompleteRef.current) {
-      console.error("[OrchestratorSubscriber] SSE error:", error);
-      // Don't fire complete on transient SSE errors — the orchestrator may still be running
-    }
-  }, [error]);
-
-  // Handle orchestrator completion
   useEffect(() => {
     if (!run || firedCompleteRef.current) return;
 
-    // Known "still active" statuses — anything else is terminal
     const ACTIVE_STATUSES = new Set([
       "PENDING_VERSION", "QUEUED", "DEQUEUED", "EXECUTING", "WAITING", "DELAYED",
     ]);
 
     if (run.status === "COMPLETED") {
       firedCompleteRef.current = true;
-      const finalStatus =
-        ((run.metadata as Record<string, unknown>)?.["finalStatus"] as string) ?? "success";
-      onComplete(finalStatus, run.output);
+      const finalStatus = ((run.metadata as any)?.["finalStatus"] as string) ?? "success";
+      onComplete(finalStatus);
     } else if (!ACTIVE_STATUSES.has(run.status)) {
-      // Terminal non-success: FAILED, CRASHED, CANCELED, SYSTEM_FAILURE, TIMED_OUT, EXPIRED, etc.
       firedCompleteRef.current = true;
-      const metaStatus = ((run.metadata as Record<string, unknown>)?.["finalStatus"] as string);
-      onComplete(metaStatus || "failed", run.output);
+      onComplete("failed");
     }
   }, [run, onComplete]);
 

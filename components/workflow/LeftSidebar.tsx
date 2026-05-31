@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
+import { useSearchParams, usePathname } from "next/navigation";
 import {
   Plus,
   Search,
@@ -33,6 +34,12 @@ interface LeftSidebarProps {
 
 export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebarProps) {
   const { user } = useUser();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const currentTab = searchParams ? searchParams.get("tab") || "workflows" : "workflows";
+
+  const isWorkflowsActive = pathname?.startsWith("/workflow") || (pathname === "/dashboard" && currentTab === "workflows");
+  const isApiActive = pathname === "/dashboard" && currentTab === "api";
   const [footerVisible, setFooterVisible] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
 
@@ -157,12 +164,13 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
                   </div>
                 </a>
                 <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors bg-[#E8E8E8] text-gray-900 font-medium"
+                  href="/dashboard?tab=workflows"
+                  className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
+                    isWorkflowsActive ? "bg-[#E8E8E8] text-gray-900 font-medium" : "text-gray-600 font-normal"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Workflow className="h-4 w-4 text-gray-900" />
+                    <Workflow className={`h-4 w-4 ${isWorkflowsActive ? "text-gray-900" : "text-gray-500"}`} />
                     Flow
                   </div>
                 </a>
@@ -177,13 +185,13 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
                   </div>
                 </a>
                 <a
-                  href="https://magica.com/docs"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors"
+                  href="/dashboard?tab=api"
+                  className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
+                    isApiActive ? "bg-[#E8E8E8] text-gray-900 font-medium" : "text-gray-600 font-normal"
+                  }`}
                 >
                   <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-gray-500" />
+                    <BookOpen className={`h-4 w-4 ${isApiActive ? "text-gray-900" : "text-gray-500"}`} />
                     API / MCP
                   </div>
                 </a>
