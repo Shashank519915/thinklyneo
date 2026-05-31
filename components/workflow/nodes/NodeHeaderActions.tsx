@@ -62,7 +62,7 @@ export default function NodeHeaderActions({
 
       {/* ── Reset button ─────────────────────────────────── */}
       <button
-        className="nodrag rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-zinc-800 dark:hover:text-white"
+        className="nodrag rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-40"
         title="Reset all inputs and output"
         onClick={onReset}
         disabled={isLocked}
@@ -87,7 +87,7 @@ export default function NodeHeaderActions({
       {/* ── Three-dot menu ───────────────────────────────── */}
       <div ref={menuRef} className="relative nodrag" style={{ overflow: "visible" }}>
         <button
-          className="nodrag inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+          className="nodrag inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100"
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
         >

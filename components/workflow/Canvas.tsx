@@ -215,6 +215,44 @@ function CanvasInner() {
     };
   }, []);
 
+  const isValidConnectionCallback = useCallback(
+    (connection: Connection | Edge) => {
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
+
+      const valid = isValidConnection(
+        connection.sourceHandle,
+        connection.targetHandle,
+        sourceNode?.type,
+        targetNode?.type
+      );
+
+      if (!valid) return false;
+
+      // Prevent target handles (except multi-image "in:images") from accepting multiple incoming connections
+      if (connection.targetHandle !== "in:images") {
+        const hasExistingConnection = edges.some(
+          (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
+        );
+        if (hasExistingConnection) {
+          return false;
+        }
+      }
+
+      const cycleCheck = validateNewEdge(nodes, edges, {
+        source: connection.source ?? "",
+        target: connection.target ?? "",
+      });
+
+      if (!cycleCheck.valid) {
+        return false;
+      }
+
+      return true;
+    },
+    [nodes, edges]
+  );
+
   const onConnect = useCallback(
     (connection: Connection) => {
       const sourceNode = nodes.find((n) => n.id === connection.source);
@@ -445,6 +483,7 @@ function CanvasInner() {
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        isValidConnection={isValidConnectionCallback}
         onNodesChange={(changes) => {
           // Push history before any remove changes (Delete/Backspace key path)
           const hasRemove = changes.some(

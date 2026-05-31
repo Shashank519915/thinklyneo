@@ -117,7 +117,10 @@ export function resolvePropagatedEdgeValue(
     sourceHandle
   ) {
     const obj = srcOutput as Record<string, unknown>;
-    if (sourceHandle in obj) {
+    const cleanHandle = sourceHandle.replace(/^out:/, "");
+    if (cleanHandle in obj) {
+      valueToPass = obj[cleanHandle];
+    } else if (sourceHandle in obj) {
       valueToPass = obj[sourceHandle];
     }
   }
@@ -168,7 +171,7 @@ export function getSourceHandleColor(handleId: string | null | undefined): strin
   if (!handleId) return "#7C3AED";
   if (handleId.includes("image") || handleId === "out:outputImage") return "#F97316"; // orange
   if (handleId === "out:response") return "#3B82F6"; // blue (Gemini response)
-  if (handleId === "out:result") return "#6366F1"; // indigo
+  if (handleId === "out:result") return "#3B82F6"; // blue (GPT Image 2 result)
   if (handleId.startsWith("field_")) {
     // Request-Inputs fields: image fields are orange, text fields are amber
     if (handleId.includes("image")) return "#F97316";

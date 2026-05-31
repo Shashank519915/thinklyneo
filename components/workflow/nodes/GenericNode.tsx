@@ -128,7 +128,7 @@ function AddToRequestToggle({ muted, disabled, onMutedChange }: AddToRequestTogg
       disabled={disabled}
       onClick={() => onMutedChange(!muted)}
       aria-label={muted ? "Remove from request" : "Add to request"}
-      className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+      className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {muted ? (
         <LucideIcons.Minus className="h-4 w-4" />
@@ -158,7 +158,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
   const hasModeTab = type === "gptImage2" || type === "klingV3";
   const modeLabels = type === "gptImage2" ? ["Text to Image", "Image to Image"] : ["Text to Video", "Image to Video"];
-  const [modeTab, setModeTab] = useState<"text" | "image" >(() => (nodeData.inputs?.inputImage ? "image" : "text"));
+  const [modeTab, setModeTab] = useState<"text" | "image" >(() => 
+    (nodeData.inputs?.inputImage || (nodeData.inputs?.uploadedImages && nodeData.inputs.uploadedImages.length > 0)) ? "image" : "text"
+  );
 
   const connectedTargets = new Set(
     (edges ?? []).filter((e) => e.target === id).map((e) => e.targetHandle)
@@ -183,6 +185,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     setModeTab(mode);
     if (mode === "text") {
       updateInput("inputImage", null);
+      updateInput("uploadedImages", null);
     }
   };
 
@@ -254,13 +257,24 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     setEdges([...edges, ...newEdges]);
   };
 
-  // Upload handler for file uploads
   const handleFileUpload = async (key: string, files: FileList | null, isArray = false) => {
     if (!files?.length || isLocked) return;
     setUploadingField(key);
 
     try {
-      for (const file of Array.from(files)) {
+      let filesToUpload = Array.from(files);
+      if (isArray) {
+        const currentInputs = nodeData.inputs || {};
+        const currentArr = currentInputs[key] || [];
+        const remaining = 10 - currentArr.length;
+        if (remaining <= 0) {
+          setUploadingField(null);
+          return;
+        }
+        filesToUpload = filesToUpload.slice(0, remaining);
+      }
+
+      for (const file of filesToUpload) {
         // 1. Local preview
         const dataUrl = await new Promise<string | null>((resolve) => {
           const reader = new FileReader();
@@ -340,8 +354,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const isWired = connectedTargets.has(handleId);
     const value = nodeData.inputs?.[param.key] ?? param.defaultValue ?? "";
 
-    // Hide inputImage if mode is text
-    if (param.key === "inputImage" && modeTab === "text") return null;
+    // Hide inputImage and uploadedImages if mode is text
+    if ((param.key === "inputImage" || param.key === "uploadedImages") && modeTab === "text") return null;
 
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
@@ -386,24 +400,26 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           </div>
         )}
 
-        <div
-          data-handle-anchor="label"
-          className="mb-1.5 flex items-center text-xs text-gray-500"
-        >
-          <span>{param.label}</span>
-          {param.required && <span className="text-red-400 ml-0.5">*</span>}
-          {param.handle && (
-            <span className="ml-auto">
-              <AddToRequestToggle
-                muted={!!requestMuteByHandle[handleId]}
-                disabled={isLocked}
-                onMutedChange={(m) =>
-                  setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                }
-              />
-            </span>
-          )}
-        </div>
+        {(param.type !== "image-array" || isWired) && (
+          <div
+            data-handle-anchor="label"
+            className="mb-1.5 flex items-center text-xs text-gray-500"
+          >
+            <span>{param.label}</span>
+            {param.required && <span className="text-red-400 ml-0.5">*</span>}
+            {param.handle && (
+              <span className="ml-auto">
+                <AddToRequestToggle
+                  muted={!!requestMuteByHandle[handleId]}
+                  disabled={isLocked}
+                  onMutedChange={(m) =>
+                    setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
+                  }
+                />
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Dynamic Controls based on type */}
         {isWired ? (
@@ -584,34 +600,91 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             )}
 
             {param.type === "image-array" && (
-              <div className="space-y-2">
-                <div className="grid grid-cols-4 gap-2">
-                  {((value as string[]) || []).map((url, idx) => (
-                    <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden">
-                      <img src={url} alt="" className="w-full h-full object-cover" />
+              <div className="space-y-3">
+                {/* Custom upload row matching reference layout */}
+                <div className="flex items-start gap-3">
+                  <span data-handle-anchor="label" className="shrink-0 pt-2 text-xs text-gray-500 min-w-[70px]">
+                    {param.label}
+                    {param.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </span>
+                  
+                  <div className="flex-1">
+                    <div className="relative">
                       <button
                         type="button"
-                        disabled={isLocked}
-                        onClick={() => removeFileValue(param.key, idx)}
-                        className="nodrag absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 hover:bg-red-600 text-white rounded-md p-1 disabled:opacity-30"
+                        disabled={disabled || ((value as string[]) || []).length >= 10}
+                        onClick={() => {
+                          const input = document.getElementById(`file-input-${param.key}`);
+                          if (input) input.click();
+                        }}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                        title="Upload image"
                       >
-                        <LucideIcons.X className="w-3 h-3" />
+                        {uploadingField === param.key ? (
+                          <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <LucideIcons.Upload className="h-3.5 w-3.5" />
+                        )}
+                        <span className="capitalize">
+                          {uploadingField === param.key ? "Uploading..." : "Upload image"}
+                        </span>
                       </button>
+                      <input
+                        id={`file-input-${param.key}`}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        disabled={disabled || ((value as string[]) || []).length >= 10}
+                        onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
+                      />
                     </div>
-                  ))}
-                  <label className={`nodrag aspect-square flex flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] text-gray-400 cursor-pointer hover:border-[#7C3AED] ${isLocked ? "pointer-events-none opacity-50" : ""}`}>
-                    <LucideIcons.Plus className="w-4 h-4" />
-                    <span className="text-[10px]">Add</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="sr-only"
-                      disabled={isLocked}
-                      onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
-                    />
-                  </label>
+                    
+                    {/* Tooltip trigger */}
+                    <div className="relative mt-1 flex items-center gap-1 group/tooltip w-fit">
+                      <span className="inline-flex cursor-pointer">
+                        <LucideIcons.Info className="h-3 w-3 text-gray-400" />
+                      </span>
+                      <span className="text-[10px] text-gray-400 cursor-pointer select-none">
+                        Upload requirements
+                      </span>
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-white border border-gray-200 rounded-lg px-2.5 py-1 text-[11px] text-gray-700 shadow-lg whitespace-nowrap z-[9999]">
+                        Max images: 10
+                      </div>
+                    </div>
+                  </div>
+
+                  {param.handle && (
+                    <span className="mt-1">
+                      <AddToRequestToggle
+                        muted={!!requestMuteByHandle[handleId]}
+                        disabled={isLocked}
+                        onMutedChange={(m) =>
+                          setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
+                        }
+                      />
+                    </span>
+                  )}
                 </div>
+
+                {/* Grid of thumbnails */}
+                {((value as string[]) || []).length > 0 && (
+                  <div className="grid grid-cols-5 gap-2 pt-1">
+                    {((value as string[]) || []).map((url, idx) => (
+                      <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          disabled={isLocked}
+                          onClick={() => removeFileValue(param.key, idx)}
+                          className="nodrag absolute top-0.5 right-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 hover:bg-red-600 text-white rounded-md p-0.5 disabled:opacity-30"
+                        >
+                          <LucideIcons.X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
