@@ -204,9 +204,15 @@ export default function WorkflowCanvasPage() {
             break;
           case "completed":
             setNodeExecuting(nodeId, false);
-            setNodeOutput(nodeId, state.output);
-            if (typeof state.output === "string") {
-              updateNodeData(nodeId, { output: state.output, error: null } as any);
+            let resolvedOutput: unknown = state.output;
+            if (state.output && typeof state.output === "object") {
+              const o = state.output as Record<string, unknown>;
+              if ("outputUrl" in o) resolvedOutput = o.outputUrl;
+              else if ("response" in o) resolvedOutput = o.response;
+            }
+            setNodeOutput(nodeId, resolvedOutput);
+            if (typeof resolvedOutput === "string") {
+              updateNodeData(nodeId, { output: resolvedOutput, error: null } as any);
             } else {
               const node = nodesRef.current.find((n) => n.id === nodeId);
               if (node?.type === "response" && state.output && typeof state.output === "object") {
