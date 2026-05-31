@@ -116,6 +116,13 @@ export default function WorkflowWorkspacePage() {
   // Code snippet dropdown
   const [codeLanguage, setCodeLanguage] = useState<"python" | "nodejs" | "curl">("python");
   const [copiedCode, setCopiedCode] = useState(false);
+  const [apiOrigin, setApiOrigin] = useState("https://api.galaxy.ai");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setApiOrigin(window.location.origin);
+    }
+  }, []);
 
   // Execution states
   const [isRunning, setIsRunning] = useState(false);
@@ -279,7 +286,7 @@ import time
 import json
 
 api_key = "YOUR_API_KEY"
-url = "https://api.galaxy.ai/api/v1/runs"
+url = "${apiOrigin}/api/v1/runs"
 
 data = {
     "workflowId": "${workflowId}",
@@ -301,7 +308,7 @@ run_id = result['data']['runId']
 print(f"Run started: {run_id}")
 
 # Poll for status
-poll_url = f"https://api.galaxy.ai/api/v1/runs/{run_id}"
+poll_url = f"${apiOrigin}/api/v1/runs/{run_id}"
 while True:
     response = requests.get(
         poll_url,
@@ -322,7 +329,7 @@ while True:
     nodejs: `const fetch = require('node-fetch');
 
 const apiKey = 'YOUR_API_KEY';
-const url = 'https://api.galaxy.ai/api/v1/runs';
+const url = '${apiOrigin}/api/v1/runs';
 const workflowId = '${workflowId}';
 
 async function startRun() {
@@ -344,7 +351,7 @@ async function startRun() {
 }
 
 async function pollResult(runId) {
-  const pollUrl = \`https://api.galaxy.ai/api/v1/runs/\${runId}\`;
+  const pollUrl = \`\${apiOrigin}/api/v1/runs/\${runId}\`;
   while (true) {
     const response = await fetch(pollUrl, {
       headers: { 'Authorization': \`Bearer \${apiKey}\` }
@@ -364,7 +371,7 @@ async function pollResult(runId) {
 
 startRun();`,
 
-    curl: `curl -X POST https://api.galaxy.ai/api/v1/runs \\
+    curl: `curl -X POST ${apiOrigin}/api/v1/runs \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
@@ -373,7 +380,7 @@ startRun();`,
   }'
 
 # Poll execution status
-curl -X GET https://api.galaxy.ai/api/v1/runs/RUN_ID \\
+curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"`,
   };
 
@@ -768,7 +775,7 @@ curl -X GET https://api.galaxy.ai/api/v1/runs/RUN_ID \\
                       <h3 className="mb-3 text-base font-semibold text-foreground">API Endpoint</h3>
                       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5">
                         <span className="shrink-0 rounded bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700 dark:bg-green-500/10 dark:text-green-400">POST</span>
-                        <code className="truncate font-mono text-sm text-foreground">https://api.galaxy.ai/api/v1/runs</code>
+                        <code className="truncate font-mono text-sm text-foreground">{apiOrigin}/api/v1/runs</code>
                       </div>
                     </div>
 
