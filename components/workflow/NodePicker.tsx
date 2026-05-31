@@ -18,9 +18,15 @@ import { type Node } from "@xyflow/react";
 const RECENT_NODES = [
   {
     id: "gemini",
-    label: "OpenRouter LLM",
+    label: "Gemini",
     nodeType: "gemini",
     icon: <Sparkles className="h-4 w-4 text-purple-600" />,
+  },
+  {
+    id: "openRouter",
+    label: "OpenRouter LLM",
+    nodeType: "openRouter",
+    icon: <Sparkles className="h-4 w-4 text-blue-600" />,
   },
   {
     id: "cropImage",
@@ -174,12 +180,35 @@ function createNode(nodeType: string): Node {
     };
   }
 
+  if (nodeType === "openRouter") {
+    return {
+      id,
+      type: "openRouter",
+      position,
+      data: {
+        label: "OpenRouter LLM",
+        inputs: {
+          prompt: "",
+          systemPrompt: "",
+          images: [],
+          video: null,
+          audio: null,
+          file: null,
+          temperature: 1.0,
+          maxTokens: 2048,
+          topP: 0.95,
+        },
+        output: null,
+      },
+    };
+  }
+
   return {
     id,
     type: "gemini",
     position,
     data: {
-      label: "OpenRouter LLM",
+      label: "Gemini",
       inputs: {
         prompt: "",
         systemPrompt: "",

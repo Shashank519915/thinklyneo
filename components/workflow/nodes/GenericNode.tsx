@@ -9,6 +9,7 @@ import NodeHeaderActions from "./NodeHeaderActions";
 import {
   cropImageDefinition,
   openrouterLlmDefinition,
+  geminiDefinition,
   gptImage2Definition,
   klingV3Definition,
   mergeVideoDefinition,
@@ -20,7 +21,8 @@ import {
 // Map React Flow type strings to their shared configurations
 const DEFINITIONS: Record<string, NodeDefinition> = {
   cropImage: cropImageDefinition,
-  gemini: openrouterLlmDefinition,
+  gemini: geminiDefinition,
+  openRouter: openrouterLlmDefinition,
   gptImage2: gptImage2Definition,
   klingV3: klingV3Definition,
   mergeVideo: mergeVideoDefinition,
@@ -603,7 +605,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               <div className="space-y-2">
                 {value ? (
                   <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] overflow-hidden p-2 flex items-center gap-3">
-                    {value.startsWith("data:image") || value.startsWith("http") && (value.includes(".jpg") || value.includes(".png") || value.includes(".jpeg") || value.includes(".webp") || value.match(/cropImage|gemini|execute/i)) ? (
+                    {value.startsWith("data:image") || value.startsWith("http") && (value.includes(".jpg") || value.includes(".png") || value.includes(".jpeg") || value.includes(".webp") || value.match(/cropImage|gemini|openRouter|execute/i)) ? (
                       <img src={value} alt="Upload preview" className="w-12 h-12 object-contain bg-white rounded border border-gray-200" />
                     ) : (
                       <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded text-gray-500">
