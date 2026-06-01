@@ -126,6 +126,59 @@ function truncateMiddle(s: string, maxLen: number): string {
   return s.slice(0, half) + "…" + s.slice(s.length - half);
 }
 
+const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
+const AUDIO_EXT_RE = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|#|$)/i;
+
+/** HTTP(S) URL that points at a playable video/audio asset, from a string or common output keys. */
+function extractMediaUrl(output: unknown): { url: string; kind: "video" | "audio" } | null {
+  const fromString = (s: string): { url: string; kind: "video" | "audio" } | null => {
+    const t = s.trim();
+    if (!/^https?:\/\//i.test(t)) return null;
+    if (VIDEO_EXT_RE.test(t)) return { url: t, kind: "video" };
+    if (AUDIO_EXT_RE.test(t)) return { url: t, kind: "audio" };
+    return null;
+  };
+  if (typeof output === "string") return fromString(output);
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const o = output as Record<string, unknown>;
+    for (const k of ["outputVideo", "outputAudio", "outputUrl", "url", "result", "href"]) {
+      const v = o[k];
+      if (typeof v === "string") {
+        const m = fromString(v);
+        if (m) return m;
+      }
+    }
+  }
+  return null;
+}
+
+/** Inline playable preview (with controls) for video/audio history outputs, plus a source link. */
+function MediaPreview({ url, kind }: { url: string; kind: "video" | "audio" }) {
+  return (
+    <div className="space-y-1">
+      {kind === "video" ? (
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          className="max-h-28 w-full rounded-md border border-gray-200 bg-black/5 object-contain"
+        />
+      ) : (
+        <audio src={url} controls preload="metadata" className="w-full" />
+      )}
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block truncate text-[10px] text-blue-600 hover:underline"
+        title={url}
+      >
+        {truncateMiddle(url, 48)}
+      </a>
+    </div>
+  );
+}
+
 function looksLikeOpaquePayload(s: string): boolean {
   if (s.length < 240) return false;
   const sample = s.slice(0, 120).replace(/\s/g, "");
@@ -200,6 +253,9 @@ function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" |
   if (nr.output !== null && nr.output !== undefined) {
     const imgUrl = extractDisplayableImageUrl(nr.output);
     if (imgUrl) return { text: "[Image output]", kind: "ok" };
+
+    const media = extractMediaUrl(nr.output);
+    if (media) return { text: media.kind === "video" ? "[Video output]" : "[Audio output]", kind: "ok" };
     
     let rawText = "";
     if (typeof nr.output === "object" && !Array.isArray(nr.output) && nr.output !== null) {
@@ -306,6 +362,11 @@ function OutputDetail({ output }: { output: unknown }) {
         );
       }
 
+      const media = extractMediaUrl(val);
+      if (media) {
+        return <MediaPreview url={media.url} kind={media.kind} />;
+      }
+
       if (typeof val === "string") {
         if (looksLikeOpaquePayload(val)) {
           return <p className="text-[11px] text-amber-700">Large/binary output omitted in history.</p>;
@@ -325,12 +386,15 @@ function OutputDetail({ output }: { output: unknown }) {
           const v = obj[k];
           const imageUrl = extractDisplayableImageUrl(v);
           const isImg = !!imageUrl;
+          const media = !isImg ? extractMediaUrl(v) : null;
           const textVal = typeof v === "string" ? v : JSON.stringify(v);
 
           return (
             <div key={k} className="border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">{k}</p>
-              {isImg ? (
+              {media ? (
+                <MediaPreview url={media.url} kind={media.kind} />
+              ) : isImg ? (
                 <div className="space-y-1">
                   <div className="max-h-20 overflow-hidden rounded bg-gray-50 flex items-center justify-center border border-gray-100">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -360,6 +424,11 @@ function OutputDetail({ output }: { output: unknown }) {
   }
 
   // Fallback for strings or primitives
+  const fallbackMedia = extractMediaUrl(output);
+  if (fallbackMedia) {
+    return <MediaPreview url={fallbackMedia.url} kind={fallbackMedia.kind} />;
+  }
+
   const imageUrl = extractDisplayableImageUrl(output);
   if (imageUrl) {
     const t = imageUrl;

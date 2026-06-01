@@ -592,6 +592,7 @@ export default function RequestInputsNode({
                                 className="h-full w-full object-cover"
                                 preload="metadata"
                                 playsInline
+                                controls
                               />
                             </div>
                             {!isPreviewMode && !readOnly && (

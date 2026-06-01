@@ -202,7 +202,7 @@ export default function WorkflowCanvasPage() {
           case "running":
             setNodeExecuting(nodeId, true);
             break;
-          case "completed":
+          case "completed": {
             setNodeExecuting(nodeId, false);
             let resolvedOutput: unknown = state.output;
             if (state.output && typeof state.output === "object") {
@@ -211,22 +211,22 @@ export default function WorkflowCanvasPage() {
               else if ("response" in o) resolvedOutput = o.response;
             }
             setNodeOutput(nodeId, resolvedOutput);
-            if (typeof resolvedOutput === "string") {
-              updateNodeData(nodeId, { output: resolvedOutput, error: null } as any);
+            const node = nodesRef.current.find((n) => n.id === nodeId);
+            if (node?.type === "response" && state.output && typeof state.output === "object") {
+              const currentResults = (node.data as any).results || [];
+              const updatedResults = currentResults.map((r: any) => ({
+                ...r,
+                value: (state.output as Record<string, unknown>)[r.id] ?? null,
+              }));
+              updateNodeData(nodeId, { results: updatedResults, error: null } as any);
             } else {
-              const node = nodesRef.current.find((n) => n.id === nodeId);
-              if (node?.type === "response" && state.output && typeof state.output === "object") {
-                const currentResults = (node.data as any).results || [];
-                const updatedResults = currentResults.map((r: any) => ({
-                  ...r,
-                  value: (state.output as Record<string, unknown>)[r.id] ?? null,
-                }));
-                updateNodeData(nodeId, { results: updatedResults, error: null } as any);
-              } else {
-                updateNodeData(nodeId, { error: null } as any);
-              }
+              // Persist the FULL output (object or string) on the node so media outputs
+              // (video/audio/image) keep rendering on the canvas after execution state is
+              // cleared on run completion — not just single string outputs.
+              updateNodeData(nodeId, { output: state.output ?? resolvedOutput ?? null, error: null } as any);
             }
             break;
+          }
           case "failed":
             setNodeExecuting(nodeId, false);
             setNodeError(nodeId, state.error ?? "Unknown error");
@@ -325,9 +325,8 @@ export default function WorkflowCanvasPage() {
             else if ("response" in o) resolvedOutput = o.response;
           }
           setNodeOutput(nr.nodeId, resolvedOutput);
-          if (typeof resolvedOutput === "string") {
-            updateNodeData(nr.nodeId, { output: resolvedOutput } as { output: string });
-          }
+          // Persist full output (object or string) so media nodes re-render on reload.
+          updateNodeData(nr.nodeId, { output: nr.output } as any);
         } else if (nr.status === "failed") {
           setNodeError(nr.nodeId, nr.error ?? "Failed");
           updateNodeData(nr.nodeId, { error: nr.error ?? "Failed" } as any);

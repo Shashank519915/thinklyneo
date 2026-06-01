@@ -968,7 +968,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       <div className="px-4 pb-4 overflow-visible space-y-4">
         {definition.outputs.map((out) => {
           const handleId = `out:${out.key}`;
-          const currentOutput = isPreviewMode ? output : nodeData.output;
+          // Preview mode: strictly use the previewed run's output (so nodes absent from that
+          // run don't show stale values). Live mode: prefer the live store output (nodeOutputs)
+          // and fall back to the value persisted on the node so media results stay visible
+          // after the run completes and execution state is cleared.
+          const currentOutput = isPreviewMode ? output : (output ?? nodeData.output);
           const displayValue = currentOutput !== null && typeof currentOutput === "object" && out.key in currentOutput 
             ? currentOutput[out.key] 
             : currentOutput;

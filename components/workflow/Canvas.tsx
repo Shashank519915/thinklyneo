@@ -183,21 +183,34 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
     return () => setReadOnly(false);
   }, [readOnly, setReadOnly]);
 
-  const { screenToFlowPosition, fitView } = useReactFlow();
+  const { screenToFlowPosition, fitView, getViewport, setViewport } = useReactFlow();
   const [minimapOpen, setMinimapOpen] = useState(true);
   const [selectionFinalized, setSelectionFinalized] = useState(false);
   const clipboardRef = useRef<typeof nodes>([]);
   const fittedWorkflowRef = useRef<string | null>(null);
 
-  // Keep viewportCenter in sync so NodePicker can place nodes at current view center
+  // Keep viewportCenter in sync so NodePicker can place nodes at current view center,
+  // and persist the full viewport (pan + zoom) per workflow so reloads restore the view.
   const canvasRef = useRef<HTMLDivElement>(null);
+  const viewportStorageKey = workflowIdStore ? `galaxy:viewport:${workflowIdStore}` : null;
+
   const updateViewportCenter = useCallback(() => {
     const el = canvasRef.current;
     if (!el) return;
     const { width, height } = el.getBoundingClientRect();
     const center = screenToFlowPosition({ x: width / 2, y: height / 2 });
     setViewportCenter(center);
-  }, [screenToFlowPosition, setViewportCenter]);
+
+    // Persist current pan/zoom (skip in read-only views so they don't overwrite the user's edit view)
+    if (!readOnly && viewportStorageKey) {
+      try {
+        const vp = getViewport();
+        window.localStorage.setItem(viewportStorageKey, JSON.stringify(vp));
+      } catch {
+        /* localStorage unavailable (private mode / quota) — non-fatal */
+      }
+    }
+  }, [screenToFlowPosition, setViewportCenter, readOnly, viewportStorageKey, getViewport]);
 
   // Track whether the drag-selection is complete (mouse released).
   // The pill only shows after mouseup so it appears on the final compact bounding box.
@@ -480,14 +493,45 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
     fittedWorkflowRef.current = null;
   }, [workflowIdStore]);
 
-  /** Sample / large graphs need fit after async load; empty deps only ran once before nodes existed. */
+  /**
+   * On workflow load, restore the previously saved pan/zoom from localStorage.
+   * Falls back to `fitView` only when there is no saved viewport (first visit / cleared storage),
+   * so we no longer clobber the user's chosen zoom on every reload.
+   */
   useEffect(() => {
     if (!workflowIdStore || nodes.length === 0) return;
     if (fittedWorkflowRef.current === workflowIdStore) return;
     fittedWorkflowRef.current = workflowIdStore;
-    const t = window.setTimeout(() => fitView({ padding: 0.12, duration: 220 }), 100);
+
+    let saved: { x: number; y: number; zoom: number } | null = null;
+    if (viewportStorageKey) {
+      try {
+        const raw = window.localStorage.getItem(viewportStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (
+            parsed &&
+            typeof parsed.x === "number" &&
+            typeof parsed.y === "number" &&
+            typeof parsed.zoom === "number"
+          ) {
+            saved = parsed;
+          }
+        }
+      } catch {
+        saved = null;
+      }
+    }
+
+    const t = window.setTimeout(() => {
+      if (saved) {
+        setViewport(saved, { duration: 0 });
+      } else {
+        fitView({ padding: 0.12, duration: 220 });
+      }
+    }, 100);
     return () => window.clearTimeout(t);
-  }, [workflowIdStore, nodes.length, fitView]);
+  }, [workflowIdStore, nodes.length, fitView, setViewport, viewportStorageKey]);
 
   return (
     <div ref={canvasRef} className="relative h-full w-full overflow-hidden bg-[#F5F5F5]">
