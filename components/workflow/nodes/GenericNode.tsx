@@ -423,7 +423,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
         {/* Dynamic Controls based on type */}
         {isWired ? (
-          <div className="nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] input-connected text-[13px] text-gray-500">
+          <div className="nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] input-connected text-[13px]">
             <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
               Connected upstream
             </p>
@@ -465,21 +465,22 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </div>
                 );
               }
-              return <span className="italic text-xs">Waiting for images...</span>;
+              return <span className="italic text-xs text-gray-400">Waiting for images...</span>;
             })() : param.type === "file-upload" || param.handle?.type === "image" || param.handle?.type === "video" || param.handle?.type === "audio" || param.handle?.type === "file" ? (
               wiredValue ? (
                 <div className="mt-2">
-                  {param.handle?.type === "video" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp4") || wiredValue.includes("video"))) ? (
-                    <div className="relative max-w-[160px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
-                      <video src={String(wiredValue)} controls className="w-full rounded-sm" style={{ maxHeight: 120 }} />
+                  {/* Audio handle type check FIRST — mp4 files in audio fields must render as <audio> */}
+                  {param.handle?.type === "audio" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp3") || wiredValue.endsWith(".wav") || wiredValue.endsWith(".ogg") || wiredValue.endsWith(".m4a"))) ? (
+                    <div className="relative inline-block w-full">
+                      <audio src={String(wiredValue)} controls className="w-full" style={{ minWidth: 160 }} />
                     </div>
-                  ) : param.handle?.type === "audio" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp3") || wiredValue.includes("audio"))) ? (
-                    <div className="relative inline-block">
-                      <audio src={String(wiredValue)} controls className="w-[160px]" />
+                  ) : param.handle?.type === "video" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp4") || wiredValue.endsWith(".webm") || wiredValue.endsWith(".mov"))) ? (
+                    <div className="relative max-w-[200px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
+                      <video src={String(wiredValue)} controls className="w-full rounded-sm" style={{ maxHeight: 140 }} />
                     </div>
                   ) : param.handle?.type === "image" || (typeof wiredValue === "string" && (wiredValue.startsWith("data:image") || wiredValue.match(/\.(jpeg|jpg|gif|png|webp)/i))) ? (
-                    <div className="relative max-w-[160px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
-                      <img src={String(wiredValue)} alt="Inbound preview" className="w-full h-full object-cover" style={{ maxHeight: 120 }} />
+                    <div className="relative max-w-[200px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
+                      <img src={String(wiredValue)} alt="Inbound preview" className="w-full h-full object-cover" style={{ maxHeight: 140 }} />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]" style={{ border: "2px solid rgba(168, 85, 247, 0.3)" }}>
@@ -491,10 +492,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   )}
                 </div>
               ) : (
-                <span className="italic text-xs">Waiting for file URL...</span>
+                <span className="italic text-xs text-gray-400">Waiting for file URL...</span>
               )
             ) : (
-              <div className="max-h-[120px] overflow-y-auto nowheel whitespace-pre-wrap break-words text-xs leading-normal">
+              <div className="max-h-[120px] overflow-y-auto nowheel whitespace-pre-wrap break-words text-xs leading-normal text-gray-500">
                 {wiredValue !== null && wiredValue !== undefined ? String(wiredValue) : "Waiting for upstream value..."}
               </div>
             )}
