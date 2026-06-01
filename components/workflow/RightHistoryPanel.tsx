@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
 import { useWorkflowStore } from "@/store/workflow-store";
-import { formatDuration, sanitizeError } from "@/lib/utils";
+import { classifyMediaUrl, formatDuration, sanitizeError } from "@/lib/utils";
 import { SpinningLogo } from "@/components/SpinningLogo";
 
 interface NodeRunData {
@@ -126,17 +126,13 @@ function truncateMiddle(s: string, maxLen: number): string {
   return s.slice(0, half) + "…" + s.slice(s.length - half);
 }
 
-const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
-const AUDIO_EXT_RE = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|#|$)/i;
-
-/** HTTP(S) URL that points at a playable video/audio asset, from a string or common output keys. */
-function extractMediaUrl(output: unknown): { url: string; kind: "video" | "audio" } | null {
-  const fromString = (s: string): { url: string; kind: "video" | "audio" } | null => {
-    const t = s.trim();
-    if (!/^https?:\/\//i.test(t)) return null;
-    if (VIDEO_EXT_RE.test(t)) return { url: t, kind: "video" };
-    if (AUDIO_EXT_RE.test(t)) return { url: t, kind: "audio" };
-    return null;
+/** Video/audio/file media from a string or common output object keys (excludes images — those have their own preview path). */
+function extractPlayableMedia(
+  output: unknown
+): { url: string; kind: "video" | "audio" | "file" } | null {
+  const fromString = (s: string) => {
+    const m = classifyMediaUrl(s);
+    return m && m.kind !== "image" ? (m as { url: string; kind: "video" | "audio" | "file" }) : null;
   };
   if (typeof output === "string") return fromString(output);
   if (output && typeof output === "object" && !Array.isArray(output)) {
@@ -152,20 +148,18 @@ function extractMediaUrl(output: unknown): { url: string; kind: "video" | "audio
   return null;
 }
 
-/** Inline playable preview (with controls) for video/audio history outputs, plus a source link. */
-function MediaPreview({ url, kind }: { url: string; kind: "video" | "audio" }) {
-  return (
-    <div className="space-y-1">
-      {kind === "video" ? (
-        <video
-          src={url}
-          controls
-          preload="metadata"
-          className="max-h-28 w-full rounded-md border border-gray-200 bg-black/5 object-contain"
-        />
-      ) : (
-        <audio src={url} controls preload="metadata" className="w-full" />
-      )}
+/** Inline preview (with controls) for image/video/audio/file history values, plus a source link. */
+function MediaPreview({
+  url,
+  kind,
+  showLink = true,
+}: {
+  url: string;
+  kind: "image" | "video" | "audio" | "file";
+  showLink?: boolean;
+}) {
+  if (kind === "file") {
+    return (
       <a
         href={url}
         target="_blank"
@@ -175,6 +169,36 @@ function MediaPreview({ url, kind }: { url: string; kind: "video" | "audio" }) {
       >
         {truncateMiddle(url, 48)}
       </a>
+    );
+  }
+  return (
+    <div className="space-y-1">
+      {kind === "video" ? (
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          className="max-h-28 w-full rounded-md border border-gray-200 bg-black/5 object-contain"
+        />
+      ) : kind === "audio" ? (
+        <audio src={url} controls preload="metadata" className="w-full" />
+      ) : (
+        <div className="max-h-28 overflow-hidden rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={url} alt="" className="max-h-28 max-w-full object-contain" loading="lazy" />
+        </div>
+      )}
+      {showLink && url.startsWith("http") && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block truncate text-[10px] text-blue-600 hover:underline"
+          title={url}
+        >
+          {truncateMiddle(url, 48)}
+        </a>
+      )}
     </div>
   );
 }
@@ -185,22 +209,6 @@ function looksLikeOpaquePayload(s: string): boolean {
   if (/^data:image\//i.test(s)) return false;
   if (/^https?:\/\//i.test(s.trim())) return false;
   return /^[A-Za-z0-9+/=]+$/.test(sample);
-}
-
-function collectInputImageUrls(inputs?: Record<string, unknown>): string[] {
-  if (!inputs) return [];
-  const out: string[] = [];
-  const push = (v: unknown) => {
-    if (typeof v !== "string" || !isRenderableImageUrl(v)) return;
-    out.push(v.trim());
-  };
-  push(inputs.inputImage);
-  const imgs = inputs.images;
-  if (Array.isArray(imgs)) {
-    for (const x of imgs) push(x);
-  }
-  const seen = new Set<string>();
-  return out.filter((u) => (seen.has(u) ? false : !!seen.add(u)));
 }
 
 function parseOutputAsRecord(output: unknown): Record<string, unknown> | null {
@@ -254,8 +262,8 @@ function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" |
     const imgUrl = extractDisplayableImageUrl(nr.output);
     if (imgUrl) return { text: "[Image output]", kind: "ok" };
 
-    const media = extractMediaUrl(nr.output);
-    if (media) return { text: media.kind === "video" ? "[Video output]" : "[Audio output]", kind: "ok" };
+    const media = extractPlayableMedia(nr.output);
+    if (media) return { text: media.kind === "video" ? "[Video output]" : media.kind === "audio" ? "[Audio output]" : "[File output]", kind: "ok" };
     
     let rawText = "";
     if (typeof nr.output === "object" && !Array.isArray(nr.output) && nr.output !== null) {
@@ -362,7 +370,7 @@ function OutputDetail({ output }: { output: unknown }) {
         );
       }
 
-      const media = extractMediaUrl(val);
+      const media = extractPlayableMedia(val);
       if (media) {
         return <MediaPreview url={media.url} kind={media.kind} />;
       }
@@ -386,7 +394,7 @@ function OutputDetail({ output }: { output: unknown }) {
           const v = obj[k];
           const imageUrl = extractDisplayableImageUrl(v);
           const isImg = !!imageUrl;
-          const media = !isImg ? extractMediaUrl(v) : null;
+          const media = !isImg ? extractPlayableMedia(v) : null;
           const textVal = typeof v === "string" ? v : JSON.stringify(v);
 
           return (
@@ -424,7 +432,7 @@ function OutputDetail({ output }: { output: unknown }) {
   }
 
   // Fallback for strings or primitives
-  const fallbackMedia = extractMediaUrl(output);
+  const fallbackMedia = extractPlayableMedia(output);
   if (fallbackMedia) {
     return <MediaPreview url={fallbackMedia.url} kind={fallbackMedia.kind} />;
   }
@@ -483,22 +491,20 @@ function RequestInputsHistoryBody({ nr }: { nr: NodeRunData }) {
               .replace(/^field_/, "")
               .replace(/_/g, " ")
               .trim() || key;
-          const img = typeof v === "string" ? valueToImagePreviewSrc(v, key) : null;
-          if (img) {
+          const media = typeof v === "string" ? classifyMediaUrl(v) : null;
+          // Fall back to base64-image detection for raw (non-URL) image field values.
+          const base64Img = !media && typeof v === "string" ? valueToImagePreviewSrc(v, key) : null;
+          if (media || base64Img) {
             return (
               <div key={key}>
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1">
                   {label}
                 </p>
-                <div className="inline-flex rounded-md border border-gray-200 bg-gray-50 p-1">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img}
-                    alt=""
-                    className="max-h-24 max-w-[220px] object-contain"
-                    loading="lazy"
-                  />
-                </div>
+                {media ? (
+                  <MediaPreview url={media.url} kind={media.kind} />
+                ) : (
+                  <MediaPreview url={base64Img!} kind="image" showLink={false} />
+                )}
               </div>
             );
           }
@@ -523,22 +529,35 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
         ? String(inputs.systemPrompt)
         : "";
 
-  const imageUrls = isRequest ? [] : collectInputImageUrls(inputs);
+  // Images supplied as an array (e.g. multi-image upload) — kept as a compact strip.
+  const imageArrayUrls = isRequest
+    ? []
+    : (Array.isArray((inputs as Record<string, unknown>).images)
+        ? ((inputs as Record<string, unknown>).images as unknown[]).filter(
+            (x): x is string => typeof x === "string" && isRenderableImageUrl(x)
+          )
+        : []);
+
+  // Any individual string input that is a previewable media URL (image/video/audio/file).
+  const mediaInputs = isRequest
+    ? []
+    : Object.entries(inputs).flatMap(([k, v]) => {
+        const m = typeof v === "string" ? classifyMediaUrl(v) : null;
+        return m ? [{ key: k, url: m.url, kind: m.kind }] : [];
+      });
+  const mediaInputKeys = new Set(mediaInputs.map((m) => m.key));
+
   const skippedKeys = new Set([
     "prompt",
     "systemPrompt",
     "images",
-    "inputImage",
-    "video",
-    "audio",
-    "file",
     "temperature",
     "maxTokens",
     "topP",
   ]);
   const otherEntries = isRequest
     ? []
-    : Object.entries(inputs).filter(([k]) => !skippedKeys.has(k));
+    : Object.entries(inputs).filter(([k]) => !skippedKeys.has(k) && !mediaInputKeys.has(k));
 
   return (
     <div className="mt-2 space-y-2 border border-gray-200 rounded-lg bg-white p-3 shadow-sm">
@@ -571,11 +590,23 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
         <RequestInputsHistoryBody nr={nr} />
       ) : (
         <>
-          {(prompt || systemPrompt || imageUrls.length > 0) && (
+          {(prompt || systemPrompt || imageArrayUrls.length > 0 || mediaInputs.length > 0) && (
             <div className="space-y-2 border-b border-gray-100 pb-2">
               {prompt ? <ScrollText label="Prompt" value={prompt} /> : null}
               {systemPrompt ? <ScrollText label="System prompt" value={systemPrompt} /> : null}
-              <SmallImageStrip urls={imageUrls} />
+              <SmallImageStrip urls={imageArrayUrls} />
+              {mediaInputs.length > 0 && (
+                <div className="space-y-2">
+                  {mediaInputs.map((m) => (
+                    <div key={m.key}>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">
+                        {m.key.replace(/_/g, " ")}
+                      </p>
+                      <MediaPreview url={m.url} kind={m.kind} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

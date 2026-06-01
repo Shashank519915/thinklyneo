@@ -5,9 +5,9 @@
  */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { FileOutput, Info, Pencil, Trash2 } from "lucide-react";
+import { ExternalLink, FileOutput, Info, Pencil, Trash2 } from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
-import { sanitizeError } from "@/lib/utils";
+import { classifyMediaUrl, sanitizeError } from "@/lib/utils";
 
 interface ResponseResult {
   id: string;
@@ -105,15 +105,30 @@ export default function ResponseNode({ id, data }: NodeProps) {
               }
             }
 
-            // Extract string response / outputUrl from parent output if it's an object
-            const parentOutputValue = parentOutput
-              ? (typeof parentOutput === "object" && !Array.isArray(parentOutput)
-                  ? (parentOutput as Record<string, unknown>)[result.id] ?? parentOutput
-                  : parentOutput)
-              : null;
+            // Resolve the parent output for this slot. Source outputs are keyed by their
+            // output handle (e.g. "outputVideo"), NOT by the response slot id ("res_…"),
+            // so resolve via the incoming edge's sourceHandle first, then fall back to
+            // the slot id, a single-key object, or the whole object.
+            const sourceHandleKey = incomingEdge?.sourceHandle?.replace(/^out:/, "") ?? null;
+            let parentOutputValue: unknown = null;
+            if (parentOutput != null) {
+              if (typeof parentOutput === "object" && !Array.isArray(parentOutput)) {
+                const obj = parentOutput as Record<string, unknown>;
+                if (sourceHandleKey && sourceHandleKey in obj) {
+                  parentOutputValue = obj[sourceHandleKey];
+                } else if (result.id in obj) {
+                  parentOutputValue = obj[result.id];
+                } else {
+                  const objKeys = Object.keys(obj);
+                  parentOutputValue = objKeys.length === 1 ? obj[objKeys[0]] : obj;
+                }
+              } else {
+                parentOutputValue = parentOutput;
+              }
+            }
 
             const outputValue = parentOutputValue ?? result.value;
-            const isImage = typeof outputValue === "string" && outputValue.startsWith("http");
+            const media = typeof outputValue === "string" ? classifyMediaUrl(outputValue) : null;
 
             return (
               <div
@@ -183,10 +198,10 @@ export default function ResponseNode({ id, data }: NodeProps) {
                       </p>
                     </div>
                   ) : outputValue ? (
-                    isImage ? (
+                    media?.kind === "image" ? (
                       <div className="flex flex-col gap-2">
                         <img 
-                          src={outputValue as string} 
+                          src={media.url} 
                           alt={result.label}
                           className="w-full max-h-36 object-contain rounded bg-gray-50"
                           onError={(e) => {
@@ -196,11 +211,25 @@ export default function ResponseNode({ id, data }: NodeProps) {
                           }}
                         />
                         <div style={{ display: 'none' }}>
-                          <a href={outputValue as string} target="_blank" rel="noreferrer" className="text-[12px] text-blue-500 hover:underline break-all">
-                            {outputValue as string}
+                          <a href={media.url} target="_blank" rel="noreferrer" className="text-[12px] text-blue-500 hover:underline break-all">
+                            {media.url}
                           </a>
                         </div>
                       </div>
+                    ) : media?.kind === "video" ? (
+                      <video src={media.url} controls preload="metadata" className="nodrag w-full max-h-40 rounded bg-black/5" />
+                    ) : media?.kind === "audio" ? (
+                      <audio src={media.url} controls preload="metadata" className="nodrag w-full" />
+                    ) : media?.kind === "file" ? (
+                      <a
+                        href={media.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-[12px] text-blue-600 hover:underline break-all"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                        {(media.url.split("/").pop() || "Download file")}
+                      </a>
                     ) : typeof outputValue === "string" ? (
                       <p className="select-text text-[12px] text-gray-800 leading-relaxed w-full whitespace-pre-wrap">
                         {outputValue}

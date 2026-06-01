@@ -221,3 +221,31 @@ export function sanitizeError(error: string): string {
   // Otherwise truncate with ellipsis
   return error.slice(0, 120) + "…";
 }
+
+const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
+const AUDIO_EXT_RE = /\.(mp3|wav|ogg|m4a|aac|flac|opus)(\?|#|$)/i;
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp|avif|svg|bmp|ico)(\?|#|$)/i;
+const FILE_EXT_RE = /\.(pdf|json|txt|csv|tsv|zip|gz|docx?|xlsx?|pptx?|md|xml|yaml|yml)(\?|#|$)/i;
+
+export type MediaKind = "image" | "video" | "audio" | "file";
+
+/**
+ * Classify a value as a previewable media URL.
+ *
+ * Detection order: data:image → known video/audio/image/document extensions →
+ * bare http(s) URLs default to "image" (matches the platform's image-first outputs;
+ * an onError handler in the UI falls back to a link if the image fails to load).
+ * Returns null for non-URL strings (plain text, JSON, base64 blobs handled elsewhere).
+ */
+export function classifyMediaUrl(value: unknown): { url: string; kind: MediaKind } | null {
+  if (typeof value !== "string") return null;
+  const t = value.trim();
+  if (!t) return null;
+  if (t.startsWith("data:image/")) return { url: t, kind: "image" };
+  if (!/^https?:\/\//i.test(t)) return null;
+  if (VIDEO_EXT_RE.test(t)) return { url: t, kind: "video" };
+  if (AUDIO_EXT_RE.test(t)) return { url: t, kind: "audio" };
+  if (IMAGE_EXT_RE.test(t)) return { url: t, kind: "image" };
+  if (FILE_EXT_RE.test(t)) return { url: t, kind: "file" };
+  return { url: t, kind: "image" };
+}

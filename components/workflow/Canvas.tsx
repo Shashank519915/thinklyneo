@@ -25,6 +25,17 @@ import "@xyflow/react/dist/style.css";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { isValidConnection, validateNewEdge } from "@/lib/execution";
 import { generateEdgeId, getSourceHandleColor } from "@/lib/utils";
+import {
+  cropImageDefinition,
+  openrouterLlmDefinition,
+  geminiDefinition,
+  gptImage2Definition,
+  klingV3Definition,
+  mergeVideoDefinition,
+  mergeAVDefinition,
+  extractAudioDefinition,
+  type NodeDefinition,
+} from "@galaxy/shared";
 import RequestInputsNode from "./nodes/RequestInputsNode";
 import CropImageNode from "./nodes/CropImageNode";
 import GenericNode from "./nodes/GenericNode";
@@ -50,6 +61,31 @@ const nodeTypes = {
 const edgeTypes = {
   animatedEdge: AnimatedEdge,
 };
+
+// Shared node defs for resolving Response result-slot labels from the source output handle.
+const NODE_DEFINITIONS: Record<string, NodeDefinition> = {
+  cropImage: cropImageDefinition,
+  gemini: geminiDefinition,
+  openRouter: openrouterLlmDefinition,
+  gptImage2: gptImage2Definition,
+  klingV3: klingV3Definition,
+  mergeVideo: mergeVideoDefinition,
+  mergeAV: mergeAVDefinition,
+  extractAudio: extractAudioDefinition,
+};
+
+/** Label for a new Response slot: prefer the source output handle's label, then node name. */
+function resolveResultLabel(sourceType: string | undefined, sourceHandle: string | null | undefined): string {
+  if (!sourceType) return "Result";
+  if (sourceType === "requestInputs") return "Request Input";
+  const def = NODE_DEFINITIONS[sourceType];
+  if (def) {
+    const key = sourceHandle?.replace(/^out:/, "");
+    const outLabel = key ? def.outputs?.find((o) => o.key === key)?.label : undefined;
+    return outLabel || def.name || "Result";
+  }
+  return "Result";
+}
 
 /** MiniMap tint derived from persisted node.type string. */
 function getNodeColor(type: string | undefined): string {
@@ -314,13 +350,8 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
       let finalTargetHandle = connection.targetHandle;
 
       if (targetNode?.type === "response") {
-        const nodeNameMap: Record<string, string> = {
-          cropImage: "Crop Image",
-          gemini: "Gemini Inference",
-          requestInputs: "Request Inputs"
-        };
-        const defaultLabel = sourceNode ? (nodeNameMap[sourceNode.type as string] || "Result") : "Result";
-        
+        const defaultLabel = resolveResultLabel(sourceNode?.type as string | undefined, connection.sourceHandle);
+
         // If connecting to the generic 'result' handle (the empty slot drop zone)
         if (connection.targetHandle === "result") {
           const newResultId = `res_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
