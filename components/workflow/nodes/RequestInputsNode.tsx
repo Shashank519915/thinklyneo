@@ -155,25 +155,6 @@ export default function RequestInputsNode({
 
       setUploadingFields((prev) => ({ ...prev, [fieldId]: true }));
 
-      // Immediate local base64 preview for images
-      if (type === "image_field") {
-        const localPreviews: string[] = [];
-        let processedPreviews = 0;
-        filesArray.forEach((file) => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            localPreviews.push(ev.target?.result as string);
-            processedPreviews++;
-            if (processedPreviews === filesArray.length) {
-              updateField(fieldId, {
-                value: [...currentUrls, ...localPreviews].slice(0, 10).join(","),
-              });
-            }
-          };
-          reader.readAsDataURL(file);
-        });
-      }
-
       try {
         const uploadPromises = filesArray.map(async (file) => {
           const formData = new FormData();
@@ -479,6 +460,37 @@ export default function RequestInputsNode({
 
                 {field.type === "image_field" && (
                   <div className="space-y-2">
+                    {!isPreviewMode && !readOnly ? (
+                      urls.length < 10 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            disabled={uploadingFields[field.id]}
+                            onClick={() => {
+                              document.getElementById(`file-input-${field.id}`)?.click();
+                            }}
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                            title="Upload image"
+                          >
+                            {uploadingFields[field.id] ? (
+                              <span>Uploading...</span>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      urls.length === 0 && (
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                          <span className="text-[11px] text-gray-400 font-medium">No image used</span>
+                        </div>
+                      )
+                    )}
+
                     {urls.length > 0 && (
                       <div className="nodrag nopan mt-2 grid grid-cols-3 gap-2">
                         {urls.map((url, idx) => (
@@ -516,37 +528,6 @@ export default function RequestInputsNode({
                       </div>
                     )}
 
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onClick={() => {
-                              document.getElementById(`file-input-${field.id}`)?.click();
-                            }}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title="Upload image"
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/10)`}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No image used</span>
-                        </div>
-                      )
-                    )}
-
                     {/* Hidden file input */}
                     {!isPreviewMode && !readOnly && (
                       <input
@@ -564,6 +545,37 @@ export default function RequestInputsNode({
 
                 {field.type === "video_field" && (
                   <div className="space-y-2">
+                    {!isPreviewMode && !readOnly ? (
+                      urls.length < 10 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            disabled={uploadingFields[field.id]}
+                            onClick={() => {
+                              document.getElementById(`file-input-${field.id}`)?.click();
+                            }}
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                            title="Upload video"
+                          >
+                            {uploadingFields[field.id] ? (
+                              <span>Uploading...</span>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      urls.length === 0 && (
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                          <span className="text-[11px] text-gray-400 font-medium">No video used</span>
+                        </div>
+                      )
+                    )}
+
                     {urls.length > 0 && (
                       <div className="nodrag nopan mt-2 grid grid-cols-3 gap-2">
                         {urls.map((url, idx) => (
@@ -602,37 +614,6 @@ export default function RequestInputsNode({
                       </div>
                     )}
 
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onClick={() => {
-                              document.getElementById(`file-input-${field.id}`)?.click();
-                            }}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title="Upload video"
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/10)`}</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No video used</span>
-                        </div>
-                      )
-                    )}
-
                     {/* Hidden file input */}
                     {!isPreviewMode && !readOnly && (
                       <input
@@ -650,35 +631,6 @@ export default function RequestInputsNode({
 
                 {(field.type === "audio_field" || field.type === "media_field") && (
                   <div className="space-y-2">
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 space-y-2">
-                        {urls.map((url, idx) => (
-                          <div key={idx} className="group relative">
-                            <audio
-                              src={url}
-                              controls
-                              className="w-full"
-                            />
-                            {!isPreviewMode && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updatedUrls = urls.filter((_, i) => i !== idx);
-                                  updateField(field.id, {
-                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                  });
-                                }}
-                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                title="Remove"
-                              >
-                                <X className="w-2.5 h-2.5 text-white" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
                     {!isPreviewMode && !readOnly ? (
                       urls.length < 10 && (
                         <div className="relative">
@@ -710,6 +662,35 @@ export default function RequestInputsNode({
                       )
                     )}
 
+                    {urls.length > 0 && (
+                      <div className="nodrag nopan mt-2 space-y-2">
+                        {urls.map((url, idx) => (
+                          <div key={idx} className="group relative">
+                            <audio
+                              src={url}
+                              controls
+                              className="w-full"
+                            />
+                            {!isPreviewMode && !readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedUrls = urls.filter((_, i) => i !== idx);
+                                  updateField(field.id, {
+                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
+                                  });
+                                }}
+                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                title="Remove"
+                              >
+                                <X className="w-2.5 h-2.5 text-white" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     {/* Hidden file input */}
                     {!isPreviewMode && !readOnly && (
                       <input
@@ -727,43 +708,6 @@ export default function RequestInputsNode({
 
                 {field.type === "file_field" && (
                   <div className="space-y-2">
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 space-y-2">
-                        {urls.map((url, idx) => {
-                          const filename = url.split("/").pop() || `File ${idx + 1}`;
-                          return (
-                            <div key={idx} className="group relative">
-                              <div
-                                className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white"
-                                style={{
-                                  border: "2px solid rgba(168, 85, 247, 0.3)",
-                                }}
-                              >
-                                <span className="truncate text-xs text-gray-600">
-                                  {filename}
-                                </span>
-                              </div>
-                              {!isPreviewMode && !readOnly && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedUrls = urls.filter((_, i) => i !== idx);
-                                    updateField(field.id, {
-                                      value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                    });
-                                  }}
-                                  className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                  title="Remove"
-                                >
-                                  <X className="w-2.5 h-2.5 text-white" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
                     {!isPreviewMode && !readOnly ? (
                       urls.length < 10 && (
                         <div className="relative">
@@ -793,6 +737,43 @@ export default function RequestInputsNode({
                           <span className="text-[11px] text-gray-400 font-medium">No file used</span>
                         </div>
                       )
+                    )}
+
+                    {urls.length > 0 && (
+                      <div className="nodrag nopan mt-2 space-y-2">
+                        {urls.map((url, idx) => {
+                          const filename = url.split("/").pop() || `File ${idx + 1}`;
+                          return (
+                            <div key={idx} className="group relative">
+                              <div
+                                className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white"
+                                style={{
+                                  border: "2px solid rgba(168, 85, 247, 0.3)",
+                                }}
+                              >
+                                <span className="truncate text-xs text-gray-600 font-mono">
+                                  {filename}
+                                </span>
+                              </div>
+                              {!isPreviewMode && !readOnly && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedUrls = urls.filter((_, i) => i !== idx);
+                                    updateField(field.id, {
+                                      value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
+                                    });
+                                  }}
+                                  className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                  title="Remove"
+                                >
+                                  <X className="w-2.5 h-2.5 text-white" />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
 
                     {/* Hidden file input */}

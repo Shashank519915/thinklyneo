@@ -295,60 +295,28 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         filesToUpload = filesToUpload.slice(0, remaining);
       }
 
-      for (const file of filesToUpload) {
-        // 1. Local preview
-        const dataUrl = await new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(file);
-        });
-
-        if (!dataUrl) continue;
-
-        // Add local preview first
-        const currentInputs = nodeData.inputs || {};
-        if (isArray) {
-          const arr = currentInputs[key] || [];
-          updateInput(key, [...arr, dataUrl]);
-        } else {
-          updateInput(key, dataUrl);
-        }
-
-        // 2. Cloud upload in background
+      const uploadPromises = filesToUpload.map(async (file) => {
         const formData = new FormData();
         formData.append("file", file);
-
         const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
         const uploadData = await uploadRes.json();
+        return uploadData.url || null;
+      });
 
-        if (uploadData.url) {
-          // Swap local preview for cloud URL
-          const store = useWorkflowStore.getState();
-          store.setNodes(
-            store.nodes.map((n) => {
-              if (n.id === id) {
-                const nodeInputs = { ...(n.data as any).inputs };
-                if (isArray) {
-                  nodeInputs[key] = (nodeInputs[key] || []).map((img: string) =>
-                    img === dataUrl ? uploadData.url : img
-                  );
-                } else {
-                  if (nodeInputs[key] === dataUrl) {
-                    nodeInputs[key] = uploadData.url;
-                  }
-                }
-                return {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    inputs: nodeInputs,
-                  },
-                };
-              }
-              return n;
-            })
-          );
+      const uploadedUrls = await Promise.all(uploadPromises);
+      const validUrls = uploadedUrls.filter((url): url is string => url !== null);
+
+      if (validUrls.length > 0) {
+        const store = useWorkflowStore.getState();
+        const latestNode = store.nodes.find((n) => n.id === id);
+        const currentInputs = (latestNode?.data as any)?.inputs || {};
+
+        if (isArray) {
+          const arr = currentInputs[key] || [];
+          const cleanArr = arr.filter((url: string) => !url.startsWith("data:"));
+          updateInput(key, [...cleanArr, ...validUrls].slice(0, 10));
+        } else {
+          updateInput(key, validUrls[0]);
         }
       }
     } catch (err) {
@@ -459,42 +427,68 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
               Connected upstream
             </p>
-            {param.type === "image-array" ? (
-              Array.isArray(wiredValue) && wiredValue.length > 0 ? (
-                <div className="flex flex-col gap-2 mt-1">
-                  <div className="flex flex-wrap gap-2">
-                    {wiredValue.map((url, idx) => (
-                      <div key={idx} className="relative w-12 h-12 border border-gray-200 rounded overflow-hidden bg-white">
-                        <img src={String(url)} alt={`preview-${idx}`} className="w-full h-full object-cover" />
-                      </div>
-                    ))}
+            {param.type === "image-array" ? (() => {
+              let imagesArray: string[] = [];
+              if (Array.isArray(wiredValue)) {
+                imagesArray = wiredValue.map(String);
+              } else if (typeof wiredValue === "string" && wiredValue) {
+                imagesArray = wiredValue.split(",").filter(Boolean);
+              }
+
+              if (imagesArray.length > 0) {
+                return (
+                  <div className="flex flex-col gap-2 mt-1">
+                    <div className="flex flex-wrap gap-2">
+                      {imagesArray.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="relative w-12 h-12 rounded overflow-hidden bg-white"
+                          style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}
+                        >
+                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
+                      {imagesArray.map((url, idx) => (
+                        <a
+                          key={idx}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-[10px] text-blue-500 hover:underline font-mono"
+                        >
+                          {url}
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
-                    {wiredValue.map((url, idx) => (
-                      <a
-                        key={idx}
-                        href={String(url)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="truncate text-[10px] text-blue-500 hover:underline font-mono"
-                      >
-                        {String(url)}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <span className="italic text-xs">Waiting for images...</span>
-              )
-            ) : param.type === "file-upload" ? (
+                );
+              }
+              return <span className="italic text-xs">Waiting for images...</span>;
+            })() : param.type === "file-upload" || param.handle?.type === "image" || param.handle?.type === "video" || param.handle?.type === "audio" || param.handle?.type === "file" ? (
               wiredValue ? (
-                <div className="flex items-center gap-2 mt-1">
-                  {typeof wiredValue === "string" && (wiredValue.startsWith("http") || wiredValue.startsWith("data:image")) ? (
-                    <img src={wiredValue} alt="Inbound preview" className="w-12 h-12 object-cover rounded border border-gray-200" />
+                <div className="mt-2">
+                  {param.handle?.type === "video" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp4") || wiredValue.includes("video"))) ? (
+                    <div className="relative max-w-[160px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
+                      <video src={String(wiredValue)} controls className="w-full rounded-sm" style={{ maxHeight: 120 }} />
+                    </div>
+                  ) : param.handle?.type === "audio" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp3") || wiredValue.includes("audio"))) ? (
+                    <div className="relative inline-block">
+                      <audio src={String(wiredValue)} controls className="w-[160px]" />
+                    </div>
+                  ) : param.handle?.type === "image" || (typeof wiredValue === "string" && (wiredValue.startsWith("data:image") || wiredValue.match(/\.(jpeg|jpg|gif|png|webp)/i))) ? (
+                    <div className="relative max-w-[160px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
+                      <img src={String(wiredValue)} alt="Inbound preview" className="w-full h-full object-cover" style={{ maxHeight: 120 }} />
+                    </div>
                   ) : (
-                    <LucideIcons.File className="w-5 h-5 text-gray-400" />
+                    <div className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]" style={{ border: "2px solid rgba(168, 85, 247, 0.3)" }}>
+                      <LucideIcons.FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                      <span className="truncate text-xs text-gray-600 font-mono">
+                        {String(wiredValue).split("/").pop() || "Document"}
+                      </span>
+                    </div>
                   )}
-                  <span className="truncate max-w-[200px] text-xs font-mono">{String(wiredValue)}</span>
                 </div>
               ) : (
                 <span className="italic text-xs">Waiting for file URL...</span>
