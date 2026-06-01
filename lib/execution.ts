@@ -117,7 +117,12 @@ function getHandleDataType(
   // Request-Inputs fields
   if (handleId.startsWith("field_")) {
     if (handleId.includes("image")) return "image";
-    return "text";
+    if (handleId.includes("video")) return "video";
+    if (handleId.includes("audio")) return "audio";
+    if (handleId.includes("number")) return "number";
+    if (handleId.includes("boolean")) return "boolean";
+    if (handleId.includes("text")) return "text";
+    return "generic";
   }
 
   // Standard handle IDs
@@ -139,6 +144,7 @@ function getHandleDataType(
   // Node type based fallback
   if (nodeType === "cropImage") return "image";
   if (nodeType === "gemini") return "text";
+  if (nodeType === "openRouter") return "text";
 
   return "generic";
 }

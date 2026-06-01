@@ -15,7 +15,15 @@ import {
 
 export interface WorkflowField {
   id: string;
-  type: "text_field" | "image_field";
+  type:
+    | "text_field"
+    | "number_field"
+    | "boolean_field"
+    | "image_field"
+    | "audio_field"
+    | "video_field"
+    | "media_field"
+    | "file_field";
   label: string;
   value: string | null;
 }
