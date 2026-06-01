@@ -17,6 +17,7 @@ import {
   Maximize2,
 } from "lucide-react";
 import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/workflow-store";
+import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
 
 interface RequestInputsData {
@@ -53,6 +54,7 @@ export default function RequestInputsNode({
 
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
+  const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
 
   const fields: WorkflowField[] = nodeData.fields ?? [];
 
@@ -273,15 +275,14 @@ export default function RequestInputsNode({
                     onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })}
                     className={`nodrag nowheel w-full min-w-0 resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-[#7C3AED] focus:shadow-[0_0_0_1px_#7C3AED] ${isPreviewMode || readOnly ? "cursor-default resize-none" : ""}`}
                   />
-                  {!isPreviewMode && !readOnly && (
-                    <button
-                      type="button"
-                      className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 hover:bg-gray-300"
-                      title="Expand"
-                    >
-                      <Maximize2 className="h-3 w-3" />
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveExpandFieldId(field.id)}
+                    className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 hover:bg-gray-300 shadow-sm"
+                    title="Expand"
+                  >
+                    <Maximize2 className="h-3 w-3" />
+                  </button>
                 </div>
               ) : (
                 /* Image field */
@@ -352,6 +353,22 @@ export default function RequestInputsNode({
           </div>
         ))}
       </div>
+
+      {activeExpandFieldId && (() => {
+        const field = fields.find((f) => f.id === activeExpandFieldId);
+        if (!field) return null;
+        const displayValue = getFieldDisplayValue(field) ?? "";
+
+        return (
+          <TextExpandModal
+            title={field.label}
+            value={displayValue}
+            readOnly={isPreviewMode || readOnly}
+            onChange={(val) => updateField(field.id, { value: val })}
+            onClose={() => setActiveExpandFieldId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

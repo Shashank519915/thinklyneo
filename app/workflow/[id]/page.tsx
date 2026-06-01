@@ -13,12 +13,21 @@ import {
   Terminal,
   ExternalLink,
   Lock,
+  AlignLeft,
+  Image,
+  Video,
+  Trash2,
+  Volume2,
+  FileText,
+  Maximize2,
+  X,
 } from "lucide-react";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { formatRelativeTime } from "@/lib/utils";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import Canvas from "@/components/workflow/Canvas";
+import TextExpandModal from "@/components/workflow/TextExpandModal";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { type Node, type Edge } from "@xyflow/react";
 
@@ -131,6 +140,95 @@ export default function WorkflowWorkspacePage() {
     orchestratorRunId: string;
     publicAccessToken: string;
   } | null>(null);
+
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
+
+  const getFieldType = (field: any) => {
+    if (field.type) {
+      if (field.type === "image_field") return "image";
+      if (field.type === "video_field") return "video";
+      if (field.type === "audio_field") return "audio";
+      if (field.type === "text_field") return "text";
+      return field.type;
+    }
+    if (field.id.startsWith("field_image_")) return "image";
+    if (field.id.startsWith("field_video_")) return "video";
+    if (field.id.startsWith("field_audio_")) return "audio";
+    if (field.id.startsWith("field_text_")) return "text";
+    return "text";
+  };
+
+  const handleFileUpload = async (fieldId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const filesArray = Array.from(files);
+    
+    // Check limit
+    const currentVal = inputValues[fieldId] || "";
+    const currentUrls = currentVal ? currentVal.split(",").filter(Boolean) : [];
+    
+    if (currentUrls.length + filesArray.length > 10) {
+      alert("You can upload a maximum of 10 files.");
+      return;
+    }
+
+    setUploadingFields((prev) => ({ ...prev, [fieldId]: true }));
+
+    // For images, show local base64 previews immediately
+    const imageFiles = filesArray.filter((file) => file.type.startsWith("image/"));
+    const localPreviews: string[] = [];
+    let processedPreviews = 0;
+    
+    if (imageFiles.length > 0) {
+      imageFiles.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          localPreviews.push(ev.target?.result as string);
+          processedPreviews++;
+          if (processedPreviews === imageFiles.length) {
+            setInputValues((prev) => {
+              const prevVal = prev[fieldId] || "";
+              const prevUrls = prevVal ? prevVal.split(",").filter(Boolean) : [];
+              return { ...prev, [fieldId]: [...prevUrls, ...localPreviews].slice(0, 10).join(",") };
+            });
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    try {
+      // Upload all files in parallel
+      const uploadPromises = filesArray.map(async (file) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        const data = await res.json();
+        return data.url || null;
+      });
+
+      const uploadedUrls = await Promise.all(uploadPromises);
+      const validUrls = uploadedUrls.filter((url): url is string => url !== null);
+
+      if (validUrls.length > 0) {
+        setInputValues((prev) => {
+          const prevVal = prev[fieldId] || "";
+          // Filter out local base64 previews and append the real URLs
+          const prevUrls = prevVal ? prevVal.split(",").filter(Boolean) : [];
+          const cleanPrevUrls = prevUrls.filter(url => !url.startsWith("data:"));
+          return {
+            ...prev,
+            [fieldId]: [...cleanPrevUrls, ...validUrls].slice(0, 10).join(",")
+          };
+        });
+      }
+    } catch (err) {
+      console.error("Upload error:", err);
+    } finally {
+      setUploadingFields((prev) => ({ ...prev, [fieldId]: false }));
+    }
+  };
 
   // Load Canvas workspace data for the readonly Workflow Tab
   const { setNodes, setEdges, setWorkflowId, setWorkflowName } = useWorkflowStore();
@@ -484,33 +582,279 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                       
                       <div className="shrink-0 bg-border h-[1px] w-full"></div>
                       
-                      <div className="p-6 min-h-0 flex-1 overflow-y-auto px-5 py-5 space-y-4">
-                        {!hasResponseConnection() ? (
-                          <div className="py-10 text-center text-sm text-muted-foreground">
-                            No edge connected to Response node.<br />
-                            Please connect it in the workflow editor.
-                          </div>
-                        ) : Object.keys(inputValues).length === 0 ? (
-                          <div className="py-10 text-center text-sm text-muted-foreground">
-                            No settings needed. Ready to trigger.
-                          </div>
-                        ) : (
-                          Object.keys(inputValues).map((key) => (
-                            <div key={key} className="flex flex-col gap-1.5">
-                              <label htmlFor={`input-${key}`} className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                                {key.replace(/([A-Z])/g, " $1").replace("_", " ")}
-                              </label>
-                              <textarea
-                                id={`input-${key}`}
-                                rows={3}
-                                value={inputValues[key]}
-                                onChange={(e) => setInputValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                                className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                                placeholder={`Enter ${key}...`}
-                              />
+                      <div className="p-6 min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                        {(() => {
+                          const requestNode = (workflow?.nodes || []).find((n: any) => n.type === "requestInputs");
+                          const fields = requestNode?.data?.fields || [];
+
+                          if (!hasResponseConnection()) {
+                            return (
+                              <div className="py-10 text-center text-sm text-muted-foreground">
+                                No edge connected to Response node.<br />
+                                Please connect it in the workflow editor.
+                              </div>
+                            );
+                          }
+
+                          if (Object.keys(inputValues).length === 0) {
+                            return (
+                              <div className="py-10 text-center text-sm text-muted-foreground">
+                                No settings needed. Ready to trigger.
+                              </div>
+                            );
+                          }
+
+                          if (fields.length === 0) {
+                            // Fallback: If no fields defined on the RequestInputs node, map over inputValues keys
+                            return (
+                              <div className="space-y-4">
+                                {Object.keys(inputValues).map((key) => (
+                                  <div key={key} className="flex flex-col gap-1.5">
+                                    <label htmlFor={`input-${key}`} className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                                      {key.replace(/([A-Z])/g, " $1").replace("_", " ")}
+                                    </label>
+                                    <textarea
+                                      id={`input-${key}`}
+                                      rows={3}
+                                      value={inputValues[key]}
+                                      onChange={(e) => setInputValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                                      className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                                      placeholder={`Enter ${key}...`}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="space-y-5">
+                              {fields.map((field: any) => {
+                                const type = getFieldType(field);
+                                const displayValue = inputValues[field.id] || "";
+
+                                return (
+                                  <div key={field.id} className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground/70">
+                                        {type === "image" && <Image className="h-4 w-4" />}
+                                        {type === "video" && <Video className="h-4 w-4" />}
+                                        {type === "audio" && <Volume2 className="h-4 w-4" />}
+                                        {type === "text" && <AlignLeft className="h-4 w-4" />}
+                                        {type !== "image" && type !== "video" && type !== "audio" && type !== "text" && (
+                                          <FileText className="h-4 w-4" />
+                                        )}
+                                      </span>
+                                      <label className="text-[13px] font-medium text-foreground">{field.label}</label>
+                                      <span className="ml-auto text-[11px] capitalize text-muted-foreground/50">{type}</span>
+                                    </div>
+
+                                    {type === "text" ? (
+                                      <div className="relative">
+                                        <textarea
+                                          placeholder={`Enter ${field.label}...`}
+                                          rows={3}
+                                          value={displayValue}
+                                          onChange={(e) => setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
+                                          className="min-h-[60px] w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary focus:ring-1 focus:ring-primary/30"
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveExpandFieldId(field.id)}
+                                          className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-muted/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer border-0"
+                                          title="Expand"
+                                        >
+                                          <Maximize2 className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      /* File upload fields (image, video, audio, generic file) */
+                                      <div className="space-y-2">
+                                        {type === "image" ? (
+                                          /* Multi-image grid field */
+                                          <div className="space-y-2">
+                                            <div className="relative">
+                                              <button
+                                                type="button"
+                                                tabIndex={-1}
+                                                disabled={uploadingFields[field.id] || (displayValue.split(",").filter(Boolean).length >= 10)}
+                                                onClick={() => {
+                                                  const input = document.getElementById(`file-input-${field.id}`);
+                                                  if (input) input.click();
+                                                }}
+                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-border bg-background px-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer"
+                                                title="Upload image"
+                                              >
+                                                {uploadingFields[field.id] ? (
+                                                  <>
+                                                    <SpinningLogo size="sm" />
+                                                    <span>Uploading...</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      width="24"
+                                                      height="24"
+                                                      viewBox="0 0 24 24"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      className="tabler-icon tabler-icon-cloud-upload h-4 w-4"
+                                                    >
+                                                      <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
+                                                      <path d="M9 15l3 -3l3 3" />
+                                                      <path d="M12 12l0 9" />
+                                                    </svg>
+                                                    <span className="capitalize">Upload image</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                              <input
+                                                id={`file-input-${field.id}`}
+                                                hidden
+                                                accept="image/*"
+                                                multiple
+                                                type="file"
+                                                onChange={(e) => handleFileUpload(field.id, e.target.files)}
+                                              />
+                                            </div>
+                                            
+                                            {displayValue && (
+                                              <div className="grid grid-cols-3 gap-2">
+                                                {displayValue.split(",").filter(Boolean).map((url: string, idx: number) => (
+                                                  <div key={idx} className="group relative">
+                                                    <div className="overflow-hidden rounded-lg bg-muted/30" style={{ border: "2px solid rgba(59, 130, 246, 0.3)", aspectRatio: "1 / 1" }}>
+                                                      <img src={url} alt="" className="h-full w-full object-cover" />
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const urls = displayValue.split(",").filter(Boolean);
+                                                        const newUrls = urls.filter((_, i) => i !== idx);
+                                                        setInputValues((prev) => ({ ...prev, [field.id]: newUrls.join(",") }));
+                                                      }}
+                                                      className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                                      title="Remove"
+                                                    >
+                                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x h-2.5 w-2.5" aria-hidden="true">
+                                                        <path d="M18 6 6 18"></path>
+                                                        <path d="m6 6 12 12"></path>
+                                                      </svg>
+                                                    </button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          /* Single/Multi file upload (video, audio, other) */
+                                          <div className="space-y-2">
+                                            <div className="relative">
+                                              <button
+                                                type="button"
+                                                tabIndex={-1}
+                                                disabled={uploadingFields[field.id] || (displayValue.split(",").filter(Boolean).length >= 10)}
+                                                onClick={() => {
+                                                  const input = document.getElementById(`file-input-${field.id}`);
+                                                  if (input) input.click();
+                                                }}
+                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-border bg-background px-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer"
+                                                title={`Upload ${type}`}
+                                              >
+                                                {uploadingFields[field.id] ? (
+                                                  <>
+                                                    <SpinningLogo size="sm" />
+                                                    <span>Uploading...</span>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <svg
+                                                      xmlns="http://www.w3.org/2000/svg"
+                                                      width="24"
+                                                      height="24"
+                                                      viewBox="0 0 24 24"
+                                                      fill="none"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                      className="tabler-icon tabler-icon-cloud-upload h-4 w-4"
+                                                    >
+                                                      <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
+                                                      <path d="M9 15l3 -3l3 3" />
+                                                      <path d="M12 12l0 9" />
+                                                    </svg>
+                                                    <span className="capitalize">Upload {type}</span>
+                                                  </>
+                                                )}
+                                              </button>
+                                              <input
+                                                id={`file-input-${field.id}`}
+                                                hidden
+                                                accept={
+                                                  type === "video"
+                                                    ? "video/*"
+                                                    : type === "audio"
+                                                    ? "audio/*"
+                                                    : "*"
+                                                }
+                                                multiple
+                                                type="file"
+                                                onChange={(e) => handleFileUpload(field.id, e.target.files)}
+                                              />
+                                            </div>
+
+                                            {displayValue && (
+                                              <div className="space-y-2">
+                                                {displayValue.split(",").filter(Boolean).map((url: string, idx: number) => (
+                                                  <div key={idx} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-2 relative group">
+                                                    {type === "video" && (
+                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-800 text-white border border-border">
+                                                        <Video className="h-4 w-4" />
+                                                      </div>
+                                                    )}
+                                                    {type === "audio" && (
+                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-indigo-50 text-indigo-500 border border-border">
+                                                        <Volume2 className="h-4 w-4" />
+                                                      </div>
+                                                    )}
+                                                    {type !== "video" && type !== "audio" && (
+                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-muted-foreground border border-border">
+                                                        <FileText className="h-4 w-4" />
+                                                      </div>
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                      <span className="block truncate text-xs text-muted-foreground font-mono">{url}</span>
+                                                    </div>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        const urls = displayValue.split(",").filter(Boolean);
+                                                        const newUrls = urls.filter((_, i) => i !== idx);
+                                                        setInputValues((prev) => ({ ...prev, [field.id]: newUrls.join(",") }));
+                                                      }}
+                                                      className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-red-500 transition-colors cursor-pointer border-0 bg-transparent"
+                                                      title="Remove file"
+                                                    >
+                                                      <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))
-                        )}
+                          );
+                        })()}
                       </div>
                       
                       {/* Run Action Container */}
@@ -841,6 +1185,23 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
           onComplete={handleOrchestratorComplete}
         />
       )}
+
+      {/* Text Expand Modal Portal */}
+      {activeExpandFieldId && (() => {
+        const requestNode = (workflow?.nodes || []).find((n: any) => n.type === "requestInputs");
+        const fields = requestNode?.data?.fields || [];
+        const field = fields.find((f: any) => f.id === activeExpandFieldId) || { id: activeExpandFieldId, label: activeExpandFieldId.replace(/([A-Z])/g, " $1").replace("_", " ") };
+        const displayValue = inputValues[activeExpandFieldId] || "";
+
+        return (
+          <TextExpandModal
+            title={field.label}
+            value={displayValue}
+            onChange={(val) => setInputValues((prev) => ({ ...prev, [activeExpandFieldId]: val }))}
+            onClose={() => setActiveExpandFieldId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

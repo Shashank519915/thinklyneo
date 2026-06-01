@@ -6,6 +6,7 @@ import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import NodeHeaderActions from "./NodeHeaderActions";
+import TextExpandModal from "../TextExpandModal";
 import {
   cropImageDefinition,
   openrouterLlmDefinition,
@@ -159,6 +160,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const [isExpanded, setIsExpanded] = useState<Record<string, boolean>>({});
   const [activeUploadPopup, setActiveUploadPopup] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [activeExpandParamKey, setActiveExpandParamKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeUploadPopup && !activeDropdown) return;
@@ -509,7 +511,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               <div className="space-y-1">
                 <div className="relative">
                   <textarea
-                    rows={expanded ? 8 : 3}
+                    rows={3}
                     placeholder={param.placeholder || `Describe the ${param.label.toLowerCase()} you want to create...`}
                     value={value}
                     onChange={(e) => updateInput(param.key, e.target.value)}
@@ -518,15 +520,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   />
                   <button
                     type="button"
-                    onClick={() => setIsExpanded((prev) => ({ ...prev, [param.key]: !expanded }))}
-                    className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-700"
-                    title={expanded ? "Collapse" : "Expand"}
+                    onClick={() => setActiveExpandParamKey(param.key)}
+                    className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-700 shadow-sm"
+                    title="Expand"
                   >
-                    {expanded ? (
-                      <LucideIcons.Minimize2 className="h-3 w-3" />
-                    ) : (
-                      <LucideIcons.Maximize2 className="h-3 w-3" />
-                    )}
+                    <LucideIcons.Maximize2 className="h-3 w-3" />
                   </button>
                 </div>
                 <div className="mt-1 text-right text-[10px] tabular-nums text-gray-400">
@@ -1090,6 +1088,22 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         <LucideIcons.Coins className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
         <span>~{(definition.credits.base / 1000000).toFixed(2)}M</span>
       </div>
+
+      {activeExpandParamKey && (() => {
+        const param = definition.inputs.find((p) => p.key === activeExpandParamKey);
+        if (!param) return null;
+        const paramValue = nodeData.inputs?.[activeExpandParamKey] ?? "";
+
+        return (
+          <TextExpandModal
+            title={param.label}
+            value={String(paramValue)}
+            readOnly={isPreviewMode || readOnly || isLocked}
+            onChange={(val) => updateInput(activeExpandParamKey, val)}
+            onClose={() => setActiveExpandParamKey(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
