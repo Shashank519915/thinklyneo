@@ -577,21 +577,23 @@ export default function RequestInputsNode({
                     )}
 
                     {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 space-y-2">
+                      <div className="nodrag nopan mt-2 grid grid-cols-2 gap-2">
                         {urls.map((url, idx) => (
                           <div key={idx} className="group relative">
                             <div
                               className="overflow-hidden rounded-md bg-black/5"
                               style={{
                                 border: "2px solid rgba(34, 197, 94, 0.3)",
+                                aspectRatio: "16 / 10",
                               }}
                             >
                               <video
                                 src={url}
-                                className="nodrag w-full max-h-40 object-contain"
+                                className="nodrag h-full w-full object-cover"
                                 preload="metadata"
                                 playsInline
                                 controls
+                                controlsList="nodownload nofullscreen"
                               />
                             </div>
                             {!isPreviewMode && !readOnly && (

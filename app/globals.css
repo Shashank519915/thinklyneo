@@ -189,10 +189,16 @@ body {
   user-select: none;
 }
 
-/* Connected input disabled state */
+/* Connected input disabled state — text/static wired values only */
 .input-connected {
   opacity: 0.4 !important;
   pointer-events: none !important;
+}
+
+/* Wired media previews (video/audio/image) stay interactive */
+.input-connected-media {
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 /* Sign-in / Sign-up: content fades in when ClerkLoaded mounts */

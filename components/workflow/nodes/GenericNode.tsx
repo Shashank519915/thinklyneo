@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
-import { generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
+import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import NodeHeaderActions from "./NodeHeaderActions";
 import TextExpandModal from "../TextExpandModal";
 import {
@@ -422,8 +422,18 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         )}
 
         {/* Dynamic Controls based on type */}
-        {isWired ? (
-          <div className="nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] input-connected text-[13px]">
+        {isWired ? (() => {
+          const wiredIsMedia =
+            param.type === "image-array" ||
+            param.type === "file-upload" ||
+            param.handle?.type === "image" ||
+            param.handle?.type === "video" ||
+            param.handle?.type === "audio" ||
+            param.handle?.type === "file" ||
+            (typeof wiredValue === "string" && wiredValue.length > 0 && classifyMediaUrl(wiredValue) !== null);
+
+          return (
+          <div className={`nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] text-[13px] ${wiredIsMedia ? "input-connected-media" : "input-connected"}`}>
             <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
               Connected upstream
             </p>
@@ -500,7 +510,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               </div>
             )}
           </div>
-        ) : (
+          );
+        })() : (
           <div className="relative">
             {param.type === "textarea" && (
               <div className="space-y-1">

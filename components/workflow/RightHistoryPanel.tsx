@@ -6,8 +6,20 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
+import type { Node as FlowNode } from "@xyflow/react";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { classifyMediaUrl, formatDuration, sanitizeError } from "@/lib/utils";
+import {
+  cropImageDefinition,
+  openrouterLlmDefinition,
+  geminiDefinition,
+  gptImage2Definition,
+  klingV3Definition,
+  mergeVideoDefinition,
+  mergeAVDefinition,
+  extractAudioDefinition,
+  type NodeDefinition,
+} from "@galaxy/shared";
 import { SpinningLogo } from "@/components/SpinningLogo";
 
 interface NodeRunData {
@@ -97,27 +109,46 @@ function formatScopeLabel(scope: string): string {
   return scope;
 }
 
-function isRenderableImageUrl(s: string): boolean {
-  const t = s.trim();
-  if (t.startsWith("data:image/")) return true;
-  return /^https?:\/\//i.test(t);
+const DEFINITIONS_BY_NAME: Record<string, NodeDefinition> = {
+  [cropImageDefinition.name]: cropImageDefinition,
+  [geminiDefinition.name]: geminiDefinition,
+  [openrouterLlmDefinition.name]: openrouterLlmDefinition,
+  [gptImage2Definition.name]: gptImage2Definition,
+  [klingV3Definition.name]: klingV3Definition,
+  [mergeVideoDefinition.name]: mergeVideoDefinition,
+  [mergeAVDefinition.name]: mergeAVDefinition,
+  [extractAudioDefinition.name]: extractAudioDefinition,
+};
+
+function resolveInputLabel(nodeName: string, key: string): string {
+  const def = DEFINITIONS_BY_NAME[nodeName];
+  const param = def?.inputs?.find((i) => i.key === key);
+  if (param?.label) return param.label;
+  return key
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .replace(/^\w/, (c) => c.toUpperCase());
 }
 
-/** URL suitable for <img> preview + link (HTTPS crops, data URLs). */
-function extractDisplayableImageUrl(output: unknown): string | null {
-  if (output === null || output === undefined) return null;
-  if (typeof output === "string") {
-    const t = output.trim();
-    return isRenderableImageUrl(t) ? t : null;
-  }
-  if (typeof output === "object" && output !== null && !Array.isArray(output)) {
-    const o = output as Record<string, unknown>;
-    for (const k of ["outputUrl", "url", "imageUrl", "href"]) {
-      const v = o[k];
-      if (typeof v === "string" && isRenderableImageUrl(v.trim())) return v.trim();
-    }
-  }
-  return null;
+function getRequestFieldLabel(fieldId: string, nodes: FlowNode[]): string {
+  const reqNode = nodes.find((n) => n.type === "requestInputs" || n.id === "request-inputs");
+  if (!reqNode) return fieldId.replace(/^field_/, "").replace(/_/g, " ");
+  const fields = ((reqNode.data as { fields?: Array<{ id: string; label?: string }> }).fields) ?? [];
+  const field = fields.find((f) => f.id === fieldId);
+  return field?.label?.trim() || fieldId.replace(/^field_/, "").replace(/_/g, " ");
+}
+
+function getResponseSlotLabel(slotId: string, nodes: FlowNode[]): string {
+  const respNode = nodes.find((n) => n.type === "response" || n.id === "response");
+  if (!respNode) return slotId;
+  const results = ((respNode.data as { results?: Array<{ id: string; label?: string }> }).results) ?? [];
+  const slot = results.find((r) => r.id === slotId);
+  return slot?.label?.trim() || slotId;
+}
+
+function isImageMediaUrl(s: string): boolean {
+  const m = classifyMediaUrl(s.trim());
+  return m?.kind === "image";
 }
 
 function truncateMiddle(s: string, maxLen: number): string {
@@ -126,22 +157,47 @@ function truncateMiddle(s: string, maxLen: number): string {
   return s.slice(0, half) + "…" + s.slice(s.length - half);
 }
 
-/** Video/audio/file media from a string or common output object keys (excludes images — those have their own preview path). */
-function extractPlayableMedia(
-  output: unknown
-): { url: string; kind: "video" | "audio" | "file" } | null {
-  const fromString = (s: string) => {
-    const m = classifyMediaUrl(s);
-    return m && m.kind !== "image" ? (m as { url: string; kind: "video" | "audio" | "file" }) : null;
-  };
-  if (typeof output === "string") return fromString(output);
+/** Summarize multi-key output objects for collapsed history rows. */
+function summarizeMultiKeyOutput(obj: Record<string, unknown>): string {
+  let videos = 0;
+  let audios = 0;
+  let images = 0;
+  let files = 0;
+  let other = 0;
+
+  for (const v of Object.values(obj)) {
+    if (typeof v !== "string") {
+      other++;
+      continue;
+    }
+    const m = classifyMediaUrl(v);
+    if (!m) {
+      other++;
+      continue;
+    }
+    if (m.kind === "video") videos++;
+    else if (m.kind === "audio") audios++;
+    else if (m.kind === "image") images++;
+    else files++;
+  }
+
+  const parts: string[] = [];
+  if (videos) parts.push(`${videos} video${videos > 1 ? "s" : ""}`);
+  if (audios) parts.push(`${audios} audio${audios > 1 ? "s" : ""}`);
+  if (images) parts.push(`${images} image${images > 1 ? "s" : ""}`);
+  if (files) parts.push(`${files} file${files > 1 ? "s" : ""}`);
+  if (other) parts.push(`${other} result${other > 1 ? "s" : ""}`);
+  return parts.length > 0 ? `[${parts.join(" + ")}]` : `[${Object.keys(obj).length} results]`;
+}
+
+function extractPlayableMediaFromObject(output: unknown): { url: string; kind: "video" | "audio" | "file" } | null {
   if (output && typeof output === "object" && !Array.isArray(output)) {
     const o = output as Record<string, unknown>;
     for (const k of ["outputVideo", "outputAudio", "outputUrl", "url", "result", "href"]) {
       const v = o[k];
       if (typeof v === "string") {
-        const m = fromString(v);
-        if (m) return m;
+        const m = classifyMediaUrl(v);
+        if (m && m.kind !== "image") return m as { url: string; kind: "video" | "audio" | "file" };
       }
     }
   }
@@ -153,10 +209,12 @@ function MediaPreview({
   url,
   kind,
   showLink = true,
+  compact = false,
 }: {
   url: string;
   kind: "image" | "video" | "audio" | "file";
   showLink?: boolean;
+  compact?: boolean;
 }) {
   if (kind === "file") {
     return (
@@ -171,6 +229,7 @@ function MediaPreview({
       </a>
     );
   }
+  const mediaMaxH = compact ? "max-h-16" : "max-h-20";
   return (
     <div className="space-y-1">
       {kind === "video" ? (
@@ -178,14 +237,15 @@ function MediaPreview({
           src={url}
           controls
           preload="metadata"
-          className="max-h-28 w-full rounded-md border border-gray-200 bg-black/5 object-contain"
+          controlsList="nodownload nofullscreen"
+          className={`${mediaMaxH} w-full rounded-md border border-gray-200 bg-black/5 object-contain`}
         />
       ) : kind === "audio" ? (
-        <audio src={url} controls preload="metadata" className="w-full" />
+        <audio src={url} controls preload="metadata" className="w-full max-h-8" />
       ) : (
-        <div className="max-h-28 overflow-hidden rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center">
+        <div className={`${mediaMaxH} overflow-hidden rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={url} alt="" className="max-h-28 max-w-full object-contain" loading="lazy" />
+          <img src={url} alt="" className={`${mediaMaxH} max-w-full object-contain`} loading="lazy" />
         </div>
       )}
       {showLink && url.startsWith("http") && (
@@ -199,6 +259,43 @@ function MediaPreview({
           {truncateMiddle(url, 48)}
         </a>
       )}
+    </div>
+  );
+}
+
+/** Render any stored value with classifyMediaUrl-first detection. */
+function ValuePreview({
+  value,
+  compact = false,
+}: {
+  value: unknown;
+  compact?: boolean;
+}) {
+  if (value === null || value === undefined) {
+    return <p className="text-[11px] text-gray-400">—</p>;
+  }
+
+  if (typeof value === "string") {
+    const media = classifyMediaUrl(value);
+    if (media) return <MediaPreview url={media.url} kind={media.kind} compact={compact} />;
+    if (looksLikeOpaquePayload(value)) {
+      return <p className="text-[11px] text-amber-700">Large/binary output omitted in history.</p>;
+    }
+    return (
+      <div className="max-h-20 overflow-y-auto rounded-md border border-gray-100 bg-white px-2 py-1.5 text-[11px] text-gray-800 leading-snug whitespace-pre-wrap break-words">
+        {value}
+      </div>
+    );
+  }
+
+  const nestedMedia = extractPlayableMediaFromObject(value);
+  if (nestedMedia) {
+    return <MediaPreview url={nestedMedia.url} kind={nestedMedia.kind} compact={compact} />;
+  }
+
+  return (
+    <div className="max-h-20 overflow-y-auto rounded-md border border-gray-100 bg-white px-2 py-1.5 text-[11px] text-gray-800 leading-snug whitespace-pre-wrap break-words">
+      {JSON.stringify(value, null, 2)}
     </div>
   );
 }
@@ -234,12 +331,16 @@ function isRequestInputsNodeRun(nr: NodeRunData): boolean {
   return keys.every((k) => k.startsWith("field_"));
 }
 
-/** data:/https URLs, or raw base64 when the field key suggests an image upload. */
+function isResponseNodeRun(nr: NodeRunData): boolean {
+  return nr.nodeId === "response" || nr.nodeName === "Output" || nr.nodeName === "Response";
+}
+
+/** data:/https image URLs, or raw base64 when the field key suggests an image upload. */
 function valueToImagePreviewSrc(value: unknown, fieldKey: string): string | null {
   if (typeof value !== "string") return null;
   const t = value.trim();
   if (!t) return null;
-  if (isRenderableImageUrl(t)) return t;
+  if (isImageMediaUrl(t) || t.startsWith("data:image/")) return t;
   const imageishKey = /image|photo|picture|img/i.test(fieldKey);
   const compact = t.replace(/\s/g, "");
   if (
@@ -252,6 +353,36 @@ function valueToImagePreviewSrc(value: unknown, fieldKey: string): string | null
   return null;
 }
 
+function summarizeOutputForRow(output: unknown): string | null {
+  if (typeof output === "string") {
+    const m = classifyMediaUrl(output);
+    if (m?.kind === "image") return "[Image output]";
+    if (m?.kind === "video") return "[Video output]";
+    if (m?.kind === "audio") return "[Audio output]";
+    if (m?.kind === "file") return "[File output]";
+    return null;
+  }
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const obj = output as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return null;
+    if (keys.length === 1 && typeof obj[keys[0]] === "string") {
+      const m = classifyMediaUrl(obj[keys[0]] as string);
+      if (m?.kind === "image") return "[Image output]";
+      if (m?.kind === "video") return "[Video output]";
+      if (m?.kind === "audio") return "[Audio output]";
+      if (m?.kind === "file") return "[File output]";
+      return null;
+    }
+    return summarizeMultiKeyOutput(obj);
+  }
+  const nested = extractPlayableMediaFromObject(output);
+  if (nested) {
+    return nested.kind === "video" ? "[Video output]" : nested.kind === "audio" ? "[Audio output]" : "[File output]";
+  }
+  return null;
+}
+
 function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" | "empty" } {
   if (nr.error) return { text: sanitizeError(nr.error), kind: "error" };
   if (isRequestInputsNodeRun(nr)) {
@@ -259,12 +390,9 @@ function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" |
     return { text: n > 0 ? `Input fields (${n})` : "Input fields", kind: "ok" };
   }
   if (nr.output !== null && nr.output !== undefined) {
-    const imgUrl = extractDisplayableImageUrl(nr.output);
-    if (imgUrl) return { text: "[Image output]", kind: "ok" };
+    const mediaSummary = summarizeOutputForRow(nr.output);
+    if (mediaSummary) return { text: mediaSummary, kind: "ok" };
 
-    const media = extractPlayableMedia(nr.output);
-    if (media) return { text: media.kind === "video" ? "[Video output]" : media.kind === "audio" ? "[Audio output]" : "[File output]", kind: "ok" };
-    
     let rawText = "";
     if (typeof nr.output === "object" && !Array.isArray(nr.output) && nr.output !== null) {
       const obj = nr.output as Record<string, unknown>;
@@ -272,12 +400,12 @@ function nodeRowSummary(nr: NodeRunData): { text: string; kind: "error" | "ok" |
       if (keys.length === 1 && typeof obj[keys[0]] === "string") {
         rawText = obj[keys[0]] as string;
       } else {
-        rawText = JSON.stringify(nr.output);
+        rawText = summarizeMultiKeyOutput(obj);
       }
     } else {
       rawText = typeof nr.output === "string" ? nr.output : JSON.stringify(nr.output);
     }
-    
+
     if (looksLikeOpaquePayload(rawText)) return { text: "[Output hidden — large/binary]", kind: "ok" };
     const t = rawText.length > 100 ? `${rawText.slice(0, 100)}…` : rawText;
     return { text: t, kind: "ok" };
@@ -329,14 +457,22 @@ function SmallImageStrip({ urls }: { urls: string[] }) {
   );
 }
 
-function OutputDetail({ output }: { output: unknown }) {
+function OutputDetail({
+  output,
+  labelForKey,
+}: {
+  output: unknown;
+  labelForKey?: (key: string) => string;
+}) {
   if (output === null || output === undefined) {
     return <p className="text-[11px] text-gray-400">—</p>;
   }
 
-  // Check if it's an object and not an array
-  if (typeof output === "object" && !Array.isArray(output) && output !== null) {
-    const obj = output as Record<string, unknown>;
+  // Prisma usually returns parsed Json, but normalize stringified objects if present.
+  const normalized = parseOutputAsRecord(output) ?? output;
+
+  if (typeof normalized === "object" && !Array.isArray(normalized) && normalized !== null) {
+    const obj = normalized as Record<string, unknown>;
     const keys = Object.keys(obj);
 
     if (keys.length === 0) {
@@ -344,135 +480,33 @@ function OutputDetail({ output }: { output: unknown }) {
     }
 
     if (keys.length === 1) {
-      const singleKey = keys[0];
-      const val = obj[singleKey];
-
-      const imageUrl = extractDisplayableImageUrl(val);
-      if (imageUrl) {
-        return (
-          <div className="space-y-1">
-            <div className="max-h-28 overflow-hidden rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imageUrl} alt="" className="max-h-28 max-w-full object-contain" />
-            </div>
-            {imageUrl.startsWith("http") && (
-              <a
-                href={imageUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block truncate text-[10px] text-blue-600 hover:underline"
-                title={imageUrl}
-              >
-                {truncateMiddle(imageUrl, 48)}
-              </a>
-            )}
-          </div>
-        );
-      }
-
-      const media = extractPlayableMedia(val);
-      if (media) {
-        return <MediaPreview url={media.url} kind={media.kind} />;
-      }
-
-      if (typeof val === "string") {
-        if (looksLikeOpaquePayload(val)) {
-          return <p className="text-[11px] text-amber-700">Large/binary output omitted in history.</p>;
-        }
-        return (
-          <div className="max-h-20 overflow-y-auto rounded-md border border-gray-100 bg-white px-2 py-1.5 text-[11px] text-gray-800 leading-snug whitespace-pre-wrap break-words">
-            {val}
-          </div>
-        );
-      }
+      return <ValuePreview value={obj[keys[0]]} compact />;
     }
 
-    // Multiple keys or not string value: render as clean key-value layout
     return (
       <div className="space-y-2 rounded-md border border-gray-100 bg-white p-2">
-        {keys.map((k) => {
-          const v = obj[k];
-          const imageUrl = extractDisplayableImageUrl(v);
-          const isImg = !!imageUrl;
-          const media = !isImg ? extractPlayableMedia(v) : null;
-          const textVal = typeof v === "string" ? v : JSON.stringify(v);
-
-          return (
-            <div key={k} className="border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">{k}</p>
-              {media ? (
-                <MediaPreview url={media.url} kind={media.kind} />
-              ) : isImg ? (
-                <div className="space-y-1">
-                  <div className="max-h-20 overflow-hidden rounded bg-gray-50 flex items-center justify-center border border-gray-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imageUrl} alt="" className="max-h-20 max-w-full object-contain" />
-                  </div>
-                  {imageUrl.startsWith("http") && (
-                    <a
-                      href={imageUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block truncate text-[9px] text-blue-600 hover:underline"
-                    >
-                      {truncateMiddle(imageUrl, 40)}
-                    </a>
-                  )}
-                </div>
-              ) : looksLikeOpaquePayload(textVal) ? (
-                <p className="text-[10px] text-amber-700">Large/binary output omitted.</p>
-              ) : (
-                <p className="text-[11px] text-gray-800 leading-normal whitespace-pre-wrap break-words">{textVal}</p>
-              )}
-            </div>
-          );
-        })}
+        {keys.map((k) => (
+          <div key={k} className="border-b border-gray-50 pb-1.5 last:border-0 last:pb-0">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-400 mb-0.5">
+              {labelForKey ? labelForKey(k) : k}
+            </p>
+            <ValuePreview value={obj[k]} compact />
+          </div>
+        ))}
       </div>
     );
   }
 
-  // Fallback for strings or primitives
-  const fallbackMedia = extractPlayableMedia(output);
-  if (fallbackMedia) {
-    return <MediaPreview url={fallbackMedia.url} kind={fallbackMedia.kind} />;
-  }
-
-  const imageUrl = extractDisplayableImageUrl(output);
-  if (imageUrl) {
-    const t = imageUrl;
-    return (
-      <div className="space-y-1">
-        <div className="max-h-28 overflow-hidden rounded-md border border-gray-200 bg-gray-50 flex items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={t} alt="" className="max-h-28 max-w-full object-contain" />
-        </div>
-        {t.startsWith("http") && (
-          <a
-            href={t}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block truncate text-[10px] text-blue-600 hover:underline"
-            title={t}
-          >
-            {truncateMiddle(t, 48)}
-          </a>
-        )}
-      </div>
-    );
-  }
-
-  const s = typeof output === "string" ? output : JSON.stringify(output, null, 2);
-  if (looksLikeOpaquePayload(s)) {
-    return <p className="text-[11px] text-amber-700">Large/binary output omitted in history.</p>;
-  }
-  return (
-    <div className="max-h-20 overflow-y-auto rounded-md border border-gray-100 bg-white px-2 py-1.5 text-[11px] text-gray-800 leading-snug whitespace-pre-wrap break-words">
-      {s}
-    </div>
-  );
+  return <ValuePreview value={normalized} compact />;
 }
 
-function RequestInputsHistoryBody({ nr }: { nr: NodeRunData }) {
+function RequestInputsHistoryBody({
+  nr,
+  fieldLabel,
+}: {
+  nr: NodeRunData;
+  fieldLabel: (fieldId: string) => string;
+}) {
   const raw = nr.inputs ?? {};
   const keys = Object.keys(raw)
     .filter((k) => k !== "__runId" && k.startsWith("field_"))
@@ -486,13 +520,8 @@ function RequestInputsHistoryBody({ nr }: { nr: NodeRunData }) {
       ) : (
         keys.map((key) => {
           const v = raw[key];
-          const label =
-            key
-              .replace(/^field_/, "")
-              .replace(/_/g, " ")
-              .trim() || key;
+          const label = fieldLabel(key);
           const media = typeof v === "string" ? classifyMediaUrl(v) : null;
-          // Fall back to base64-image detection for raw (non-URL) image field values.
           const base64Img = !media && typeof v === "string" ? valueToImagePreviewSrc(v, key) : null;
           if (media || base64Img) {
             return (
@@ -501,9 +530,9 @@ function RequestInputsHistoryBody({ nr }: { nr: NodeRunData }) {
                   {label}
                 </p>
                 {media ? (
-                  <MediaPreview url={media.url} kind={media.kind} />
+                  <MediaPreview url={media.url} kind={media.kind} compact />
                 ) : (
-                  <MediaPreview url={base64Img!} kind="image" showLink={false} />
+                  <MediaPreview url={base64Img!} kind="image" showLink={false} compact />
                 )}
               </div>
             );
@@ -517,7 +546,9 @@ function RequestInputsHistoryBody({ nr }: { nr: NodeRunData }) {
 }
 
 function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
+  const nodes = useWorkflowStore((s) => s.nodes);
   const isRequest = isRequestInputsNodeRun(nr);
+  const isResponse = isResponseNodeRun(nr);
 
   const inputs = nr.inputs ?? {};
   const prompt =
@@ -529,17 +560,16 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
         ? String(inputs.systemPrompt)
         : "";
 
-  // Images supplied as an array (e.g. multi-image upload) — kept as a compact strip.
-  const imageArrayUrls = isRequest
+  const imageArrayUrls = isRequest || isResponse
     ? []
     : (Array.isArray((inputs as Record<string, unknown>).images)
         ? ((inputs as Record<string, unknown>).images as unknown[]).filter(
-            (x): x is string => typeof x === "string" && isRenderableImageUrl(x)
+            (x): x is string => typeof x === "string" && isImageMediaUrl(x)
           )
         : []);
 
-  // Any individual string input that is a previewable media URL (image/video/audio/file).
-  const mediaInputs = isRequest
+  // Response node inputs duplicate output — only show the Output block for that node.
+  const mediaInputs = isRequest || isResponse
     ? []
     : Object.entries(inputs).flatMap(([k, v]) => {
         const m = typeof v === "string" ? classifyMediaUrl(v) : null;
@@ -555,9 +585,12 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
     "maxTokens",
     "topP",
   ]);
-  const otherEntries = isRequest
+  const otherEntries = isRequest || isResponse
     ? []
     : Object.entries(inputs).filter(([k]) => !skippedKeys.has(k) && !mediaInputKeys.has(k));
+
+  const outputLabelForKey = (key: string) =>
+    isResponse ? getResponseSlotLabel(key, nodes) : key;
 
   return (
     <div className="mt-2 space-y-2 border border-gray-200 rounded-lg bg-white p-3 shadow-sm">
@@ -587,7 +620,10 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
       </div>
 
       {isRequest ? (
-        <RequestInputsHistoryBody nr={nr} />
+        <RequestInputsHistoryBody
+          nr={nr}
+          fieldLabel={(fieldId) => getRequestFieldLabel(fieldId, nodes)}
+        />
       ) : (
         <>
           {(prompt || systemPrompt || imageArrayUrls.length > 0 || mediaInputs.length > 0) && (
@@ -597,14 +633,17 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
               <SmallImageStrip urls={imageArrayUrls} />
               {mediaInputs.length > 0 && (
                 <div className="space-y-2">
-                  {mediaInputs.map((m) => (
-                    <div key={m.key}>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">
-                        {m.key.replace(/_/g, " ")}
-                      </p>
-                      <MediaPreview url={m.url} kind={m.kind} />
-                    </div>
-                  ))}
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Inputs</p>
+                  <div className={mediaInputs.length > 1 ? "grid grid-cols-2 gap-2" : "space-y-2"}>
+                    {mediaInputs.map((m) => (
+                      <div key={m.key}>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">
+                          {resolveInputLabel(nr.nodeName, m.key)}
+                        </p>
+                        <MediaPreview url={m.url} kind={m.kind} compact />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -615,7 +654,7 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
               <summary className="cursor-pointer text-gray-500 hover:text-gray-700">Other inputs</summary>
               <div className="mt-1 max-h-24 overflow-y-auto rounded-md bg-gray-50 px-2 py-1 font-mono text-[10px] text-gray-700">
                 {otherEntries.map(([k, v]) => {
-                  if (typeof v === "string" && isRenderableImageUrl(v)) {
+                  if (typeof v === "string" && isImageMediaUrl(v)) {
                     return (
                       <div key={k} className="py-1">
                         <span className="font-semibold text-gray-600">{k}:</span>{" "}
@@ -639,8 +678,10 @@ function ExpandedNodePanel({ nr }: { nr: NodeRunData }) {
           )}
 
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">Output</p>
-            <OutputDetail output={nr.output} />
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-0.5">
+              {isResponse ? "Results" : "Output"}
+            </p>
+            <OutputDetail output={nr.output} labelForKey={outputLabelForKey} />
           </div>
         </>
       )}
@@ -705,7 +746,7 @@ function FilterDropdown({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as HTMLElement)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
