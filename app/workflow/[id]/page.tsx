@@ -28,8 +28,14 @@ import { formatRelativeTime } from "@/lib/utils";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import Canvas from "@/components/workflow/Canvas";
 import TextExpandModal from "@/components/workflow/TextExpandModal";
-import { useWorkflowStore } from "@/store/workflow-store";
+import { useWorkflowStore, type WorkflowField } from "@/store/workflow-store";
 import { type Node, type Edge } from "@xyflow/react";
+import {
+  getRequestFieldKind,
+  buildInputValuesFromFields,
+  acceptForFieldKind,
+  isMultiAssetField,
+} from "@/lib/request-inputs";
 
 interface NodeRunItem {
   id: string;
@@ -144,22 +150,7 @@ export default function WorkflowWorkspacePage() {
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
 
-  const getFieldType = (field: any) => {
-    if (field.type) {
-      if (field.type === "image_field") return "image";
-      if (field.type === "video_field") return "video";
-      if (field.type === "audio_field") return "audio";
-      if (field.type === "text_field") return "text";
-      return field.type;
-    }
-    if (field.id.startsWith("field_image_")) return "image";
-    if (field.id.startsWith("field_video_")) return "video";
-    if (field.id.startsWith("field_audio_")) return "audio";
-    if (field.id.startsWith("field_text_")) return "text";
-    return "text";
-  };
-
-  const handleFileUpload = async (fieldId: string, files: FileList | null) => {
+  const handleFileUpload = async (fieldId: string, files: FileList | null, kind?: ReturnType<typeof getRequestFieldKind>) => {
     if (!files || files.length === 0) return;
 
     const filesArray = Array.from(files);
@@ -176,7 +167,8 @@ export default function WorkflowWorkspacePage() {
     setUploadingFields((prev) => ({ ...prev, [fieldId]: true }));
 
     // For images, show local base64 previews immediately
-    const imageFiles = filesArray.filter((file) => file.type.startsWith("image/"));
+    const imageFiles =
+      kind === "image" ? filesArray.filter((file) => file.type.startsWith("image/")) : [];
     const localPreviews: string[] = [];
     let processedPreviews = 0;
     
@@ -249,12 +241,10 @@ export default function WorkflowWorkspacePage() {
         // Load input fields from Request-Inputs node
         const requestNode = (data.data.nodes || []).find((n: any) => n.type === "requestInputs");
         if (requestNode) {
-          const fields = requestNode.data?.fields || [];
-          const initialVals: Record<string, string> = {};
-          fields.forEach((f: any) => {
-            initialVals[f.id] = f.value || "";
-          });
-          setInputValues(initialVals);
+          const fields = (requestNode.data?.fields || []) as WorkflowField[];
+          setInputValues((prev) => buildInputValuesFromFields(fields, prev));
+        } else {
+          setInputValues({});
         }
 
         // Calculate estimated cost
@@ -596,14 +586,6 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                             );
                           }
 
-                          if (Object.keys(inputValues).length === 0) {
-                            return (
-                              <div className="py-10 text-center text-sm text-muted-foreground">
-                                No settings needed. Ready to trigger.
-                              </div>
-                            );
-                          }
-
                           if (fields.length === 0) {
                             // Fallback: If no fields defined on the RequestInputs node, map over inputValues keys
                             return (
@@ -629,27 +611,48 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 
                           return (
                             <div className="space-y-5">
-                              {fields.map((field: any) => {
-                                const type = getFieldType(field);
-                                const displayValue = inputValues[field.id] || "";
+                              {fields.map((field: WorkflowField) => {
+                                const kind = getRequestFieldKind(field);
+                                const displayValue = inputValues[field.id] ?? "";
 
                                 return (
                                   <div key={field.id} className="space-y-1.5">
                                     <div className="flex items-center gap-1.5">
                                       <span className="text-muted-foreground/70">
-                                        {type === "image" && <Image className="h-4 w-4" />}
-                                        {type === "video" && <Video className="h-4 w-4" />}
-                                        {type === "audio" && <Volume2 className="h-4 w-4" />}
-                                        {type === "text" && <AlignLeft className="h-4 w-4" />}
-                                        {type !== "image" && type !== "video" && type !== "audio" && type !== "text" && (
-                                          <FileText className="h-4 w-4" />
-                                        )}
+                                        {kind === "image" && <Image className="h-4 w-4" />}
+                                        {kind === "video" && <Video className="h-4 w-4" />}
+                                        {kind === "audio" && <Volume2 className="h-4 w-4" />}
+                                        {kind === "text" && <AlignLeft className="h-4 w-4" />}
+                                        {kind === "number" && <FileText className="h-4 w-4" />}
+                                        {kind === "boolean" && <Check className="h-4 w-4" />}
+                                        {(kind === "file") && <FileText className="h-4 w-4" />}
                                       </span>
                                       <label className="text-[13px] font-medium text-foreground">{field.label}</label>
-                                      <span className="ml-auto text-[11px] capitalize text-muted-foreground/50">{type}</span>
+                                      <span className="ml-auto text-[11px] capitalize text-muted-foreground/50">{kind}</span>
                                     </div>
 
-                                    {type === "text" ? (
+                                    {kind === "number" ? (
+                                      <input
+                                        type="number"
+                                        value={displayValue}
+                                        onChange={(e) =>
+                                          setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))
+                                        }
+                                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                                        placeholder={`Enter ${field.label}...`}
+                                      />
+                                    ) : kind === "boolean" ? (
+                                      <select
+                                        value={displayValue === "true" ? "true" : "false"}
+                                        onChange={(e) =>
+                                          setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))
+                                        }
+                                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                                      >
+                                        <option value="false">false</option>
+                                        <option value="true">true</option>
+                                      </select>
+                                    ) : kind === "text" ? (
                                       <div className="relative">
                                         <textarea
                                           placeholder={`Enter ${field.label}...`}
@@ -670,7 +673,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                     ) : (
                                       /* File upload fields (image, video, audio, generic file) */
                                       <div className="space-y-2">
-                                        {type === "image" ? (
+                                        {isMultiAssetField(kind) ? (
                                           /* Multi-image grid field */
                                           <div className="space-y-2">
                                             <div className="relative">
@@ -718,7 +721,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                                 accept="image/*"
                                                 multiple
                                                 type="file"
-                                                onChange={(e) => handleFileUpload(field.id, e.target.files)}
+                                                onChange={(e) => handleFileUpload(field.id, e.target.files, kind)}
                                               />
                                             </div>
                                             
@@ -762,7 +765,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                                   if (input) input.click();
                                                 }}
                                                 className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-border bg-background px-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer"
-                                                title={`Upload ${type}`}
+                                                title={`Upload ${kind}`}
                                               >
                                                 {uploadingFields[field.id] ? (
                                                   <>
@@ -787,23 +790,17 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                                       <path d="M9 15l3 -3l3 3" />
                                                       <path d="M12 12l0 9" />
                                                     </svg>
-                                                    <span className="capitalize">Upload {type}</span>
+                                                    <span className="capitalize">Upload {kind}</span>
                                                   </>
                                                 )}
                                               </button>
                                               <input
                                                 id={`file-input-${field.id}`}
                                                 hidden
-                                                accept={
-                                                  type === "video"
-                                                    ? "video/*"
-                                                    : type === "audio"
-                                                    ? "audio/*"
-                                                    : "*"
-                                                }
-                                                multiple
+                                                accept={acceptForFieldKind(kind)}
+                                                multiple={isMultiAssetField(kind)}
                                                 type="file"
-                                                onChange={(e) => handleFileUpload(field.id, e.target.files)}
+                                                onChange={(e) => handleFileUpload(field.id, e.target.files, kind)}
                                               />
                                             </div>
 
@@ -811,17 +808,17 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                               <div className="space-y-2">
                                                 {displayValue.split(",").filter(Boolean).map((url: string, idx: number) => (
                                                   <div key={idx} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-2 relative group">
-                                                    {type === "video" && (
+                                                    {kind === "video" && (
                                                       <div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-800 text-white border border-border">
                                                         <Video className="h-4 w-4" />
                                                       </div>
                                                     )}
-                                                    {type === "audio" && (
+                                                    {kind === "audio" && (
                                                       <div className="flex h-10 w-10 items-center justify-center rounded bg-indigo-50 text-indigo-500 border border-border">
                                                         <Volume2 className="h-4 w-4" />
                                                       </div>
                                                     )}
-                                                    {type !== "video" && type !== "audio" && (
+                                                    {kind !== "video" && kind !== "audio" && (
                                                       <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-muted-foreground border border-border">
                                                         <FileText className="h-4 w-4" />
                                                       </div>
