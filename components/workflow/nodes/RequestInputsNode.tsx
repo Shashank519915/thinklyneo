@@ -55,6 +55,7 @@ export default function RequestInputsNode({
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
   const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
 
   const fields: WorkflowField[] = nodeData.fields ?? [];
 
@@ -95,30 +96,71 @@ export default function RequestInputsNode({
   };
 
   const handleImageUpload = useCallback(
-    (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+    async (fieldId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
 
-      // Show local preview immediately
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        updateField(fieldId, { value: ev.target?.result as string });
-      };
-      reader.readAsDataURL(file);
+      const filesArray = Array.from(files);
+      const field = fields.find((f) => f.id === fieldId);
+      const currentVal = field?.value || "";
+      const currentUrls = currentVal ? currentVal.split(",").filter(Boolean) : [];
 
-      // Upload to Transloadit via API
-      const formData = new FormData();
-      formData.append("file", file);
-      fetch("/api/upload", { method: "POST", body: formData })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.url) updateField(fieldId, { value: data.url });
-        })
-        .catch(() => {
-          // keep local data URL on failure
+      if (currentUrls.length + filesArray.length > 10) {
+        alert("You can upload a maximum of 10 images.");
+        return;
+      }
+
+      setUploadingFields((prev) => ({ ...prev, [fieldId]: true }));
+
+      // Show local base64 previews immediately
+      const localPreviews: string[] = [];
+      let processedPreviews = 0;
+      filesArray.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          localPreviews.push(ev.target?.result as string);
+          processedPreviews++;
+          if (processedPreviews === filesArray.length) {
+            updateField(fieldId, {
+              value: [...currentUrls, ...localPreviews].slice(0, 10).join(","),
+            });
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+
+      try {
+        const uploadPromises = filesArray.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+          const res = await fetch("/api/upload", { method: "POST", body: formData });
+          const data = await res.json();
+          return data.url || null;
         });
+
+        const uploadedUrls = await Promise.all(uploadPromises);
+        const validUrls = uploadedUrls.filter((url): url is string => url !== null);
+
+        if (validUrls.length > 0) {
+          const latestState = useWorkflowStore.getState();
+          const latestNode = latestState.nodes.find((n) => n.id === id);
+          const latestNodeFields = (latestNode?.data as any)?.fields as WorkflowField[] || [];
+          const latestField = latestNodeFields.find((f) => f.id === fieldId);
+          const latestVal = latestField?.value || "";
+          const latestUrls = latestVal ? latestVal.split(",").filter(Boolean) : [];
+          
+          const cleanUrls = latestUrls.filter((url) => !url.startsWith("data:"));
+          updateField(fieldId, {
+            value: [...cleanUrls, ...validUrls].slice(0, 10).join(","),
+          });
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+      } finally {
+        setUploadingFields((prev) => ({ ...prev, [fieldId]: false }));
+      }
     },
-    [fields]
+    [id, fields]
   );
 
   const handleColor = (type: string) => {
@@ -286,65 +328,114 @@ export default function RequestInputsNode({
                 </div>
               ) : (
                 /* Image field */
-                <div>
+                <div className="space-y-2">
                   {(() => {
-                    const displayValue = getFieldDisplayValue(field);
-                    return displayValue ? (
-                      <div className="relative inline-block group/img">
-                        <img
-                          src={displayValue}
-                          alt="Uploaded"
-                          className="w-20 object-cover rounded-lg border border-gray-200"
-                          style={{ width: 80, height: 60 }}
-                        />
-                        {/* Only show replace/remove in edit mode */}
-                         {/* Only show replace/remove in edit mode */}
-                        {!isPreviewMode && !readOnly && (
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1.5">
-                            {/* Replace button */}
-                            <label
-                              className="nodrag cursor-pointer p-1 bg-white/80 rounded hover:bg-white"
-                              title="Replace image"
-                            >
-                              <Upload className="w-3 h-3 text-gray-700" />
+                    const displayValue = getFieldDisplayValue(field) ?? "";
+                    const urls = displayValue ? displayValue.split(",").filter(Boolean) : [];
+
+                    return (
+                      <>
+                        {urls.length > 0 && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {urls.map((url, idx) => (
+                              <div key={idx} className="group relative">
+                                <div
+                                  className="overflow-hidden rounded-lg bg-gray-50"
+                                  style={{
+                                    border: "2px solid rgba(59, 130, 246, 0.3)",
+                                    aspectRatio: "1 / 1",
+                                  }}
+                                >
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                </div>
+                                {!isPreviewMode && !readOnly && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updatedUrls = urls.filter((_, i) => i !== idx);
+                                      updateField(field.id, {
+                                        value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
+                                      });
+                                    }}
+                                    className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3 text-white" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {!isPreviewMode && !readOnly ? (
+                          urls.length === 0 ? (
+                            <label className="nodrag flex flex-col items-center justify-center gap-1.5 w-full h-20 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] transition-colors cursor-pointer">
+                              {uploadingFields[field.id] ? (
+                                <span className="text-[12px] text-gray-400">Uploading...</span>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4 text-gray-400" />
+                                  <span className="text-[12px] text-gray-400">Upload Image</span>
+                                  <span className="text-[10px] text-gray-300">jpg, jpeg, png, webp, gif</span>
+                                </>
+                              )}
                               <input
                                 type="file"
+                                multiple
                                 accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                                 className="sr-only"
+                                disabled={uploadingFields[field.id]}
                                 onChange={(e) => handleImageUpload(field.id, e)}
                               />
                             </label>
-                            {/* Remove button */}
-                            <button
-                              className="nodrag p-1 bg-white/80 rounded hover:bg-white"
-                              title="Remove image"
-                              onClick={() => updateField(field.id, { value: null })}
-                            >
-                              <X className="w-3 h-3 text-gray-700" />
-                            </button>
-                          </div>
+                          ) : (
+                            urls.length < 10 && (
+                              <button
+                                type="button"
+                                disabled={uploadingFields[field.id]}
+                                onClick={() => {
+                                  document.getElementById(`file-input-${field.id}`)?.click();
+                                }}
+                                className="nodrag flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] text-xs text-gray-500 cursor-pointer"
+                                title="Upload image"
+                              >
+                                {uploadingFields[field.id] ? (
+                                  <span>Uploading...</span>
+                                ) : (
+                                  <>
+                                    <Upload className="w-3.5 h-3.5" />
+                                    <span>Upload Image ({urls.length}/10)</span>
+                                  </>
+                                )}
+                              </button>
+                            )
+                          )
+                        ) : (
+                          urls.length === 0 && (
+                            <div className="flex items-center justify-center w-full h-20 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                              <span className="text-[11px] text-gray-400">No image used</span>
+                            </div>
+                          )
                         )}
-                      </div>
-                    ) : !isPreviewMode && !readOnly ? (
-                      <label className="nodrag flex flex-col items-center justify-center gap-1.5 w-full h-20 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] transition-colors cursor-pointer">
-                        <Upload className="w-4 h-4 text-gray-400" />
-                        <span className="text-[12px] text-gray-400">
-                          Upload Image
-                        </span>
-                        <span className="text-[10px] text-gray-300">
-                          jpg, jpeg, png, webp, gif
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                          className="sr-only"
-                          onChange={(e) => handleImageUpload(field.id, e)}
-                        />
-                      </label>
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-20 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                        <span className="text-[11px] text-gray-400">No image used</span>
-                      </div>
+
+                        {/* Hidden file input for adding more images */}
+                        {!isPreviewMode && !readOnly && urls.length > 0 && (
+                          <input
+                            id={`file-input-${field.id}`}
+                            type="file"
+                            multiple
+                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                            className="sr-only"
+                            disabled={uploadingFields[field.id]}
+                            onChange={(e) => handleImageUpload(field.id, e)}
+                          />
+                        )}
+                      </>
                     );
                   })()}
                 </div>
