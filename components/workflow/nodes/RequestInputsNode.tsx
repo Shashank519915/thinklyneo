@@ -217,16 +217,16 @@ export default function RequestInputsNode({
       case "video_field":
         return "#22c55e"; // Green
       case "audio_field":
-        return "#ec4899"; // Pink
+        return "#06b6d4"; // Cyan
       case "number_field":
-        return "#10b981"; // Emerald
+        return "#ec4899"; // Pink
       case "boolean_field":
-        return "#8b5cf6"; // Purple
+        return "#6366f1"; // Indigo
       case "media_field":
-        return "#d946ef"; // Fuchsia
+        return "#086136"; // Forest Green
       case "file_field":
       default:
-        return "#6b7280"; // Gray
+        return "#a855f7"; // Purple
     }
   };
 
@@ -245,8 +245,8 @@ export default function RequestInputsNode({
           </span>
           <div className="group/tip relative">
             <Info className="w-3.5 h-3.5 text-gray-400 cursor-default" />
-            <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] text-gray-700 shadow-lg group-hover/tip:block font-normal">
-              Define the input fields for your workflow.
+            <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[280px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/tip:block">
+              Define the input fields for your workflow. These become the request parameters when running via Playground or API.
             </div>
           </div>
         </div>
@@ -395,12 +395,12 @@ export default function RequestInputsNode({
                         />
                       )}
                       {/* Field-level Info Tooltip */}
-                      <div className="group/tip relative flex shrink-0">
+                      <span className="group/tip relative flex shrink-0 text-gray-400">
                         <Info className="w-3 h-3 cursor-help text-gray-400" />
-                        <div className="pointer-events-none absolute left-1/2 bottom-full z-[9999] mb-1.5 hidden w-max max-w-[200px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-2 py-1 text-[10px] text-gray-700 shadow-lg group-hover/tip:block font-normal">
-                          Field ID: {field.id}
+                        <div className="pointer-events-none absolute left-1/2 bottom-full z-[9999] mb-1.5 hidden w-max max-w-[280px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/tip:block">
+                          Parameter ID: {field.id}
                         </div>
-                      </div>
+                      </span>
                     </span>
                   )}
 
@@ -413,14 +413,6 @@ export default function RequestInputsNode({
                         onClick={() => copyToClipboard(field.value)}
                       >
                         <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      {/* Pencil Edit Button */}
-                      <button
-                        className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                        title="Edit label"
-                        onClick={() => startEditLabel(field)}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
                       </button>
                       {/* Delete Button */}
                       <button
@@ -458,45 +450,41 @@ export default function RequestInputsNode({
 
                 {field.type === "number_field" && (
                   <input
-                    type="text"
+                    type="number"
+                    step="any"
                     placeholder={readOnly ? "No number configured" : "Enter number..."}
                     value={displayValue}
                     readOnly={isPreviewMode || readOnly}
                     onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })}
-                    className={`nodrag nowheel w-full min-w-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-[#7C3AED] focus:shadow-[0_0_0_1px_#7C3AED] ${isPreviewMode || readOnly ? "cursor-default" : ""}`}
+                    className={`nodrag nowheel w-full min-w-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 ${isPreviewMode || readOnly ? "cursor-default" : ""}`}
                   />
                 )}
 
                 {field.type === "boolean_field" && (
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      disabled={isPreviewMode || readOnly}
-                      onClick={() => !isPreviewMode && !readOnly && updateField(field.id, { value: displayValue === "true" ? "false" : "true" })}
-                      className={`nodrag relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        displayValue === "true" ? "bg-[#7C3AED]" : "bg-gray-200"
-                      } ${(isPreviewMode || readOnly) ? "opacity-60 cursor-default" : ""}`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                          displayValue === "true" ? "translate-x-4" : "translate-x-0"
-                        }`}
+                  <div className="w-full min-w-0">
+                    <label className="nodrag flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={displayValue === "true"}
+                        disabled={isPreviewMode || readOnly}
+                        onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.checked ? "true" : "false" })}
+                        className="h-4 w-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50"
                       />
-                    </button>
-                    <span className="ml-2 text-[12px] text-gray-500 font-medium select-none capitalize">
-                      {displayValue === "true" ? "True" : "False"}
-                    </span>
+                      <span className="text-sm text-gray-700 select-none">
+                        {displayValue === "true" ? "True" : "False"}
+                      </span>
+                    </label>
                   </div>
                 )}
 
                 {field.type === "image_field" && (
                   <div className="space-y-2">
                     {urls.length > 0 && (
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="nodrag nopan mt-2 grid grid-cols-3 gap-2">
                         {urls.map((url, idx) => (
                           <div key={idx} className="group relative">
                             <div
-                              className="overflow-hidden rounded-lg bg-gray-50"
+                              className="overflow-hidden rounded-md bg-gray-50"
                               style={{
                                 border: "2px solid rgba(59, 130, 246, 0.3)",
                                 aspectRatio: "1 / 1",
@@ -517,10 +505,10 @@ export default function RequestInputsNode({
                                     value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
                                   });
                                 }}
-                                className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
                                 title="Remove"
                               >
-                                <X className="w-3 h-3 text-white" />
+                                <X className="w-2.5 h-2.5 text-white" />
                               </button>
                             )}
                           </div>
@@ -529,35 +517,15 @@ export default function RequestInputsNode({
                     )}
 
                     {!isPreviewMode && !readOnly ? (
-                      urls.length === 0 ? (
-                        <label className="nodrag flex flex-col items-center justify-center gap-1.5 w-full h-20 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] transition-colors cursor-pointer">
-                          {uploadingFields[field.id] ? (
-                            <span className="text-[12px] text-gray-400">Uploading...</span>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 text-gray-400" />
-                              <span className="text-[12px] text-gray-400">Upload Image</span>
-                              <span className="text-[10px] text-gray-300">jpg, jpeg, png, webp, gif</span>
-                            </>
-                          )}
-                          <input
-                            type="file"
-                            multiple
-                            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
-                            className="sr-only"
-                            disabled={uploadingFields[field.id]}
-                            onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                          />
-                        </label>
-                      ) : (
-                        urls.length < 10 && (
+                      urls.length < 10 && (
+                        <div className="relative">
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
                             onClick={() => {
                               document.getElementById(`file-input-${field.id}`)?.click();
                             }}
-                            className="nodrag flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] text-xs text-gray-500 cursor-pointer"
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                             title="Upload image"
                           >
                             {uploadingFields[field.id] ? (
@@ -565,27 +533,27 @@ export default function RequestInputsNode({
                             ) : (
                               <>
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>Upload Image ({urls.length}/10)</span>
+                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/10)`}</span>
                               </>
                             )}
                           </button>
-                        )
+                        </div>
                       )
                     ) : (
                       urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-20 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400">No image used</span>
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                          <span className="text-[11px] text-gray-400 font-medium">No image used</span>
                         </div>
                       )
                     )}
 
-                    {/* Hidden file input for adding more images */}
-                    {!isPreviewMode && !readOnly && urls.length > 0 && (
+                    {/* Hidden file input */}
+                    {!isPreviewMode && !readOnly && (
                       <input
                         id={`file-input-${field.id}`}
                         type="file"
                         multiple
-                        accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+                        accept="image/*"
                         className="sr-only"
                         disabled={uploadingFields[field.id]}
                         onChange={(e) => handleFileUpload(field.id, field.type, e)}
@@ -594,24 +562,186 @@ export default function RequestInputsNode({
                   </div>
                 )}
 
-                {/* Audio / Video / Media / File generic card-based list */}
-                {(field.type === "audio_field" || field.type === "video_field" || field.type === "media_field" || field.type === "file_field") && (
+                {field.type === "video_field" && (
                   <div className="space-y-2">
                     {urls.length > 0 && (
-                      <div className="space-y-1.5">
+                      <div className="nodrag nopan mt-2 grid grid-cols-3 gap-2">
+                        {urls.map((url, idx) => (
+                          <div key={idx} className="group relative">
+                            <div
+                              className="overflow-hidden rounded-md bg-gray-50"
+                              style={{
+                                border: "2px solid rgba(34, 197, 94, 0.3)",
+                                aspectRatio: "4 / 3",
+                              }}
+                            >
+                              <video
+                                src={url}
+                                className="h-full w-full object-cover"
+                                preload="metadata"
+                                playsInline
+                              />
+                            </div>
+                            {!isPreviewMode && !readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedUrls = urls.filter((_, i) => i !== idx);
+                                  updateField(field.id, {
+                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
+                                  });
+                                }}
+                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                title="Remove"
+                              >
+                                <X className="w-2.5 h-2.5 text-white" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {!isPreviewMode && !readOnly ? (
+                      urls.length < 10 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            disabled={uploadingFields[field.id]}
+                            onClick={() => {
+                              document.getElementById(`file-input-${field.id}`)?.click();
+                            }}
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                            title="Upload video"
+                          >
+                            {uploadingFields[field.id] ? (
+                              <span>Uploading...</span>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      urls.length === 0 && (
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                          <span className="text-[11px] text-gray-400 font-medium">No video used</span>
+                        </div>
+                      )
+                    )}
+
+                    {/* Hidden file input */}
+                    {!isPreviewMode && !readOnly && (
+                      <input
+                        id={`file-input-${field.id}`}
+                        type="file"
+                        multiple
+                        accept="video/*"
+                        className="sr-only"
+                        disabled={uploadingFields[field.id]}
+                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {(field.type === "audio_field" || field.type === "media_field") && (
+                  <div className="space-y-2">
+                    {urls.length > 0 && (
+                      <div className="nodrag nopan mt-2 space-y-2">
+                        {urls.map((url, idx) => (
+                          <div key={idx} className="group relative">
+                            <audio
+                              src={url}
+                              controls
+                              className="w-full"
+                            />
+                            {!isPreviewMode && !readOnly && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedUrls = urls.filter((_, i) => i !== idx);
+                                  updateField(field.id, {
+                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
+                                  });
+                                }}
+                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
+                                title="Remove"
+                              >
+                                <X className="w-2.5 h-2.5 text-white" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {!isPreviewMode && !readOnly ? (
+                      urls.length < 10 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            disabled={uploadingFields[field.id]}
+                            onClick={() => {
+                              document.getElementById(`file-input-${field.id}`)?.click();
+                            }}
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                            title={`Upload ${field.type === "audio_field" ? "audio" : "media"}`}
+                          >
+                            {uploadingFields[field.id] ? (
+                              <span>Uploading...</span>
+                            ) : (
+                              <>
+                                <Upload className="w-3.5 h-3.5" />
+                                <span className="capitalize">Upload {field.type === "audio_field" ? "audio" : "media"}{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      urls.length === 0 && (
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                          <span className="text-[11px] text-gray-400 font-medium">No {field.type === "audio_field" ? "audio" : "media"} used</span>
+                        </div>
+                      )
+                    )}
+
+                    {/* Hidden file input */}
+                    {!isPreviewMode && !readOnly && (
+                      <input
+                        id={`file-input-${field.id}`}
+                        type="file"
+                        multiple
+                        accept="audio/*,video/*"
+                        className="sr-only"
+                        disabled={uploadingFields[field.id]}
+                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {field.type === "file_field" && (
+                  <div className="space-y-2">
+                    {urls.length > 0 && (
+                      <div className="nodrag nopan mt-2 space-y-2">
                         {urls.map((url, idx) => {
-                          const filename = url.split("/").pop() || `${field.type.replace("_field", "")} ${idx + 1}`;
+                          const filename = url.split("/").pop() || `File ${idx + 1}`;
                           return (
-                            <div key={idx} className="group relative flex items-center justify-between p-2 rounded-lg border border-gray-200 bg-[#F5F5F5] text-[12px]">
-                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                {field.type === "video_field" ? (
-                                  <Video className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                                ) : field.type === "audio_field" ? (
-                                  <Music className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                                ) : (
-                                  <FileText className="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                                )}
-                                <span className="truncate text-gray-700 font-medium" title={filename}>{filename}</span>
+                            <div key={idx} className="group relative">
+                              <div
+                                className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white"
+                                style={{
+                                  border: "2px solid rgba(168, 85, 247, 0.3)",
+                                }}
+                              >
+                                <span className="truncate text-xs text-gray-600">
+                                  {filename}
+                                </span>
                               </div>
                               {!isPreviewMode && !readOnly && (
                                 <button
@@ -622,10 +752,10 @@ export default function RequestInputsNode({
                                       value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
                                     });
                                   }}
-                                  className="nodrag p-1 text-gray-400 hover:text-red-500 hover:bg-gray-200/50 rounded transition-colors border-0 bg-transparent cursor-pointer"
+                                  className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
                                   title="Remove"
                                 >
-                                  <X className="w-3.5 h-3.5" />
+                                  <X className="w-2.5 h-2.5 text-white" />
                                 </button>
                               )}
                             </div>
@@ -635,74 +765,43 @@ export default function RequestInputsNode({
                     )}
 
                     {!isPreviewMode && !readOnly ? (
-                      urls.length === 0 ? (
-                        <label className="nodrag flex flex-col items-center justify-center gap-1.5 w-full h-20 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] transition-colors cursor-pointer">
-                          {uploadingFields[field.id] ? (
-                            <span className="text-[12px] text-gray-400">Uploading...</span>
-                          ) : (
-                            <>
-                              <Upload className="w-4 h-4 text-gray-400" />
-                              <span className="text-[12px] text-gray-400">Upload {field.type.replace("_field", "").replace("file", "File").replace("audio", "Audio").replace("video", "Video").replace("media", "Media")}</span>
-                            </>
-                          )}
-                          <input
-                            type="file"
-                            multiple
-                            accept={
-                              field.type === "video_field"
-                                ? "video/*"
-                                : field.type === "audio_field"
-                                ? "audio/*"
-                                : "*"
-                            }
-                            className="sr-only"
-                            disabled={uploadingFields[field.id]}
-                            onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                          />
-                        </label>
-                      ) : (
-                        urls.length < 10 && (
+                      urls.length < 10 && (
+                        <div className="relative">
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
                             onClick={() => {
                               document.getElementById(`file-input-${field.id}`)?.click();
                             }}
-                            className="nodrag flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] hover:bg-[#F3F0FF] text-xs text-gray-500 cursor-pointer"
-                            title={`Upload ${field.type.replace("_field", "")}`}
+                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                            title="Upload file"
                           >
                             {uploadingFields[field.id] ? (
                               <span>Uploading...</span>
                             ) : (
                               <>
                                 <Upload className="w-3.5 h-3.5" />
-                                <span>Upload {field.type.replace("_field", "").replace("file", "File").replace("audio", "Audio").replace("video", "Video").replace("media", "Media")} ({urls.length}/10)</span>
+                                <span className="capitalize">Upload file{urls.length > 0 && ` (${urls.length}/10)`}</span>
                               </>
                             )}
                           </button>
-                        )
+                        </div>
                       )
                     ) : (
                       urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-20 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
+                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
                           <span className="text-[11px] text-gray-400 font-medium">No file used</span>
                         </div>
                       )
                     )}
 
-                    {/* Hidden file input for adding more files */}
-                    {!isPreviewMode && !readOnly && urls.length > 0 && (
+                    {/* Hidden file input */}
+                    {!isPreviewMode && !readOnly && (
                       <input
                         id={`file-input-${field.id}`}
                         type="file"
                         multiple
-                        accept={
-                          field.type === "video_field"
-                            ? "video/*"
-                            : field.type === "audio_field"
-                            ? "audio/*"
-                            : "*"
-                        }
+                        accept="*/*"
                         className="sr-only"
                         disabled={uploadingFields[field.id]}
                         onChange={(e) => handleFileUpload(field.id, field.type, e)}
