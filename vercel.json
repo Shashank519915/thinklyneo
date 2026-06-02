@@ -3,5 +3,15 @@
     "app/workflow/[id]/page.tsx": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/docs",
+      "destination": "https://nextflow-6b82c0dd.mintlify.dev/docs"
+    },
+    {
+      "source": "/docs/:match*",
+      "destination": "https://nextflow-6b82c0dd.mintlify.dev/docs/:match*"
+    }
+  ]
 }
