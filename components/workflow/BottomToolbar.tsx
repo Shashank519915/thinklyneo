@@ -4,6 +4,7 @@
  * @fileoverview Bottom-centered chrome: sticky-note placeholder plus add-node FAB toggling the `NodePicker`.
  */
 
+import { useRef } from "react";
 import { StickyNote, Plus } from "lucide-react";
 import { useWorkflowStore } from "@/store/workflow-store";
 import NodePicker from "./NodePicker";
@@ -11,6 +12,7 @@ import NodePicker from "./NodePicker";
 /** Docked toolbar above canvas bottom lip; exposes node palette anchored to “+”. */
 export default function BottomToolbar() {
   const { setIsNodePickerOpen, isNodePickerOpen } = useWorkflowStore();
+  const pickerAnchorRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
@@ -25,7 +27,7 @@ export default function BottomToolbar() {
         </button>
 
         {/* Add node button */}
-        <div className="relative">
+        <div ref={pickerAnchorRef} className="relative">
           <button
             type="button"
             onClick={() => setIsNodePickerOpen(!isNodePickerOpen)}
@@ -40,7 +42,7 @@ export default function BottomToolbar() {
           </button>
 
           {/* Picker portal — opens above the button */}
-          {isNodePickerOpen && <NodePicker />}
+          {isNodePickerOpen && <NodePicker anchorRef={pickerAnchorRef} />}
         </div>
       </div>
     </div>
