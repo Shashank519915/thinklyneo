@@ -1,12 +1,13 @@
 /**
- * @fileoverview Static fractional “million-credit” estimates surfaced on Crop/Gemini nodes + top chrome.
- * These constants are illustrative only — no metering backend verifies spend.
+ * @fileoverview Static workflow cost estimates for canvas chrome — sourced from @galaxy/shared definitions.
  */
 
 import type { Node } from "@xyflow/react";
+import { estimateWorkflowCostMillions } from "@galaxy/shared";
 
-/** Fixed placeholder “cost” per node type for Est UI only (no billing backend). */
+/** @deprecated Use estimateWorkflowCostMillions from shared; kept for CropImageNode label compat */
 export const ESTIMATE_CROP_M = 0.21;
+/** @deprecated Use estimateWorkflowCostMillions from shared; kept for CropImageNode label compat */
 export const ESTIMATE_GEMINI_M = 0.45;
 
 export const NODE_ESTIMATE_LABEL: Record<"cropImage" | "gemini", string> = {
@@ -15,15 +16,10 @@ export const NODE_ESTIMATE_LABEL: Record<"cropImage" | "gemini", string> = {
 };
 
 /**
- * Walks workflow nodes accumulating fixed placeholders for UI aggregate display.
- *
- * @param nodeList — Current React Flow node array (may contain unrelated types — ignored silently).
+ * Sums credits.base for all executable nodes on the canvas (microcredits → millions).
  */
 export function sumWorkflowEstimateMillions(nodeList: Node[]): number {
-  let sum = 0;
-  for (const n of nodeList) {
-    if (n.type === "cropImage") sum += ESTIMATE_CROP_M;
-    if (n.type === "gemini") sum += ESTIMATE_GEMINI_M;
-  }
-  return sum;
+  return estimateWorkflowCostMillions(
+    nodeList.map((n) => ({ type: n.type ?? "" }))
+  );
 }

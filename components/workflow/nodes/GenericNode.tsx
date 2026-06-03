@@ -5,6 +5,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
+import { uploadFilesViaApi } from "@/lib/upload";
 import NodeHeaderActions from "./NodeHeaderActions";
 import TextExpandModal from "../TextExpandModal";
 import {
@@ -289,22 +290,17 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         const currentArr = currentInputs[key] || [];
         const remaining = 10 - currentArr.length;
         if (remaining <= 0) {
+          alert("You can upload a maximum of 10 files.");
           setUploadingField(null);
           return;
         }
         filesToUpload = filesToUpload.slice(0, remaining);
       }
 
-      const uploadPromises = filesToUpload.map(async (file) => {
-        const formData = new FormData();
-        formData.append("file", file);
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData });
-        const uploadData = await uploadRes.json();
-        return uploadData.url || null;
-      });
-
-      const uploadedUrls = await Promise.all(uploadPromises);
-      const validUrls = uploadedUrls.filter((url): url is string => url !== null);
+      const { urls: validUrls, firstError } = await uploadFilesViaApi(filesToUpload);
+      if (firstError) {
+        window.alert(firstError);
+      }
 
       if (validUrls.length > 0) {
         const store = useWorkflowStore.getState();

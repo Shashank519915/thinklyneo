@@ -18,6 +18,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { workflowFilePayloadSchema } from "@/lib/validation";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
+import { validateWorkflowInputsSync } from "@galaxy/shared";
 import WorkflowSaveToast, {
   type WorkflowSaveToastPhase,
 } from "@/components/workflow/WorkflowSaveToast";
@@ -128,6 +129,24 @@ export default function WorkflowCanvasPage() {
       let existingOutputs = {};
       if (scope === "single" || scope === "partial") {
         existingOutputs = useWorkflowStore.getState().nodeOutputs;
+      }
+
+      const limitErr = validateWorkflowInputsSync({
+        nodes: nodesRef.current.map((n) => ({
+          id: n.id,
+          type: n.type ?? "",
+          data: n.data as Record<string, unknown>,
+        })),
+        inputValues,
+        scope,
+        targetNodeIds: targetIds,
+      });
+      if (limitErr) {
+        window.alert(limitErr.message);
+        isRunningRef.current = false;
+        setIsRunning(false);
+        setCurrentRunScope(null);
+        return;
       }
 
       try {

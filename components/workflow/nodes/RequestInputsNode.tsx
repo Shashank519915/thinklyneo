@@ -27,6 +27,7 @@ import {
 import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/workflow-store";
 import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
+import { uploadFilesViaApi } from "@/lib/upload";
 
 interface RequestInputsData {
   label: string;
@@ -156,16 +157,10 @@ export default function RequestInputsNode({
       setUploadingFields((prev) => ({ ...prev, [fieldId]: true }));
 
       try {
-        const uploadPromises = filesArray.map(async (file) => {
-          const formData = new FormData();
-          formData.append("file", file);
-          const res = await fetch("/api/upload", { method: "POST", body: formData });
-          const data = await res.json();
-          return data.url || null;
-        });
-
-        const uploadedUrls = await Promise.all(uploadPromises);
-        const validUrls = uploadedUrls.filter((url): url is string => url !== null);
+        const { urls: validUrls, firstError } = await uploadFilesViaApi(filesArray);
+        if (firstError) {
+          window.alert(firstError);
+        }
 
         if (validUrls.length > 0) {
           const latestState = useWorkflowStore.getState();
