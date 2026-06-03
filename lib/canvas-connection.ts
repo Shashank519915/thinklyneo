@@ -4,11 +4,14 @@
  */
 
 import type { Connection, Edge, Node } from "@xyflow/react";
+import { isLikelyVideoUrl, parseMediaList } from "@galaxy/shared";
 import { isValidConnection, validateNewEdge } from "@/lib/execution";
+import { resolvePropagatedEdgeValue } from "@/lib/utils";
 
 export type CanvasConnectionRejection =
   | "invalid-type"
   | "duplicate-target"
+  | "single-video-only"
   | "cycle";
 
 export interface CanvasConnectionEvaluation {
@@ -25,6 +28,25 @@ type ConnectionLike = {
   targetHandle?: string | null;
 };
 
+function countVideoUrlsFromSource(
+  nodes: Node[],
+  connection: ConnectionLike
+): number {
+  if (!connection.source || !connection.sourceHandle) return 0;
+  const edge = {
+    id: "__eval__",
+    source: connection.source,
+    target: connection.target ?? "",
+    sourceHandle: connection.sourceHandle,
+    targetHandle: connection.targetHandle ?? "",
+  } as Edge;
+  const val = resolvePropagatedEdgeValue(edge, nodes);
+  const videos = parseMediaList(val).filter(isLikelyVideoUrl);
+  if (videos.length > 0) return videos.length;
+  return parseMediaList(val).length;
+}
+
+/** Mirrors `Canvas` `isValidConnection` / `onConnect` guards. */
 export function evaluateCanvasConnection(
   nodes: Node[],
   edges: Edge[],
@@ -52,7 +74,32 @@ export function evaluateCanvasConnection(
         e.targetHandle === connection.targetHandle
     );
     if (hasExisting) {
-      return { allowed: false, reason: "duplicate-target" };
+      const isMergeAvVideo =
+        targetNode?.type === "mergeAV" &&
+        connection.targetHandle === "in:video_url";
+      return {
+        allowed: false,
+        reason: "duplicate-target",
+        error: isMergeAvVideo
+          ? "Merge Audio & Video accepts only one video input. Disconnect the existing wire first."
+          : undefined,
+      };
+    }
+  }
+
+  if (
+    targetNode?.type === "mergeAV" &&
+    connection.targetHandle === "in:video_url" &&
+    connection.source
+  ) {
+    const videoCount = countVideoUrlsFromSource(nodes, connection);
+    if (videoCount > 1) {
+      return {
+        allowed: false,
+        reason: "single-video-only",
+        error:
+          "Merge Audio & Video accepts only one video. Use Merge Videos to combine multiple clips.",
+      };
     }
   }
 

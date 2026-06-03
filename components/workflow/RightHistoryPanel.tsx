@@ -193,7 +193,7 @@ function summarizeMultiKeyOutput(obj: Record<string, unknown>): string {
 function extractPlayableMediaFromObject(output: unknown): { url: string; kind: "video" | "audio" | "file" } | null {
   if (output && typeof output === "object" && !Array.isArray(output)) {
     const o = output as Record<string, unknown>;
-    for (const k of ["outputVideo", "outputAudio", "outputUrl", "url", "result", "href"]) {
+    for (const k of ["video_url", "outputVideo", "outputAudio", "outputUrl", "url", "result", "href"]) {
       const v = o[k];
       if (typeof v === "string") {
         const m = classifyMediaUrl(v);

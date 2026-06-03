@@ -54,7 +54,7 @@ const RECENT_NODES = [
   },
   {
     id: "mergeAV",
-    label: "Merge A/V",
+    label: "Merge Audio & Video",
     nodeType: "mergeAV",
     icon: <Video className="h-4 w-4 text-cyan-500" />,
   },
@@ -160,8 +160,8 @@ function createNode(nodeType: string): Node {
       type: "mergeAV",
       position,
       data: {
-        label: "Merge A/V",
-        inputs: { videoUrl: "", audioUrl: "" },
+        label: "Merge Audio & Video",
+        inputs: { video_url: null, audio_url: null, audio_volume: 0.5 },
         output: null,
       },
     };

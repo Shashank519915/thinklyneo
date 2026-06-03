@@ -5,6 +5,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { parseMediaList } from "@/lib/media-list";
+import { isLikelyVideoUrl } from "@galaxy/shared";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import NodeHeaderActions from "./NodeHeaderActions";
@@ -369,6 +370,241 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const disabled = readOnly || isLocked || isWired || requestMuteByHandle[handleId];
     const expanded = !!isExpanded[param.key];
 
+    if (definition.type === "mergeAV" && param.uiVariant === "magica-volume-row") {
+      const vol =
+        value !== "" && value !== null && value !== undefined
+          ? Number(value)
+          : (param.defaultValue ?? 0.5);
+      return (
+        <div key={param.key} className="relative overflow-visible">
+          {param.handle && (
+            <div
+              className="absolute flex items-center"
+              style={{ left: "-22px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+            >
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={handleId}
+                className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: param.handle.color,
+                  border: `2px solid ${param.handle.color}80`,
+                  boxShadow: `${param.handle.color}50 0px 0px 8px`,
+                  cursor: "crosshair",
+                }}
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                data-handle-anchor="label"
+                className="flex min-w-0 shrink items-center truncate text-xs text-gray-500"
+              >
+                {param.label}
+                {param.tooltip && (
+                  <span className="group/voltip relative ml-1 inline-flex shrink-0 cursor-pointer">
+                    <LucideIcons.Info className="h-3 w-3 text-gray-400" aria-hidden="true" />
+                    <span className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/voltip:block">
+                      {param.tooltip}
+                    </span>
+                  </span>
+                )}
+              </span>
+              <input
+                type="range"
+                min={param.min ?? 0}
+                max={param.max ?? 2}
+                step={param.step ?? 0.1}
+                value={vol}
+                onChange={(e) => updateInput(param.key, Number(e.target.value))}
+                disabled={disabled}
+                className={`nodrag h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 ${theme.accent} disabled:opacity-50`}
+              />
+              <input
+                type="number"
+                min={param.min ?? 0}
+                max={param.max ?? 2}
+                step={param.step ?? 0.1}
+                value={vol}
+                onChange={(e) => updateInput(param.key, Number(e.target.value))}
+                disabled={disabled}
+                className="nodrag w-12 shrink-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-1.5 py-1 text-center text-xs text-gray-900 outline-none disabled:opacity-50"
+              />
+              <button
+                type="button"
+                disabled={disabled}
+                onClick={() => updateInput(param.key, param.defaultValue ?? 0.5)}
+                className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                title="Reset to default"
+              >
+                <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              {!readOnly && (
+                <AddToRequestToggle
+                  muted={!!requestMuteByHandle[handleId]}
+                  disabled={isLocked}
+                  onMutedChange={(m) =>
+                    setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
+                  }
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (definition.type === "mergeAV" && param.uiVariant === "magica-side-label") {
+      const isVideoField = param.key === "video_url";
+      const mediaUrls = isWired ? parseMediaList(wiredValue) : parseMediaList(value);
+      const videoUrls = isVideoField ? mediaUrls.filter(isLikelyVideoUrl) : mediaUrls;
+      const displayUrls = isVideoField && videoUrls.length > 0 ? videoUrls : mediaUrls;
+      const primaryUrl = displayUrls[0];
+      const multiVideoRejected =
+        isVideoField && isWired && (videoUrls.length > 1 || mediaUrls.length > 1);
+      const accept =
+        param.key === "video_url"
+          ? "video/*"
+          : param.key === "audio_url"
+            ? "audio/*,video/*"
+            : "*";
+      const borderColor =
+        param.handle?.color === "#06b6d4"
+          ? "rgba(6, 182, 212, 0.3)"
+          : "rgba(34, 197, 94, 0.3)";
+
+      return (
+        <div key={param.key} className="relative overflow-visible">
+          {param.handle && (
+            <div
+              className="absolute flex items-center"
+              style={{ left: "-22px", top: "12px", transform: "translateY(-50%)", zIndex: 50 }}
+            >
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={handleId}
+                className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: param.handle.color,
+                  border: `2px solid ${param.handle.color}80`,
+                  boxShadow: `${param.handle.color}50 0px 0px 8px`,
+                  cursor: "crosshair",
+                }}
+              />
+            </div>
+          )}
+          <div className="flex items-start gap-3">
+            <span
+              data-handle-anchor="label"
+              className="shrink-0 pt-2 text-xs text-gray-500"
+            >
+              {param.label}
+              {param.required && <span className="text-red-400">*</span>}
+            </span>
+            <div className="flex-1">
+              {!readOnly && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    disabled={disabled || multiVideoRejected}
+                    onClick={() => {
+                      if (!isWired) {
+                        document.getElementById(`file-input-${param.key}`)?.click();
+                      }
+                    }}
+                    className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:opacity-50"
+                    title={primaryUrl ? `Change ${param.label.toLowerCase()}` : `Upload ${param.label.toLowerCase()}`}
+                  >
+                    {uploadingField === param.key ? (
+                      <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <LucideIcons.Upload className="h-3.5 w-3.5" />
+                    )}
+                    <span className="capitalize">
+                      {uploadingField === param.key
+                        ? "Uploading..."
+                        : primaryUrl
+                          ? `Change ${param.label.toLowerCase()}`
+                          : `Upload ${param.label.toLowerCase()}`}
+                    </span>
+                  </button>
+                  <input
+                    id={`file-input-${param.key}`}
+                    type="file"
+                    hidden
+                    accept={accept}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      void handleFileUpload(param.key, e.target.files).finally(() => {
+                        e.target.value = "";
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          {multiVideoRejected && (
+            <p className="mt-2 text-[11px] text-amber-600">
+              Only one video is allowed. Use Merge Videos to combine multiple clips.
+            </p>
+          )}
+          {primaryUrl && !multiVideoRejected && (
+            <div className="mt-2">
+              {param.handle?.type === "audio" ||
+              /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(primaryUrl) ? (
+                <div className="relative inline-block">
+                  <audio src={primaryUrl} controls className="w-[160px]" />
+                  {!readOnly && !isWired && (
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => removeFileValue(param.key)}
+                      className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                    >
+                      <LucideIcons.X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="relative max-w-[160px] overflow-hidden rounded-md"
+                  style={{ border: `2px solid ${borderColor}` }}
+                >
+                  <video
+                    src={primaryUrl}
+                    controls
+                    className="w-full rounded-sm"
+                    style={{ maxHeight: 120 }}
+                  />
+                  {!readOnly && !isWired && (
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => removeFileValue(param.key)}
+                      className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                    >
+                      <LucideIcons.X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div
         key={param.key}
@@ -401,7 +637,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         )}
 
         {(param.type !== "image-array" && param.type !== "video-array" || isWired) &&
-          !(param.type === "select" && param.key === "transition") && (
+          !(param.type === "select" && param.key === "transition") &&
+          param.uiVariant !== "magica-side-label" &&
+          param.uiVariant !== "magica-volume-row" && (
           <div
             data-handle-anchor="label"
             className="mb-1.5 flex items-center text-xs text-gray-500"

@@ -93,6 +93,47 @@ describe("evaluateCanvasConnection", () => {
     expect(result.allowed).toBe(true);
   });
 
+  it("rejects multiple videos wired into Merge A/V in:video_url", () => {
+    const nodes: Node[] = [
+      {
+        id: "ri",
+        type: "requestInputs",
+        position: { x: 0, y: 0 },
+        data: {
+          fields: [
+            {
+              id: "field_video_multi",
+              value: "https://a/1.mp4,https://a/2.mp4",
+            },
+          ],
+        },
+      },
+      node("mav", "mergeAV"),
+    ];
+    const result = evaluateCanvasConnection(nodes, [], {
+      source: "ri",
+      target: "mav",
+      sourceHandle: "field_video_multi",
+      targetHandle: "in:video_url",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("single-video-only");
+  });
+
+  it("rejects a second wire to Merge A/V in:video_url", () => {
+    const nodes = [node("a", "klingV3"), node("b", "mergeVideo"), node("mav", "mergeAV")];
+    const edges = [edge("a", "mav", "out:outputVideo", "in:video_url")];
+    const result = evaluateCanvasConnection(nodes, edges, {
+      source: "b",
+      target: "mav",
+      sourceHandle: "out:outputVideo",
+      targetHandle: "in:video_url",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("duplicate-target");
+    expect(result.error).toMatch(/only one video/i);
+  });
+
   it("rejects edges that would create a cycle", () => {
     const nodes = [node("a", "openRouter"), node("b", "openRouter"), node("c", "openRouter")];
     const edges = [edge("a", "b", "out:response", "in:prompt"), edge("b", "c", "out:response", "in:prompt")];

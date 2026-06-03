@@ -286,9 +286,14 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
       const evaluation = evaluateCanvasConnection(nodes, edges, connection);
       if (!evaluation.allowed) {
         if (evaluation.reason === "duplicate-target") {
-          console.warn(
-            "Single connection enforced for target handle:",
-            connection.targetHandle
+          window.alert(
+            evaluation.error ??
+              "Only one connection is allowed for this input. Disconnect the existing wire first."
+          );
+        } else if (evaluation.reason === "single-video-only") {
+          window.alert(
+            evaluation.error ??
+              "Merge Audio & Video accepts only one video input."
           );
         } else if (evaluation.reason === "cycle") {
           console.warn("Connection would create a cycle:", evaluation.error);
