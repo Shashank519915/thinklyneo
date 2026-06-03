@@ -20,8 +20,8 @@ export function getInboundEdgeForHandle(
   return edges.find((e) => e.target === targetNodeId && e.targetHandle === targetHandle);
 }
 
-/** Edge from Request-Inputs into this handle (promoted / run-time dependency). */
-export function getRequestPromotedEdge(
+/** Inbound edge whose source is the Request-Inputs node. */
+export function getInboundRequestEdge(
   nodes: Node[],
   edges: Edge[],
   targetNodeId: string,
@@ -33,13 +33,16 @@ export function getRequestPromotedEdge(
   return source?.type === "requestInputs" ? edge : undefined;
 }
 
+/** True only for handles promoted via “Add to request” (field has linkedTarget). */
 export function isRequestPromoted(
   nodes: Node[],
   edges: Edge[],
   targetNodeId: string,
   targetHandle: string
 ): boolean {
-  return !!getRequestPromotedEdge(nodes, edges, targetNodeId, targetHandle);
+  const edge = getInboundRequestEdge(nodes, edges, targetNodeId, targetHandle);
+  if (!edge) return false;
+  return !!findLinkedRequestField(nodes, edge.source, targetNodeId, targetHandle);
 }
 
 /** Any inbound edge (Request or upstream node). */

@@ -47,7 +47,9 @@ describe("promoteInputToRequest", () => {
     expect(fields[0].value).toBe("fade");
     expect(result.edges).toHaveLength(1);
     expect(result.edges[0].targetHandle).toBe("in:transition");
-    expect(isRequestPromoted(result.nodes, result.edges, "mv", "in:transition")).toBe(true);
+    expect(isRequestPromoted(result.nodes, result.edges, "mv", "in:transition")).toBe(
+      true
+    );
   });
 
   it("does not promote when handle is wired from a non-request node", () => {
@@ -115,6 +117,30 @@ describe("removeRequestFieldAndEdges", () => {
       (cleared.nodes.find((n) => n.id === "ri")?.data as { fields: unknown[] }).fields
     ).toHaveLength(0);
     expect(isRequestPromoted(cleared.nodes, cleared.edges, "mv", "in:transition")).toBe(false);
+  });
+});
+
+describe("isRequestPromoted vs manual request wire", () => {
+  it("returns false for manual request wire without linkedTarget", () => {
+    const nodes = [
+      reqNode(),
+      {
+        id: "llm",
+        type: "openRouter",
+        position: { x: 200, y: 0 },
+        data: { inputs: {} },
+      },
+    ];
+    const edges: Edge[] = [
+      {
+        id: "e1",
+        source: "ri",
+        target: "llm",
+        sourceHandle: "field_text_1",
+        targetHandle: "in:prompt",
+      },
+    ];
+    expect(isRequestPromoted(nodes, edges, "llm", "in:prompt")).toBe(false);
   });
 });
 
