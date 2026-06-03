@@ -16,7 +16,6 @@ export const cropImageOutputSchema = z.object({
 export const cropImageDefinition: NodeDefinition = {
   type: "cropImage",
   name: "Crop Image",
-  description: "Crop an image to specified dimensions",
   category: "image",
   icon: "Crop",
   color: "orange",
@@ -104,13 +103,7 @@ export const cropImageDefinition: NodeDefinition = {
     },
   ],
   limits: {
-    inputImage: {
-      mediaKind: "image",
-      maxSizeMb: 15,
-      maxWidth: 4096,
-      maxHeight: 4096,
-      maxCount: 1,
-    },
+    inputImage: { mediaKind: "image", maxSizeMb: 15, maxWidth: 4096, maxHeight: 4096 },
   },
   inputSchema: cropImageInputSchema,
   outputSchema: cropImageOutputSchema,

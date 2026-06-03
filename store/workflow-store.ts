@@ -129,6 +129,8 @@ interface WorkflowStore {
 
   // Execution state
   executingNodeIds: string[];
+  /** Nodes in the current run scope (yellow pending outline). Cleared when run ends. */
+  activeRunNodeIds: Set<string>;
   nodeOutputs: Record<string, unknown>;
   nodeErrors: Record<string, string>;
   isRunning: boolean;
@@ -138,6 +140,7 @@ interface WorkflowStore {
 
   // Execution actions
   setNodeExecuting: (nodeId: string, executing: boolean) => void;
+  setActiveRunNodeIds: (ids: Set<string>) => void;
   setNodeOutput: (nodeId: string, output: unknown) => void;
   setNodeError: (nodeId: string, error: string) => void;
   clearExecutionState: () => void;
@@ -200,6 +203,7 @@ export function useNodePreview(nodeId: string) {
     previewRunNodeIds,
     previewRunNodeFields,
     executingNodeIds,
+    activeRunNodeIds,
     nodeOutputs,
     nodeErrors,
     nodes,
@@ -224,14 +228,17 @@ export function useNodePreview(nodeId: string) {
   // Field IDs that existed in the run for this node (undefined when not in preview)
   const runFieldIds: Set<string> | undefined = isPreviewMode ? (previewRunNodeFields[nodeId] ?? undefined) : undefined;
 
-  /** Yellow outline + Pending run button (Magica-style) for all nodes except Response. */
+  /** Yellow outline + Pending run button (Magica-style) — only nodes in run scope. */
+  const inRunScope = isPreviewMode
+    ? previewRunNodeIds.has(nodeId)
+    : activeRunNodeIds.has(nodeId);
   const isRunPending =
     isRunSession &&
     !isResponseNode &&
     !isDimmed &&
     !isExecuting &&
     !hasError &&
-    (isRunning || previewRunNodeIds.has(nodeId));
+    inRunScope;
 
   return {
     isPreviewMode,
@@ -344,6 +351,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
   // Execution state
   executingNodeIds: [],
+  activeRunNodeIds: new Set(),
   nodeOutputs: {},
   nodeErrors: {},
   isRunning: false,
@@ -357,6 +365,8 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         : state.executingNodeIds.filter((id) => id !== nodeId),
     }));
   },
+
+  setActiveRunNodeIds: (ids) => set({ activeRunNodeIds: ids }),
 
   setNodeOutput: (nodeId, output) => {
     set((state) => ({
@@ -373,6 +383,7 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   clearExecutionState: () => {
     set({
       executingNodeIds: [],
+      activeRunNodeIds: new Set(),
       nodeOutputs: {},
       nodeErrors: {},
       isRunning: false,

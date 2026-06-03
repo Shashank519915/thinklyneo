@@ -18,7 +18,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { workflowFilePayloadSchema } from "@/lib/validation";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
-import { validateWorkflowInputsSync } from "@galaxy/shared";
+import { resolveActiveRunNodeIds, validateWorkflowInputsSync } from "@galaxy/shared";
 import WorkflowSaveToast, {
   type WorkflowSaveToastPhase,
 } from "@/components/workflow/WorkflowSaveToast";
@@ -40,6 +40,7 @@ export default function WorkflowCanvasPage() {
     setIsHistoryPanelOpen,
     isRunning,
     setIsRunning,
+    setActiveRunNodeIds,
     setCurrentRunId,
     currentRunId,
     setNodeExecuting,
@@ -126,10 +127,28 @@ export default function WorkflowCanvasPage() {
         }
       }
 
-      let existingOutputs = {};
+      let existingOutputs: Record<string, unknown> = {};
       if (scope === "single" || scope === "partial") {
         existingOutputs = useWorkflowStore.getState().nodeOutputs;
       }
+
+      const graphNodes = nodesRef.current.map((n) => ({
+        id: n.id,
+        type: n.type ?? "",
+      }));
+      const graphEdges = edgesRef.current.map((e) => ({
+        source: e.source,
+        target: e.target,
+      }));
+      setActiveRunNodeIds(
+        resolveActiveRunNodeIds(
+          graphNodes,
+          graphEdges,
+          scope,
+          targetIds,
+          Object.keys(existingOutputs)
+        )
+      );
 
       const limitErr = validateWorkflowInputsSync({
         nodes: nodesRef.current.map((n) => ({
@@ -144,6 +163,7 @@ export default function WorkflowCanvasPage() {
       if (limitErr) {
         window.alert(limitErr.message);
         isRunningRef.current = false;
+        setActiveRunNodeIds(new Set());
         setIsRunning(false);
         setCurrentRunScope(null);
         return;
@@ -189,7 +209,7 @@ export default function WorkflowCanvasPage() {
         setCurrentRunScope(null);
       }
     },
-    [isRunning, workflowId, clearPreviewRun, clearExecutionState, clearCanvasNodeData, setIsRunning, setCurrentRunId, setCurrentRunScope, fetchBalance]
+    [isRunning, workflowId, clearPreviewRun, clearExecutionState, clearCanvasNodeData, setIsRunning, setActiveRunNodeIds, setCurrentRunId, setCurrentRunScope, fetchBalance]
   );
 
   const handleCancelRun = useCallback(async () => {

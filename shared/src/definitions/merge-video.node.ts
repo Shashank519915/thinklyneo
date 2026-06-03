@@ -86,8 +86,6 @@ export const mergeVideoDefinition: NodeDefinition = {
       label: "Transition",
       type: "select",
       group: "primary",
-      tooltip:
-        "How clips are joined: none (hard cut), fade, or dissolve (crossfade). Requires at least two videos.",
       defaultValue: "none",
       options: [
         { value: "none", label: "none" },
