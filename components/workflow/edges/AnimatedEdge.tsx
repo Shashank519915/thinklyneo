@@ -31,7 +31,8 @@ export default function AnimatedEdge({
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const { deleteElements } = useReactFlow();
-  const { executingNodeIds, previewRunId, previewRunNodeIds } = useWorkflowStore();
+  const { executingNodeIds, previewRunId, previewRunNodeIds, isRunning, activeRunNodeIds } =
+    useWorkflowStore();
 
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
@@ -42,11 +43,11 @@ export default function AnimatedEdge({
     targetPosition,
   });
 
-  // In preview mode: dim edge if source OR target is not in the previewed run
   const isPreviewMode = previewRunId !== null;
-  const isDimmed =
-    isPreviewMode &&
-    (!previewRunNodeIds.has(source) || !previewRunNodeIds.has(target));
+  const isDimmed = isPreviewMode
+    ? !previewRunNodeIds.has(source) || !previewRunNodeIds.has(target)
+    : isRunning &&
+      (!activeRunNodeIds.has(source) || !activeRunNodeIds.has(target));
 
   // Source node currently executing → pulse purple to match glow
   const sourceExecuting = isPreviewMode ? false : executingNodeIds.includes(source);

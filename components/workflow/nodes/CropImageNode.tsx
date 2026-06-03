@@ -229,7 +229,7 @@ export default function CropImageNode({ id, data }: NodeProps) {
   const nodeData = data as unknown as CropImageData;
   const { updateNodeData, deleteNode, addNode, setEdges, setNodes, edges, nodes, previewRunId, previewNodeOutputs } =
     useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, isRunPending, output, error } =
+  const { isPreviewMode, isDimmed, isExecuting, isRunPending, isRunCompleted, isRunFailed, output, error } =
     useNodePreview(id);
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
@@ -405,7 +405,7 @@ export default function CropImageNode({ id, data }: NodeProps) {
         <NodeHeaderActions
           nodeId={id}
           description="Crop an image to specified dimensions"
-          runState={getNodeRunButtonState(isExecuting, isRunPending)}
+          runState={getNodeRunButtonState(isExecuting, isRunPending, isRunCompleted, isRunFailed)}
           isLocked={isLocked}
           onRun={handleSingleRun}
           onReset={handleReset}

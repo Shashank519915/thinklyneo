@@ -2,14 +2,18 @@
  * @fileoverview Shared border + run-button states while a workflow run or history preview is active.
  */
 
-export type NodeRunButtonState = "idle" | "pending" | "running";
+export type NodeRunButtonState = "idle" | "pending" | "running" | "done" | "error";
 
 export function getNodeRunButtonState(
   isExecuting: boolean,
-  isRunPending: boolean
+  isRunPending: boolean,
+  isRunCompleted: boolean,
+  isRunFailed: boolean
 ): NodeRunButtonState {
   if (isExecuting) return "running";
   if (isRunPending) return "pending";
+  if (isRunFailed) return "error";
+  if (isRunCompleted) return "done";
   return "idle";
 }
 

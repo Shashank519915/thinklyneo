@@ -140,7 +140,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const nodeData = data as any;
   const { updateNodeData, deleteNode, setNodes, setEdges, edges, nodes, previewRunId, previewNodeOutputs, readOnly } =
     useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, isRunPending, output, error } =
+  const { isPreviewMode, isDimmed, isExecuting, isRunPending, isRunCompleted, isRunFailed, output, error } =
     useNodePreview(id);
 
   const nodeError = error as string | null;
@@ -1326,7 +1326,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           <NodeHeaderActions
             nodeId={id}
             description={definition.description ?? `Execute a ${definition.name} operation inside the workflow.`}
-            runState={getNodeRunButtonState(isExecuting, isRunPending)}
+            runState={getNodeRunButtonState(isExecuting, isRunPending, isRunCompleted, isRunFailed)}
             isLocked={isLocked}
             onRun={handleSingleRun}
             onReset={handleReset}

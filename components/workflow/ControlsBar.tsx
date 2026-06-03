@@ -420,7 +420,7 @@ export default function ControlsBar() {
           </button>
         </Tip>
 
-        {/* Shortcuts — Command icon */}
+        {/* Keyboard shortcuts — re-enable when shortcut modal is needed again
         <Tip label="Keyboard shortcuts">
           <button
             onClick={() => setShowShortcuts(true)}
@@ -431,6 +431,7 @@ export default function ControlsBar() {
         </Tip>
 
         <div className="mx-0.5 h-5 w-px bg-gray-200" />
+        */}
 
         {/* Zoom out */}
         <Tip label="Zoom out" shortcut="−">

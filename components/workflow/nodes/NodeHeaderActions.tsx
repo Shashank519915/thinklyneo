@@ -66,10 +66,14 @@ export default function NodeHeaderActions({
 
   const runButtonClass =
     runState === "running"
-      ? "border border-[#7C3AED]/30 bg-[#7C3AED]/20 text-[#7C3AED] hover:bg-[#7C3AED]/30"
+      ? "border border-[#7C3AED]/30 bg-[#7C3AED]/20 text-[#7C3AED]"
       : runState === "pending"
-        ? "border border-yellow-500/30 bg-yellow-500/20 text-yellow-600 hover:bg-yellow-500/30"
-        : "border border-green-500/30 bg-green-500/20 text-green-500 hover:bg-green-500/30";
+        ? "border border-yellow-500/30 bg-yellow-500/20 text-yellow-600"
+        : runState === "error"
+          ? "border border-red-200 bg-red-50 text-red-400"
+          : runState === "done"
+            ? "border border-gray-200 bg-gray-100 text-gray-400"
+            : "border border-green-500/30 bg-green-500/20 text-green-500 hover:bg-green-500/30";
 
   return (
     <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
@@ -100,7 +104,7 @@ export default function NodeHeaderActions({
       >
         {runState === "running" ? (
           <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-        ) : runState === "idle" ? (
+        ) : runState === "idle" || runState === "done" ? (
           <Play className="h-3 w-3 fill-current" aria-hidden="true" />
         ) : null}
         <span>{runLabel}</span>

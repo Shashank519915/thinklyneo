@@ -219,8 +219,11 @@ export function useNodePreview(nodeId: string) {
 
   const isPreviewMode = previewRunId !== null;
   const isRunSession = isRunning || isPreviewMode;
-  // In preview: node is dimmed if it's NOT in the previewed run's node set
-  const isDimmed = isPreviewMode && !previewRunNodeIds.has(nodeId);
+  const inRunScope = isPreviewMode
+    ? previewRunNodeIds.has(nodeId)
+    : activeRunNodeIds.has(nodeId);
+  // Blur nodes (and edges) outside the active/previewed run scope
+  const isDimmed = isPreviewMode ? !inRunScope : isRunning && !inRunScope;
   const isExecuting = isPreviewMode ? false : executingNodeIds.includes(nodeId);
 
   const node = nodes.find((n) => n.id === nodeId);
@@ -235,17 +238,30 @@ export function useNodePreview(nodeId: string) {
   // Field IDs that existed in the run for this node (undefined when not in preview)
   const runFieldIds: Set<string> | undefined = isPreviewMode ? (previewRunNodeFields[nodeId] ?? undefined) : undefined;
 
-  /** Yellow outline + Pending run button (Magica-style) — only nodes in run scope. */
-  const inRunScope = isPreviewMode
-    ? previewRunNodeIds.has(nodeId)
-    : activeRunNodeIds.has(nodeId);
+  const hasRunOutput =
+    output !== null && output !== undefined && output !== "";
+
+  /** Yellow outline + Pending — in scope, not yet executed this run. */
+  const isRunCompleted =
+    isRunSession &&
+    !isResponseNode &&
+    !isDimmed &&
+    !isExecuting &&
+    !hasError &&
+    inRunScope &&
+    hasRunOutput;
+
+  const isRunFailed =
+    isRunSession && !isResponseNode && !isDimmed && !isExecuting && hasError && inRunScope;
+
   const isRunPending =
     isRunSession &&
     !isResponseNode &&
     !isDimmed &&
     !isExecuting &&
     !hasError &&
-    inRunScope;
+    inRunScope &&
+    !isRunCompleted;
 
   return {
     isPreviewMode,
@@ -253,6 +269,8 @@ export function useNodePreview(nodeId: string) {
     isExecuting,
     isRunSession,
     isRunPending,
+    isRunCompleted,
+    isRunFailed,
     output,
     error,
     runFieldIds,
