@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
@@ -126,29 +126,12 @@ function getColorTheme(color: string) {
   }
 }
 
-interface AddToRequestToggleProps {
-  muted: boolean;
-  disabled?: boolean;
-  onMutedChange: (muted: boolean) => void;
-}
-
-function AddToRequestToggle({ muted, disabled, onMutedChange }: AddToRequestToggleProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onMutedChange(!muted)}
-      aria-label={muted ? "Remove from request" : "Add to request"}
-      className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {muted ? (
-        <LucideIcons.Minus className="h-4 w-4" />
-      ) : (
-        <LucideIcons.Plus className="h-4 w-4" />
-      )}
-    </button>
-  );
-}
+import { AddToRequestToggle } from "@/components/workflow/AddToRequestToggle";
+import {
+  isRequestPromoted,
+  promoteInputToRequest,
+  shouldShowAddToRequest,
+} from "@/lib/promote-to-request";
 
 export default function GenericNode({ id, data, type }: NodeProps) {
   const definition = DEFINITIONS[type as string] || DEFINITIONS[data.type as string] || DEFINITIONS[data.model as string] || cropImageDefinition;
@@ -163,7 +146,6 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
 
-  const [requestMuteByHandle, setRequestMuteByHandle] = useState<Record<string, boolean>>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState<Record<string, boolean>>({});
@@ -330,6 +312,32 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     }
   };
 
+  const handlePromoteInput = useCallback(
+    (param: { key: string; label: string; type?: string; handle?: { type?: string }; defaultValue?: unknown }) => {
+      if (readOnly || isLocked) return;
+      const handleId = `in:${param.key}`;
+      const result = promoteInputToRequest({
+        nodes: nodes ?? [],
+        edges: edges ?? [],
+        targetNodeId: id,
+        targetHandle: handleId,
+        paramKey: param.key,
+        paramLabel: param.label,
+        paramType: param.type as never,
+        handleType: param.handle?.type,
+        currentValue: nodeData.inputs?.[param.key],
+        defaultValue: param.defaultValue,
+      });
+      if (result.error) {
+        console.warn("[Add to request]", result.error);
+        return;
+      }
+      setNodes(result.nodes);
+      setEdges(result.edges);
+    },
+    [readOnly, isLocked, nodes, edges, id, nodeData.inputs, setNodes, setEdges]
+  );
+
   const removeFileValue = (key: string, indexToRemove?: number) => {
     if (isLocked || readOnly) return;
     const currentInputs = nodeData.inputs || {};
@@ -345,6 +353,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const renderParameterInput = (param: any) => {
     const handleId = `in:${param.key}`;
     const isWired = connectedTargets.has(handleId);
+    const requestPromoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
+    const showUpstreamPanel = isWired && !requestPromoted;
+    const showAddToRequestBtn = shouldShowAddToRequest({
+      hasHandle: !!param.handle,
+      readOnly,
+      isLocked,
+      wired: isWired,
+    });
     const value = nodeData.inputs?.[param.key] ?? param.defaultValue ?? "";
 
     // Hide inputImage and uploadedImages if mode is text
@@ -373,7 +389,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       }
     }
 
-    const disabled = readOnly || isLocked || isWired || requestMuteByHandle[handleId];
+    const disabled = readOnly || isLocked || requestPromoted;
     const expanded = !!isExpanded[param.key];
 
     if (definition.type === "mergeAV" && param.uiVariant === "magica-volume-row") {
@@ -443,13 +459,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               >
                 <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
-              {!readOnly && (
+              {showAddToRequestBtn && (
                 <AddToRequestToggle
-                  muted={!!requestMuteByHandle[handleId]}
                   disabled={isLocked}
-                  onMutedChange={(m) =>
-                    setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                  }
+                  onPromote={() => handlePromoteInput(param)}
                 />
               )}
             </div>
@@ -460,12 +473,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
     if (definition.type === "mergeAV" && param.uiVariant === "magica-side-label") {
       const isVideoField = param.key === "video_url";
-      const mediaUrls = isWired ? parseMediaList(wiredValue) : parseMediaList(value);
+      const mediaUrls = showUpstreamPanel ? parseMediaList(wiredValue) : parseMediaList(value);
       const videoUrls = isVideoField ? mediaUrls.filter(isLikelyVideoUrl) : mediaUrls;
       const displayUrls = isVideoField && videoUrls.length > 0 ? videoUrls : mediaUrls;
       const primaryUrl = displayUrls[0];
       const multiVideoRejected =
-        isVideoField && isWired && (videoUrls.length > 1 || mediaUrls.length > 1);
+        isVideoField && showUpstreamPanel && (videoUrls.length > 1 || mediaUrls.length > 1);
       const accept =
         param.key === "video_url"
           ? "video/*"
@@ -501,13 +514,25 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               />
             </div>
           )}
-          <div className="flex items-start gap-3">
+          <div
+            className={`flex items-start gap-3 ${
+              requestPromoted && !isLocked ? "opacity-60" : ""
+            }`}
+          >
             <span
               data-handle-anchor="label"
-              className="shrink-0 pt-2 text-xs text-gray-500"
+              className="flex shrink-0 items-center gap-1 pt-2 text-xs text-gray-500"
             >
-              {param.label}
-              {param.required && <span className="text-red-400">*</span>}
+              <span>
+                {param.label}
+                {param.required && <span className="text-red-400">*</span>}
+              </span>
+              {showAddToRequestBtn && (
+                <AddToRequestToggle
+                  disabled={isLocked}
+                  onPromote={() => handlePromoteInput(param)}
+                />
+              )}
             </span>
             <div className="flex-1">
               {!readOnly && (
@@ -517,7 +542,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     tabIndex={-1}
                     disabled={disabled || multiVideoRejected}
                     onClick={() => {
-                      if (!isWired) {
+                      if (!showUpstreamPanel) {
                         document.getElementById(`file-input-${param.key}`)?.click();
                       }
                     }}
@@ -564,7 +589,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(primaryUrl) ? (
                 <div className="relative inline-block">
                   <audio src={primaryUrl} controls className="w-[160px]" />
-                  {!readOnly && !isWired && (
+                  {!readOnly && !showUpstreamPanel && (
                     <button
                       type="button"
                       disabled={isLocked}
@@ -586,7 +611,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     className="w-full rounded-sm"
                     style={{ maxHeight: 120 }}
                   />
-                  {!readOnly && !isWired && (
+                  {!readOnly && !showUpstreamPanel && (
                     <button
                       type="button"
                       disabled={isLocked}
@@ -608,7 +633,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       <div
         key={param.key}
         className={`relative overflow-visible transition-opacity ${
-          requestMuteByHandle[handleId] && !isLocked ? "opacity-60 bg-gray-50/50 rounded-lg p-1" : ""
+          requestPromoted && !isLocked ? "opacity-60 bg-gray-50/50 rounded-lg p-1" : ""
         }`}
       >
         {/* Render Handle if specified */}
@@ -647,13 +672,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.required && <span className="text-red-400 ml-0.5">*</span>}
             {param.handle && (
               <span className="ml-auto">
-                {!readOnly && (
+                {showAddToRequestBtn && (
                   <AddToRequestToggle
-                    muted={!!requestMuteByHandle[handleId]}
                     disabled={isLocked}
-                    onMutedChange={(m) =>
-                      setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                    }
+                    onPromote={() => handlePromoteInput(param)}
                   />
                 )}
               </span>
@@ -662,7 +684,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         )}
 
         {/* Dynamic Controls based on type */}
-        {isWired ? (() => {
+        {showUpstreamPanel ? (() => {
           const wiredIsMedia =
             param.type === "image-array" ||
             param.type === "video-array" ||
@@ -900,10 +922,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 {param.key === "transition" && (
                   <span
                     data-handle-anchor="label"
-                    className="flex min-w-0 shrink items-center text-xs text-gray-500"
+                    className="flex min-w-0 shrink items-center gap-1 text-xs text-gray-500"
                   >
                     <span className="truncate">{param.label}</span>
                     {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
+                    {showAddToRequestBtn && (
+                      <AddToRequestToggle
+                        disabled={isLocked}
+                        onPromote={() => handlePromoteInput(param)}
+                      />
+                    )}
                   </span>
                 )}
                 <div className={`relative ${param.key === "transition" ? "flex-1 custom-select-container" : ""}`}>
@@ -1138,13 +1166,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
                   {param.handle && (
                     <span className="mt-1">
-                      {!readOnly && (
+                      {showAddToRequestBtn && (
                         <AddToRequestToggle
-                          muted={!!requestMuteByHandle[handleId]}
                           disabled={isLocked}
-                          onMutedChange={(m) =>
-                            setRequestMuteByHandle((prev) => ({ ...prev, [handleId]: m }))
-                          }
+                          onPromote={() => handlePromoteInput(param)}
                         />
                       )}
                     </span>

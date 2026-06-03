@@ -13,6 +13,12 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 
+/** When set, field was auto-created via “Add to request” on a target node handle. */
+export interface RequestFieldLink {
+  nodeId: string;
+  handle: string;
+}
+
 export interface WorkflowField {
   id: string;
   type:
@@ -26,6 +32,7 @@ export interface WorkflowField {
     | "file_field";
   label: string;
   value: string | null;
+  linkedTarget?: RequestFieldLink;
 }
 
 export interface RequestInputsData {

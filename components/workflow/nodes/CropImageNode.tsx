@@ -5,8 +5,14 @@
  */
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { useState } from "react";
-import { Upload, X, Minus, Plus, RotateCcw, Coins } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Upload, X, RotateCcw, Coins } from "lucide-react";
+import { AddToRequestToggle } from "@/components/workflow/AddToRequestToggle";
+import {
+  isRequestPromoted,
+  promoteInputToRequest,
+  shouldShowAddToRequest,
+} from "@/lib/promote-to-request";
 import FieldInfoTooltip from "./FieldInfoTooltip";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import NodeHeaderActions from "./NodeHeaderActions";
@@ -67,9 +73,9 @@ interface CropSliderRowProps {
   min: number;
   max: number;
   disabled: boolean;
-  /** Visual-only: "add to request" pressed → muted look */
-  requestMuted: boolean;
-  onRequestMutedChange: (muted: boolean) => void;
+  requestPromoted: boolean;
+  showAddToRequest: boolean;
+  onPromote: () => void;
 }
 
 /** Clamps UX slider percentages to whole numbers within min–max. */
@@ -131,34 +137,7 @@ function CropPreviewOverlay({
   );
 }
 
-/** + when unmuted, − when muted; same slot as Gemini node. */
-function AddToRequestToggle({
-  muted,
-  disabled,
-  onMutedChange,
-}: {
-  muted: boolean;
-  disabled?: boolean;
-  onMutedChange: (muted: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onMutedChange(!muted)}
-      aria-label={muted ? "Remove from request (visual)" : "Add to request (visual)"}
-      className="nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40"
-    >
-      {muted ? (
-        <Minus className="w-3.5 h-3.5" strokeWidth={2.5} />
-      ) : (
-        <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-      )}
-    </button>
-  );
-}
-
-/** Row tying a magenta target handle to range input, reset shortcut, plus visual-only request muting parity with Gemini UX. */
+/** Row tying a magenta target handle to range input, reset shortcut, and promote-to-request. */
 function CropSliderRow({
   label,
   tooltip,
@@ -169,16 +148,17 @@ function CropSliderRow({
   min,
   max,
   disabled,
-  requestMuted,
-  onRequestMutedChange,
+  requestPromoted,
+  showAddToRequest,
+  onPromote,
 }: CropSliderRowProps) {
   const v = clampPct(value, min, max);
-  const sliderLocked = disabled || requestMuted;
+  const sliderLocked = disabled || requestPromoted;
 
   return (
     <div
       className={`relative overflow-visible transition-opacity ${
-        requestMuted && !disabled ? "opacity-60" : ""
+        requestPromoted && !disabled ? "opacity-60" : ""
       }`}
     >
       <Handle
@@ -235,11 +215,9 @@ function CropSliderRow({
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
-          <AddToRequestToggle
-            muted={requestMuted}
-            disabled={disabled}
-            onMutedChange={onRequestMutedChange}
-          />
+          {showAddToRequest && (
+            <AddToRequestToggle disabled={disabled} onPromote={onPromote} />
+          )}
         </div>
       </div>
     </div>
@@ -256,9 +234,32 @@ export default function CropImageNode({ id, data }: NodeProps) {
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
 
-  /** Visual-only: “add to request” mute per handle (not read by execution). */
-  const [requestMuteByHandle, setRequestMuteByHandle] = useState<Record<string, boolean>>({});
   const [uploading, setUploading] = useState(false);
+
+  const promoteCropHandle = useCallback(
+    (fieldKey: "x" | "y" | "w" | "h", label: string, value: number) => {
+      if (isLocked) return;
+      const handleId = `in:${fieldKey}`;
+      const result = promoteInputToRequest({
+        nodes: nodes ?? [],
+        edges: edges ?? [],
+        targetNodeId: id,
+        targetHandle: handleId,
+        paramKey: fieldKey,
+        paramLabel: label,
+        paramType: "number",
+        handleType: "text",
+        currentValue: value,
+      });
+      if (result.error) {
+        console.warn("[Add to request]", result.error);
+        return;
+      }
+      setNodes(result.nodes);
+      setEdges(result.edges);
+    },
+    [isLocked, nodes, edges, id, setNodes, setEdges]
+  );
 
   const connectedTargets = new Set(
     (edges ?? []).filter((e) => e.target === id).map((e) => e.targetHandle)
@@ -535,66 +536,39 @@ export default function CropImageNode({ id, data }: NodeProps) {
             ) : null}
           </div>
 
-          <CropSliderRow
-            label="X Position (%)"
-            tooltip={FIELD_TOOLTIPS.x}
-            value={nodeData.inputs.x}
-            onChange={(v) => updateInput("x", v)}
-            handleId="in:x"
-            fieldKey="x"
-            min={0}
-            max={100}
-            disabled={isLocked || connectedTargets.has("in:x")}
-            requestMuted={!!requestMuteByHandle["in:x"]}
-            onRequestMutedChange={(muted) =>
-              setRequestMuteByHandle((m) => ({ ...m, "in:x": muted }))
-            }
-          />
-          <CropSliderRow
-            label="Y Position (%)"
-            tooltip={FIELD_TOOLTIPS.y}
-            value={nodeData.inputs.y}
-            onChange={(v) => updateInput("y", v)}
-            handleId="in:y"
-            fieldKey="y"
-            min={0}
-            max={100}
-            disabled={isLocked || connectedTargets.has("in:y")}
-            requestMuted={!!requestMuteByHandle["in:y"]}
-            onRequestMutedChange={(muted) =>
-              setRequestMuteByHandle((m) => ({ ...m, "in:y": muted }))
-            }
-          />
-          <CropSliderRow
-            label="Width (%)"
-            tooltip={FIELD_TOOLTIPS.w}
-            value={nodeData.inputs.w}
-            onChange={(v) => updateInput("w", v)}
-            handleId="in:w"
-            fieldKey="w"
-            min={1}
-            max={100}
-            disabled={isLocked || connectedTargets.has("in:w")}
-            requestMuted={!!requestMuteByHandle["in:w"]}
-            onRequestMutedChange={(muted) =>
-              setRequestMuteByHandle((m) => ({ ...m, "in:w": muted }))
-            }
-          />
-          <CropSliderRow
-            label="Height (%)"
-            tooltip={FIELD_TOOLTIPS.h}
-            value={nodeData.inputs.h}
-            onChange={(v) => updateInput("h", v)}
-            handleId="in:h"
-            fieldKey="h"
-            min={1}
-            max={100}
-            disabled={isLocked || connectedTargets.has("in:h")}
-            requestMuted={!!requestMuteByHandle["in:h"]}
-            onRequestMutedChange={(muted) =>
-              setRequestMuteByHandle((m) => ({ ...m, "in:h": muted }))
-            }
-          />
+          {(
+            [
+              { key: "x" as const, label: "X Position (%)", min: 0 },
+              { key: "y" as const, label: "Y Position (%)", min: 0 },
+              { key: "w" as const, label: "Width (%)", min: 1 },
+              { key: "h" as const, label: "Height (%)", min: 1 },
+            ] as const
+          ).map(({ key, label, min }) => {
+            const handleId = `in:${key}`;
+            const wired = connectedTargets.has(handleId);
+            const promoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
+            return (
+              <CropSliderRow
+                key={key}
+                label={label}
+                tooltip={FIELD_TOOLTIPS[key]}
+                value={nodeData.inputs[key]}
+                onChange={(v) => updateInput(key, v)}
+                handleId={handleId}
+                fieldKey={key}
+                min={min}
+                max={100}
+                disabled={isLocked || wired}
+                requestPromoted={promoted}
+                showAddToRequest={shouldShowAddToRequest({
+                  hasHandle: true,
+                  isLocked,
+                  wired,
+                })}
+                onPromote={() => promoteCropHandle(key, label, nodeData.inputs[key])}
+              />
+            );
+          })}
         </div>
 
         <div className="relative mt-4 overflow-visible border-t border-gray-100 pt-4">

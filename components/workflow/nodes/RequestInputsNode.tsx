@@ -29,6 +29,7 @@ import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import { getNodeRunBorderClass } from "@/lib/node-run-chrome";
+import { removeRequestFieldAndEdges } from "@/lib/promote-to-request";
 
 interface RequestInputsData {
   label: string;
@@ -41,7 +42,7 @@ export default function RequestInputsNode({
   data,
 }: NodeProps) {
   const nodeData = data as unknown as RequestInputsData;
-  const { updateNodeData, readOnly } = useWorkflowStore();
+  const { updateNodeData, readOnly, nodes, edges, setNodes, setEdges } = useWorkflowStore();
   const { isPreviewMode, isDimmed, isExecuting, isRunPending, error, runFieldIds, output } =
     useNodePreview(id);
   const nodeError = error as string | null;
@@ -109,9 +110,14 @@ export default function RequestInputsNode({
   };
 
   const removeField = (fieldId: string) => {
-    updateNodeData(id, {
-      fields: fields.filter((f) => f.id !== fieldId),
-    } as Partial<RequestInputsData>);
+    const { nodes: nextNodes, edges: nextEdges } = removeRequestFieldAndEdges(
+      nodes,
+      edges,
+      id,
+      fieldId
+    );
+    setNodes(nextNodes);
+    setEdges(nextEdges);
   };
 
   const updateField = (fieldId: string, updates: Partial<WorkflowField>) => {
