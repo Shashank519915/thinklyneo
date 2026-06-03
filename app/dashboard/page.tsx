@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useEffect, useState, useRef, useCallback, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,10 +17,6 @@ import {
   Clock,
   Upload,
   Search,
-  Key,
-  Webhook,
-  Copy,
-  Check,
   ImagePlus,
   EllipsisVertical,
 } from "lucide-react";
@@ -60,6 +56,17 @@ function countWorkflowNodes(nodes: unknown): number {
   ).length;
 }
 
+function RedirectToDocs() {
+  useEffect(() => {
+    window.location.href = "/docs";
+  }, []);
+  return (
+    <div className="flex flex-col items-center justify-center py-24 gap-4 text-muted-foreground">
+      <p className="text-sm">Redirecting to API docs…</p>
+    </div>
+  );
+}
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -74,34 +81,8 @@ function DashboardContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // API Keys state
-  const [keys, setKeys] = useState<any[]>([]);
-  const [keysLoading, setKeysLoading] = useState(false);
-  const [keyName, setKeyName] = useState("");
-  const [rateLimit, setRateLimit] = useState(60);
-  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
-  const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [revokingId, setRevokingId] = useState<string | null>(null);
-
-  // Webhooks state
-  const [webhookDrafts, setWebhookDrafts] = useState<Record<string, string>>({});
-  const [savingWebhookId, setSavingWebhookId] = useState<string | null>(null);
-
   const [activeUploadPopoverId, setActiveUploadPopoverId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
-  const fetchKeys = async () => {
-    setKeysLoading(true);
-    try {
-      const resp = await fetch("/api/keys");
-      const data = await resp.json();
-      if (data.data) setKeys(data.data);
-    } catch (err) {
-      console.error("Failed to fetch keys:", err);
-    } finally {
-      setKeysLoading(false);
-    }
-  };
 
   const fetchWorkflows = async () => {
     try {
@@ -109,12 +90,6 @@ function DashboardContent() {
       const data = await resp.json();
       if (data.data) {
         setWorkflows(data.data);
-        // Initialize drafts for webhook urls
-        const drafts: Record<string, string> = {};
-        data.data.forEach((w: any) => {
-          drafts[w.id] = w.webhookUrl || "";
-        });
-        setWebhookDrafts(drafts);
       }
     } catch (err) {
       console.error("Failed to fetch workflows:", err);
@@ -125,7 +100,6 @@ function DashboardContent() {
 
   useEffect(() => {
     fetchWorkflows();
-    fetchKeys();
     console.log(
       "[NextFlow] Candidate LinkedIn: " +
         (process.env.NEXT_PUBLIC_LINKEDIN_URL ||
@@ -239,80 +213,6 @@ function DashboardContent() {
     reader.readAsText(file);
   };
 
-  const createApiKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!keyName.trim()) return;
-    try {
-      const resp = await fetch("/api/keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: keyName.trim(), rateLimit }),
-      });
-      const data = await resp.json();
-      if (data.data) {
-        setNewlyCreatedKey(data.data.key);
-        setKeyName("");
-        fetchKeys();
-      } else if (data.error) {
-        alert(data.error);
-      }
-    } catch (err) {
-      console.error("Failed to create key:", err);
-    }
-  };
-
-  const revokeApiKey = async (id: string) => {
-    if (revokingId) return;
-    setRevokingId(id);
-    try {
-      const resp = await fetch(`/api/keys/${id}`, {
-        method: "DELETE",
-      });
-      if (resp.ok) {
-        setKeys((prev) => prev.filter((k) => k.id !== id));
-      }
-    } catch (err) {
-      console.error("Failed to revoke key:", err);
-    } finally {
-      setRevokingId(null);
-    }
-  };
-
-  const saveWebhook = async (workflowId: string) => {
-    setSavingWebhookId(workflowId);
-    const url = webhookDrafts[workflowId] || "";
-    try {
-      const resp = await fetch(`/api/workflows/${workflowId}/webhook`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webhookUrl: url }),
-      });
-      const data = await resp.json();
-      if (data.data) {
-        setWorkflows((prev) =>
-          prev.map((w) =>
-            w.id === workflowId
-              ? { ...w, webhookUrl: data.data.webhookUrl, webhookSecret: data.data.webhookSecret }
-              : w
-          )
-        );
-        alert("Webhook configured successfully!");
-      } else if (data.error) {
-        alert(data.error);
-      }
-    } catch (err) {
-      console.error("Failed to save webhook:", err);
-    } finally {
-      setSavingWebhookId(null);
-    }
-  };
-
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(id);
-    setTimeout(() => setCopiedText(null), 2000);
-  };
-
   const filteredWorkflows = workflows.filter((wf) =>
     wf.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -344,213 +244,8 @@ function DashboardContent() {
           {/* Main dashboard content */}
           <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
             {currentTab === "api" ? (
-              <div className="space-y-12">
-                {/* Header Row */}
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground tracking-tight sm:text-3xl">API & Outbound Webhooks</h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Expose workflow platforms externally and register outbound webhook listeners.
-                  </p>
-                </div>
-
-                {/* API Keys Configuration Card */}
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-6">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <Key className="w-5 h-5 text-indigo-500" />
-                      API Keys
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Create, manage, and revoke credentials for calling the versioned Public REST API.
-                    </p>
-                  </div>
-
-                  {/* Create Key Form */}
-                  <form onSubmit={createApiKey} className="flex flex-col gap-4 max-w-xl">
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="key-name-input" className="text-xs font-semibold text-foreground">API Key Name</label>
-                      <input
-                        id="key-name-input"
-                        type="text"
-                        placeholder="e.g. Production client key"
-                        value={keyName}
-                        onChange={(e) => setKeyName(e.target.value)}
-                        className="h-9 px-3 rounded-lg border border-border bg-background text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                        required
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label htmlFor="rate-limit-select" className="text-xs font-semibold text-foreground">Rate Limit per Minute</label>
-                      <select
-                        id="rate-limit-select"
-                        value={rateLimit}
-                        onChange={(e) => setRateLimit(Number(e.target.value))}
-                        className="h-9 px-2.5 rounded-lg border border-border bg-background text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value={60}>60 requests / minute (Standard)</option>
-                        <option value={120}>120 requests / minute (Pro)</option>
-                        <option value={300}>300 requests / minute (Enterprise)</option>
-                      </select>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="inline-flex h-9 max-w-max items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors border-0 cursor-pointer"
-                    >
-                      Generate API Key
-                    </button>
-                  </form>
-
-                  {/* Newly Created Key Alert (Shown once) */}
-                  {newlyCreatedKey && (
-                    <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-2">
-                      <div className="text-xs font-semibold text-green-800">
-                        API Key generated successfully! Make sure to copy it now. You will not be able to retrieve it again.
-                      </div>
-                      <div className="flex items-center gap-2 max-w-xl">
-                        <code className="flex-1 bg-background text-foreground border border-border px-3 py-1.5 rounded-lg text-xs font-mono font-bold select-all truncate">
-                          {newlyCreatedKey}
-                        </code>
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(newlyCreatedKey, "newkey")}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                          title="Copy key"
-                        >
-                          {copiedText === "newkey" ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* API Keys List */}
-                  <div className="border-t border-border pt-6">
-                    <h3 className="text-sm font-semibold text-foreground mb-4">Generated Keys ({keys.length})</h3>
-
-                    {keysLoading ? (
-                      <div className="flex items-center justify-center py-6">
-                        <SpinningLogo size="sm" />
-                      </div>
-                    ) : keys.length === 0 ? (
-                      <div className="text-xs text-muted-foreground py-2 italic">No API keys registered. Create one above to get started.</div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-border bg-background">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="border-b border-border bg-muted/30 text-xs font-bold text-muted-foreground uppercase select-none">
-                              <th className="px-4 py-3 font-semibold">Key Name</th>
-                              <th className="px-4 py-3 font-semibold">Masked Token</th>
-                              <th className="px-4 py-3 font-semibold">Created At</th>
-                              <th className="px-4 py-3 font-semibold text-right">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border text-sm text-foreground">
-                            {keys.map((k) => (
-                              <tr key={k.id} className="hover:bg-muted/10 transition-colors">
-                                <td className="px-4 py-3 font-medium">{k.name}</td>
-                                <td className="px-4 py-3 font-mono text-xs">{k.maskedKey}</td>
-                                <td className="px-4 py-3 text-muted-foreground">{new Date(k.createdAt).toLocaleDateString()}</td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (confirm(`Revoke API key "${k.name}"? Active external clients using this key will immediately fail.`)) {
-                                        revokeApiKey(k.id);
-                                      }
-                                    }}
-                                    disabled={revokingId === k.id}
-                                    className="inline-flex h-7 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-xs font-semibold text-red-600 hover:bg-red-100 transition-colors px-2.5 cursor-pointer disabled:opacity-40"
-                                  >
-                                    {revokingId === k.id ? "Revoking..." : "Revoke"}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Webhooks Configuration Card */}
-                <div className="rounded-2xl border border-border bg-card shadow-sm p-6 space-y-6">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <Webhook className="w-5 h-5 text-indigo-500" />
-                      Outbound Webhooks
-                    </h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Configure webhook endpoints to receive lifecycle payload updates when workflow runs execute.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {workflows.length === 0 ? (
-                      <div className="text-xs text-muted-foreground py-2 italic">Create a workflow from the Flow tab to configure webhooks.</div>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-border bg-background">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="border-b border-border bg-muted/30 text-xs font-bold text-muted-foreground uppercase select-none">
-                              <th className="px-4 py-3 font-semibold w-[200px]">Workflow</th>
-                              <th className="px-4 py-3 font-semibold">Webhook Destination URL</th>
-                              <th className="px-4 py-3 font-semibold w-[240px]">Webhook Secret</th>
-                              <th className="px-4 py-3 font-semibold text-right w-[120px]">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border text-sm text-foreground">
-                            {workflows.map((w) => (
-                              <tr key={w.id} className="hover:bg-muted/10 transition-colors align-top">
-                                <td className="px-4 py-4 font-medium pt-5">{w.name}</td>
-                                <td className="px-4 py-4">
-                                  <input
-                                    type="text"
-                                    placeholder="e.g. https://my-app.com/api/webhooks"
-                                    value={webhookDrafts[w.id] ?? ""}
-                                    onChange={(e) => setWebhookDrafts(prev => ({ ...prev, [w.id]: e.target.value }))}
-                                    className="w-full h-8 px-2.5 rounded-lg border border-border bg-background text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                                  />
-                                </td>
-                                <td className="px-4 py-4 pt-5 select-all">
-                                  {w.webhookSecret ? (
-                                    <div className="flex items-center gap-2">
-                                      <code className="text-xs font-mono bg-muted px-2 py-0.5 rounded text-muted-foreground truncate max-w-[170px]" title={w.webhookSecret}>
-                                        {w.webhookSecret}
-                                      </code>
-                                      <button
-                                        type="button"
-                                        onClick={() => copyToClipboard(w.webhookSecret, w.id)}
-                                        className="inline-flex h-6 w-6 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                                        title="Copy secret"
-                                      >
-                                        {copiedText === w.id ? <Check className="w-2.5 h-2.5 text-green-600" /> : <Copy className="w-2.5 h-2.5" />}
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground italic">Secret auto-generated on URL save</span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-4 text-right pt-4">
-                                  <button
-                                    type="button"
-                                    onClick={() => saveWebhook(w.id)}
-                                    disabled={savingWebhookId === w.id}
-                                    className="inline-flex h-8 items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white transition-colors px-3 cursor-pointer disabled:opacity-40 border-0"
-                                  >
-                                    {savingWebhookId === w.id ? "Saving..." : "Save URL"}
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              /* Redirect legacy ?tab=api to the Mintlify docs */
+              <RedirectToDocs />
             ) : (
               <>
                 {/* Upper Header Row */}
