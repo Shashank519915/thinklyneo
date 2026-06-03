@@ -399,10 +399,28 @@ export default function WorkflowCanvasPage() {
         return;
       }
 
+      // Rebuild the in-scope node set so restored runs highlight (not blur) the
+      // nodes that belong to this run. Without this, isRunning is true while
+      // activeRunNodeIds is empty, so every node is dimmed on refresh.
+      const scope = runningRun.scope as "full" | "partial" | "single";
+      const graphNodes = nodesRef.current.map((n) => ({ id: n.id, type: n.type ?? "" }));
+      const graphEdges = edgesRef.current.map((e) => ({ source: e.source, target: e.target }));
+      if (scope === "full") {
+        setActiveRunNodeIds(resolveActiveRunNodeIds(graphNodes, graphEdges, "full"));
+      } else {
+        // Recorded node runs are exactly the scoped set chosen at run start.
+        const recordedIds = runningRun.nodeRuns.map((nr) => nr.nodeId);
+        setActiveRunNodeIds(
+          recordedIds.length
+            ? resolveActiveRunNodeIds(graphNodes, graphEdges, scope, recordedIds)
+            : resolveActiveRunNodeIds(graphNodes, graphEdges, "full")
+        );
+      }
+
       isRunningRef.current = true;
       setIsRunning(true);
       setCurrentRunId(runningRun.id);
-      setCurrentRunScope(runningRun.scope as "full" | "partial" | "single");
+      setCurrentRunScope(scope);
       setOrchestratorState({
         orchestratorRunId: runningRun.orchestratorRunId,
         publicAccessToken,
@@ -417,6 +435,7 @@ export default function WorkflowCanvasPage() {
     setIsRunning,
     setCurrentRunId,
     setCurrentRunScope,
+    setActiveRunNodeIds,
     setNodeOutput,
     setNodeError,
     setNodeExecuting,
