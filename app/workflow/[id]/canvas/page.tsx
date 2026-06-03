@@ -59,7 +59,7 @@ export default function WorkflowCanvasPage() {
     clearCanvasNodeData,
   } = useWorkflowStore();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState(workflowName);
@@ -798,15 +798,6 @@ export default function WorkflowCanvasPage() {
               <div className="pointer-events-none absolute left-4 top-[11px] z-50">
                 <div className="pointer-events-auto flex flex-col gap-2">
                   <div className="inline-flex items-center gap-2">
-                    {sidebarCollapsed && (
-                      <button
-                        onClick={() => setSidebarCollapsed(false)}
-                        className="inline-flex h-9 w-9 items-center justify-center rounded-[18px] border border-gray-200 bg-white shadow-md text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0"
-                        title="Open Sidebar"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
-                      </button>
-                    )}
                     <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/85 px-2 py-1.5 shadow-md backdrop-blur">
                       <button
                         onClick={() => router.push(`/workflow/${workflowId}`)}

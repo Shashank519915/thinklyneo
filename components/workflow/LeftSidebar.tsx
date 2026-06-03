@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * @fileoverview Reference-navigation chrome with dynamic credit display, new task/search triggers, Settings,
- * and Clerk integration, styled exactly to match the reference Magica portal.
+ * @fileoverview App navigation sidebar: expanded (260px) or collapsed icon rail (48px), Magica-style.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Plus,
   Search,
@@ -24,12 +24,46 @@ import {
   Users,
   ArrowRight,
   ChevronDown,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
+
+const EXPANDED_WIDTH = 260;
+const COLLAPSED_WIDTH = 48;
 
 interface LeftSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
+}
+
+function IconRailButton({
+  children,
+  title,
+  onClick,
+  href,
+  active,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onClick?: (e: React.MouseEvent) => void;
+  href?: string;
+  active?: boolean;
+}) {
+  const className = `inline-flex h-8 w-8 items-center justify-center rounded-[18px] text-gray-500 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
+    active ? "bg-[#E8E8E8] text-gray-900" : ""
+  }`;
+  if (href) {
+    return (
+      <Link href={href} className={className} title={title} onClick={onClick}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} className={className} title={title}>
+      {children}
+    </button>
+  );
 }
 
 export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebarProps) {
@@ -38,12 +72,13 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
   const pathname = usePathname();
   const currentTab = searchParams ? searchParams.get("tab") || "workflows" : "workflows";
 
-  const isWorkflowsActive = pathname?.startsWith("/workflow") || (pathname === "/dashboard" && currentTab === "workflows");
+  const isWorkflowsActive =
+    pathname?.startsWith("/workflow") ||
+    (pathname === "/dashboard" && currentTab === "workflows");
   const isApiActive = pathname === "/dashboard" && currentTab === "api";
   const [footerVisible, setFooterVisible] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
 
-  // Fetch actual credits balance dynamically from Neon PG database
   const fetchBalance = useCallback(async () => {
     try {
       const resp = await fetch("/api/credits/balance");
@@ -60,11 +95,8 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
     fetchBalance();
   }, [fetchBalance]);
 
-  // Synchronize credits balance with workflow run events
   useEffect(() => {
-    const handleRefresh = () => {
-      fetchBalance();
-    };
+    const handleRefresh = () => fetchBalance();
     window.addEventListener("nextflow:refresh-history", handleRefresh);
     return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
   }, [fetchBalance]);
@@ -75,231 +107,306 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
     user?.emailAddresses[0]?.emailAddress?.split("@")[0] ??
     "User";
 
+  const width = collapsed ? COLLAPSED_WIDTH : EXPANDED_WIDTH;
+
   return (
     <div
-      className={`flex-shrink-0 flex flex-col bg-[#F9F9F9] border-r border-gray-200 transition-all duration-200 overflow-hidden ${
-        collapsed ? "w-0" : "w-[260px]"
-      }`}
-      style={{ minHeight: "100%" }}
+      className="group/sidebar relative flex flex-shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-[#F9F9F9] transition-[width] duration-300 ease-in-out"
+      style={{ width, minHeight: "100%" }}
     >
-      {/* ── Header: logo + PanelLeft toggle ── */}
-      <div className="mx-1.5 mb-2 mt-2 flex items-center justify-between px-3 py-1 h-14">
-        <div className="flex items-center gap-0 pl-0">
+      {/* ── Collapsed icon rail (48px) ── */}
+      <div
+        className={`absolute inset-y-0 left-0 z-10 flex h-full w-12 flex-col items-center transition-opacity duration-300 ease-in-out ${
+          collapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onToggle}
+          title="Expand sidebar"
+          className="relative mb-3 mt-3 inline-flex h-7 w-7 items-center justify-center rounded-[18px] text-gray-500 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+        >
           <img
             src="/logo.svg"
-            alt="NextFlow logo"
-            className="w-10 h-10 flex-shrink-0"
+            alt="NextFlow"
+            className="h-5 w-5 transition-opacity duration-200 group-hover/sidebar:opacity-0"
           />
-          <span className="text-[20px] font-bold text-gray-900 tracking-tight select-none leading-none ml-1">
-            NextFlow
-          </span>
-        </div>
-        <button
-          onClick={onToggle}
-          className="inline-flex items-center justify-center rounded-[18px] h-9 w-9 shrink-0 text-gray-500 hover:bg-gray-100 transition-colors cursor-pointer"
-          title="Collapse sidebar"
-        >
-          <PanelLeft className="w-4 h-4" />
+          <PanelLeftOpen
+            className="absolute inset-0 m-auto h-4 w-4 opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100"
+            aria-hidden
+          />
         </button>
+
+        <div className="flex flex-col items-center gap-1">
+          <IconRailButton title="New task" onClick={(e) => e.preventDefault()}>
+            <Plus className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Search tasks" onClick={(e) => e.preventDefault()}>
+            <Search className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Tasks" onClick={(e) => e.preventDefault()}>
+            <MessageSquare className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Projects" onClick={(e) => e.preventDefault()}>
+            <FolderOpen className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Library" onClick={(e) => e.preventDefault()}>
+            <Library className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Flow" href="/dashboard?tab=workflows" active={isWorkflowsActive}>
+            <Workflow className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="Nodes" onClick={(e) => e.preventDefault()}>
+            <Boxes className="h-4 w-4" />
+          </IconRailButton>
+          <IconRailButton title="API / MCP" href="/dashboard?tab=api" active={isApiActive}>
+            <BookOpen className="h-4 w-4" />
+          </IconRailButton>
+        </div>
+
+        <div className="mt-auto flex flex-col items-center gap-2 pb-4">
+          <div className="flex items-center justify-center">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                  userButtonTrigger: "focus:shadow-none",
+                },
+              }}
+            />
+          </div>
+        </div>
       </div>
 
-      {!collapsed && (
-        <>
-          {/* ── Upper controls ── */}
-          <div className="mx-1.5 mb-2 flex flex-col p-2">
-            <button
-              onClick={(e) => e.preventDefault()}
-              className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Plus className="h-4 w-4 text-gray-500" />
-                New task
-              </div>
-              <span className="text-[10px] text-gray-400 opacity-0 transition-opacity group-hover:opacity-100">CtrlShift+O</span>
-            </button>
-            <button
-              onClick={(e) => e.preventDefault()}
-              className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Search className="h-4 w-4 text-gray-500" />
-                Search tasks
-              </div>
-              <span className="text-[10px] text-gray-400 opacity-0 transition-opacity group-hover:opacity-100">CtrlK</span>
-            </button>
+      {/* ── Expanded panel (260px) ── */}
+      <div
+        className={`flex h-full min-w-[260px] flex-col transition-opacity duration-300 ease-in-out ${
+          collapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+        }`}
+        style={{ width: EXPANDED_WIDTH }}
+      >
+        <div className="mx-1.5 mb-2 mt-2 flex h-14 items-center justify-between px-3 py-1">
+          <div className="flex min-w-0 items-center gap-0 pl-0">
+            <img src="/logo.svg" alt="NextFlow logo" className="h-10 w-10 flex-shrink-0" />
+            <span className="ml-1 select-none text-[20px] font-bold leading-none tracking-tight text-gray-900">
+              NextFlow
+            </span>
           </div>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-[18px] text-gray-500 transition-colors hover:bg-gray-100"
+            title="Collapse sidebar"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        </div>
 
-          {/* ── Scrollable Nav Content ── */}
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto h-full [scrollbar-width:thin] [scrollbar-color:rgb(209_213_219)_transparent] hover:[scrollbar-color:rgb(156_163_175)_transparent]">
-              <div className="mx-1.5 mb-2 flex flex-col px-2">
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    Tasks
-                  </div>
-                </a>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-gray-500" />
-                    Projects
-                  </div>
-                </a>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Library className="h-4 w-4 text-gray-500" />
-                    Library
-                  </div>
-                </a>
-                <a
-                  href="/dashboard?tab=workflows"
-                  className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
-                    isWorkflowsActive ? "bg-[#E8E8E8] text-gray-900 font-medium" : "text-gray-600 font-normal"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Workflow className={`h-4 w-4 ${isWorkflowsActive ? "text-gray-900" : "text-gray-500"}`} />
-                    Flow
-                  </div>
-                </a>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 hover:bg-[#E8E8E8] hover:text-gray-900 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Boxes className="h-4 w-4 text-gray-500" />
-                    Nodes
-                  </div>
-                </a>
-                <a
-                  href="/dashboard?tab=api"
-                  className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
-                    isApiActive ? "bg-[#E8E8E8] text-gray-900 font-medium" : "text-gray-600 font-normal"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <BookOpen className={`h-4 w-4 ${isApiActive ? "text-gray-900" : "text-gray-500"}`} />
-                    API / MCP
-                  </div>
-                </a>
-              </div>
-              <div className="px-3 py-8 text-center text-sm text-gray-400 select-none">No tasks yet</div>
+        <div className="mx-1.5 mb-2 flex flex-col p-2">
+          <button
+            type="button"
+            onClick={(e) => e.preventDefault()}
+            className="group mb-0.5 flex w-full cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-gray-500" />
+              New task
             </div>
-            {/* Bottom fade overlay */}
-            <div className="pointer-events-none absolute bottom-0 left-0 z-10 h-16 w-full bg-gradient-to-t from-white to-transparent" />
-          </div>
-
-          {/* ── Footer ── */}
-          <div className="relative z-10 flex-shrink-0 px-2 pb-2">
-            <div
-              className={`transition-all duration-300 ease-in-out overflow-hidden flex flex-col gap-2 ${
-                footerVisible ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              {/* Credits section */}
-              <div className="flex flex-col gap-2">
-                <div className="px-2 pt-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-gray-400">Available Credits</span>
-                    </div>
-                    <div className="flex items-center min-h-[16px]">
-                      <a
-                        href="#"
-                        onClick={(e) => e.preventDefault()}
-                        className="text-xs font-semibold text-neutral-600 hover:text-neutral-800 font-mono tabular-nums transition-colors duration-200 underline-offset-2 hover:underline"
-                      >
-                        {balance !== null ? `${(balance / 1000000).toFixed(2)}M` : "100.00M"}
-                      </a>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 mt-1 p-1.5 rounded-[18px] bg-green-50 border border-green-200">
-                  <p className="text-[11px] font-medium text-green-700">+15M credits on 30 Jun &apos;26</p>
-                </div>
-              </div>
-
-              {/* Get Lifetime Access button */}
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-primary/90 px-4 py-2 w-full mt-2 h-8 text-xs cursor-pointer shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden font-semibold bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 hover:to-yellow-700 text-white before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:translate-x-[-200%] hover:before:translate-x-[200%] before:transition-transform before:duration-1000 before:ease-in-out border-0">
-                <Crown className="w-3.5 h-3.5 mr-1.5 text-white relative z-10" />
-                <span className="relative z-10">Get Lifetime Access</span>
-              </button>
-
-              {/* Add Credits button */}
-              <button className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] font-semibold focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring w-full text-xs text-white bg-indigo-600/90 hover:bg-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent before:translate-x-[-200%] hover:before:translate-x-[200%] before:transition-transform before:duration-1000 before:ease-in-out h-8 px-4 border-0">
-                <Wallet className="w-4 h-4 mr-1.5" />
-                Add Credits
-              </button>
-
-              {/* Settings & What's New buttons side by side */}
-              <div className="flex items-center gap-2 mt-2">
-                <div className="relative w-full">
-                  <button className="inline-flex items-center whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border shadow-sm rounded-[18px] px-3 w-full h-8 text-xs font-medium justify-center gap-1.5 bg-white hover:bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer">
-                    <Settings className="w-3.5 h-3.5" />
-                    Settings
-                  </button>
-                </div>
-                <button className="inline-flex items-center whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring border shadow-sm rounded-[18px] px-3 w-full h-8 text-xs font-medium justify-center gap-1.5 bg-white hover:bg-gray-50 border-gray-200 text-gray-600 hover:text-gray-900 transition-colors relative cursor-pointer" type="button">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  What's New
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-                </button>
-              </div>
-
-              {/* Invite team members */}
-              <div className="mt-2">
-                <a role="button" className="group relative z-10 flex w-full items-center justify-between rounded-[18px] border border-gray-200 bg-white hover:bg-gray-50 py-2 px-3.5 text-xs text-gray-600 hover:text-gray-900 transition-colors duration-150" href="#" onClick={(e) => e.preventDefault()}>
-                  <span className="flex items-center gap-3">
-                    <span className="flex-shrink-0">
-                      <Users className="h-4 w-4 text-gray-500" />
-                    </span>
-                    <span>Invite team members</span>
-                  </span>
-                  <ArrowRight className="h-4 w-4 flex-shrink-0" />
-                </a>
-              </div>
+            <span className="text-[10px] text-gray-400 opacity-0 transition-opacity group-hover:opacity-100">
+              CtrlShift+O
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => e.preventDefault()}
+            className="group mb-0.5 flex w-full cursor-pointer items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+          >
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-gray-500" />
+              Search tasks
             </div>
+            <span className="text-[10px] text-gray-400 opacity-0 transition-opacity group-hover:opacity-100">
+              CtrlK
+            </span>
+          </button>
+        </div>
 
-            {/* Divider + toggle chevron */}
-            <div className="border-t border-gray-200 mt-2">
-              <button
-                onClick={() => setFooterVisible((v) => !v)}
-                className="w-full py-1 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all cursor-pointer border-0 bg-transparent"
-                aria-label={footerVisible ? "Hide sidebar details" : "Show sidebar details"}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex h-full min-h-0 flex-1 flex-col gap-2 overflow-auto [scrollbar-color:rgb(209_213_219)_transparent] [scrollbar-width:thin] hover:[scrollbar-color:rgb(156_163_175)_transparent]">
+            <div className="mx-1.5 mb-2 flex flex-col px-2">
+              <a
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
               >
-                <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${footerVisible ? "" : "rotate-180"}`} />
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-gray-500" />
+                  Tasks
+                </div>
+              </a>
+              <a
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+              >
+                <div className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4 text-gray-500" />
+                  Projects
+                </div>
+              </a>
+              <a
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+              >
+                <div className="flex items-center gap-2">
+                  <Library className="h-4 w-4 text-gray-500" />
+                  Library
+                </div>
+              </a>
+              <a
+                href="/dashboard?tab=workflows"
+                className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
+                  isWorkflowsActive
+                    ? "bg-[#E8E8E8] font-medium text-gray-900"
+                    : "font-normal text-gray-600"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Workflow
+                    className={`h-4 w-4 ${isWorkflowsActive ? "text-gray-900" : "text-gray-500"}`}
+                  />
+                  Flow
+                </div>
+              </a>
+              <a
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm font-normal text-gray-600 transition-colors hover:bg-[#E8E8E8] hover:text-gray-900"
+              >
+                <div className="flex items-center gap-2">
+                  <Boxes className="h-4 w-4 text-gray-500" />
+                  Nodes
+                </div>
+              </a>
+              <a
+                href="/dashboard?tab=api"
+                className={`group mb-0.5 flex w-full items-center justify-between gap-2 rounded-[10px] px-3 py-2 text-sm transition-colors hover:bg-[#E8E8E8] hover:text-gray-900 ${
+                  isApiActive ? "bg-[#E8E8E8] font-medium text-gray-900" : "font-normal text-gray-600"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen className={`h-4 w-4 ${isApiActive ? "text-gray-900" : "text-gray-500"}`} />
+                  API / MCP
+                </div>
+              </a>
+            </div>
+            <div className="select-none px-3 py-8 text-center text-sm text-gray-400">No tasks yet</div>
+          </div>
+          <div className="pointer-events-none absolute bottom-0 left-0 z-10 h-16 w-full bg-gradient-to-t from-[#F9F9F9] to-transparent" />
+        </div>
+
+        <div className="relative z-10 flex-shrink-0 px-2 pb-2">
+          <div
+            className={`flex flex-col gap-2 overflow-hidden transition-all duration-300 ease-in-out ${
+              footerVisible ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            <div className="flex flex-col gap-2">
+              <div className="px-2 pt-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-gray-400">Available Credits</span>
+                  <a
+                    href="#"
+                    onClick={(e) => e.preventDefault()}
+                    className="font-mono text-xs font-semibold tabular-nums text-neutral-600 underline-offset-2 transition-colors duration-200 hover:text-neutral-800 hover:underline"
+                  >
+                    {balance !== null ? `${(balance / 1000000).toFixed(2)}M` : "100.00M"}
+                  </a>
+                </div>
+              </div>
+              <div className="mt-1 flex items-center gap-1 rounded-[18px] border border-green-200 bg-green-50 p-1.5">
+                <p className="text-[11px] font-medium text-green-700">+15M credits on 30 Jun &apos;26</p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="relative mt-2 inline-flex h-8 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-[18px] border-0 bg-gradient-to-r from-amber-500 to-yellow-600 px-4 py-2 text-xs font-semibold text-white shadow-lg transition-all duration-300 before:absolute before:inset-0 before:translate-x-[-200%] before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:transition-transform before:duration-1000 before:ease-in-out hover:from-amber-600 hover:to-yellow-700 hover:shadow-xl hover:before:translate-x-[200%]"
+            >
+              <Crown className="relative z-10 mr-1.5 h-3.5 w-3.5 text-white" />
+              <span className="relative z-10">Get Lifetime Access</span>
+            </button>
+
+            <button
+              type="button"
+              className="relative inline-flex h-8 w-full items-center justify-center gap-2 overflow-hidden rounded-[18px] border-0 bg-indigo-600/90 px-4 text-xs font-semibold text-white shadow-lg transition-all duration-300 before:absolute before:inset-0 before:translate-x-[-200%] before:bg-gradient-to-r before:from-transparent before:via-white/10 before:to-transparent before:transition-transform before:duration-1000 before:ease-in-out hover:bg-indigo-700 hover:shadow-xl hover:before:translate-x-[200%]"
+            >
+              <Wallet className="mr-1.5 h-4 w-4" />
+              Add Credits
+            </button>
+
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[18px] border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Settings
+              </button>
+              <button
+                type="button"
+                className="relative inline-flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[18px] border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                What&apos;s New
+                <span className="absolute -right-1 -top-1 h-2 w-2 animate-pulse rounded-full bg-blue-500" />
               </button>
             </div>
 
-            {/* User row */}
-            <div className="flex items-center px-2 py-1 gap-2.5">
-              <UserButton
-                appearance={{
-                  elements: {
-                    avatarBox: "w-7 h-7",
-                  },
-                }}
-              />
-              <span className="text-sm font-medium text-gray-700 truncate flex-1 select-none">
-                {displayName}
-              </span>
+            <div className="mt-2">
+              <a
+                role="button"
+                href="#"
+                onClick={(e) => e.preventDefault()}
+                className="group relative z-10 flex w-full items-center justify-between rounded-[18px] border border-gray-200 bg-white px-3.5 py-2 text-xs text-gray-600 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-900"
+              >
+                <span className="flex items-center gap-3">
+                  <Users className="h-4 w-4 flex-shrink-0 text-gray-500" />
+                  <span>Invite team members</span>
+                </span>
+                <ArrowRight className="h-4 w-4 flex-shrink-0" />
+              </a>
             </div>
           </div>
-        </>
-      )}
+
+          <div className="mt-2 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setFooterVisible((v) => !v)}
+              className="flex w-full cursor-pointer items-center justify-center border-0 bg-transparent py-1 text-gray-400 transition-all hover:bg-gray-50 hover:text-gray-600"
+              aria-label={footerVisible ? "Hide sidebar details" : "Show sidebar details"}
+            >
+              <ChevronDown
+                className={`h-3 w-3 transition-transform duration-200 ${footerVisible ? "" : "rotate-180"}`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2.5 px-2 py-1">
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-7 h-7",
+                },
+              }}
+            />
+            <span className="flex-1 select-none truncate text-sm font-medium text-gray-700">
+              {displayName}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
