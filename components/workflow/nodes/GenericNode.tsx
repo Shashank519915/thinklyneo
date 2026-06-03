@@ -9,6 +9,7 @@ import { isLikelyVideoUrl } from "@galaxy/shared";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import NodeHeaderActions from "./NodeHeaderActions";
+import FieldInfoTooltip from "./FieldInfoTooltip";
 import TextExpandModal from "../TextExpandModal";
 import {
   cropImageDefinition,
@@ -403,17 +404,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             <div className="flex min-w-0 items-center gap-2">
               <span
                 data-handle-anchor="label"
-                className="flex min-w-0 shrink items-center truncate text-xs text-gray-500"
+                className="flex min-w-0 shrink items-center text-xs text-gray-500"
               >
-                {param.label}
-                {param.tooltip && (
-                  <span className="group/voltip relative ml-1 inline-flex shrink-0 cursor-pointer">
-                    <LucideIcons.Info className="h-3 w-3 text-gray-400" aria-hidden="true" />
-                    <span className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[240px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/voltip:block">
-                      {param.tooltip}
-                    </span>
-                  </span>
-                )}
+                <span className="truncate">{param.label}</span>
+                {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
               </span>
               <input
                 type="range"
@@ -901,10 +895,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 {param.key === "transition" && (
                   <span
                     data-handle-anchor="label"
-                    className="flex min-w-0 shrink items-center truncate text-xs text-gray-500"
+                    className="flex min-w-0 shrink items-center text-xs text-gray-500"
                   >
-                    {param.label}
-                    <LucideIcons.Info className="ml-1 h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+                    <span className="truncate">{param.label}</span>
+                    {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
                   </span>
                 )}
                 <div className={`relative ${param.key === "transition" ? "flex-1 custom-select-container" : ""}`}>

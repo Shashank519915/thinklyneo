@@ -6,12 +6,13 @@
 import type { Connection, Edge, Node } from "@xyflow/react";
 import { isLikelyVideoUrl, parseMediaList } from "@galaxy/shared";
 import { isValidConnection, validateNewEdge } from "@/lib/execution";
-import { resolvePropagatedEdgeValue } from "@/lib/utils";
+import { classifyMediaUrl, resolvePropagatedEdgeValue } from "@/lib/utils";
 
 export type CanvasConnectionRejection =
   | "invalid-type"
   | "duplicate-target"
   | "single-video-only"
+  | "single-image-only"
   | "cycle";
 
 export interface CanvasConnectionEvaluation {
@@ -27,6 +28,22 @@ type ConnectionLike = {
   sourceHandle?: string | null;
   targetHandle?: string | null;
 };
+
+function countImageUrlsFromSource(
+  nodes: Node[],
+  connection: ConnectionLike
+): number {
+  if (!connection.source || !connection.sourceHandle) return 0;
+  const edge = {
+    id: "__eval__",
+    source: connection.source,
+    target: connection.target ?? "",
+    sourceHandle: connection.sourceHandle,
+    targetHandle: connection.targetHandle ?? "",
+  } as Edge;
+  const val = resolvePropagatedEdgeValue(edge, nodes);
+  return parseMediaList(val).filter((u) => classifyMediaUrl(u)?.kind === "image").length;
+}
 
 function countVideoUrlsFromSource(
   nodes: Node[],
@@ -77,12 +94,33 @@ export function evaluateCanvasConnection(
       const isMergeAvVideo =
         targetNode?.type === "mergeAV" &&
         connection.targetHandle === "in:video_url";
+      const isCropImage =
+        targetNode?.type === "cropImage" &&
+        connection.targetHandle === "in:inputImage";
       return {
         allowed: false,
         reason: "duplicate-target",
         error: isMergeAvVideo
           ? "Merge Audio & Video accepts only one video input. Disconnect the existing wire first."
-          : undefined,
+          : isCropImage
+            ? "Crop Image accepts only one image input. Disconnect the existing wire first."
+            : undefined,
+      };
+    }
+  }
+
+  if (
+    targetNode?.type === "cropImage" &&
+    connection.targetHandle === "in:inputImage" &&
+    connection.source
+  ) {
+    const imageCount = countImageUrlsFromSource(nodes, connection);
+    if (imageCount > 1) {
+      return {
+        allowed: false,
+        reason: "single-image-only",
+        error:
+          "Crop Image accepts only one image. Use a single-image field or disconnect extra sources.",
       };
     }
   }

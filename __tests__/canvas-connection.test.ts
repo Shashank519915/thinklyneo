@@ -120,6 +120,47 @@ describe("evaluateCanvasConnection", () => {
     expect(result.reason).toBe("single-video-only");
   });
 
+  it("rejects multiple images wired into Crop Image in:inputImage", () => {
+    const nodes: Node[] = [
+      {
+        id: "ri",
+        type: "requestInputs",
+        position: { x: 0, y: 0 },
+        data: {
+          fields: [
+            {
+              id: "field_img_multi",
+              value: "https://a/1.jpg,https://a/2.jpg",
+            },
+          ],
+        },
+      },
+      node("crop", "cropImage"),
+    ];
+    const result = evaluateCanvasConnection(nodes, [], {
+      source: "ri",
+      target: "crop",
+      sourceHandle: "field_img_multi",
+      targetHandle: "in:inputImage",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("single-image-only");
+  });
+
+  it("rejects a second wire to Crop Image in:inputImage", () => {
+    const nodes = [node("a", "gptImage2"), node("b", "gemini"), node("crop", "cropImage")];
+    const edges = [edge("a", "crop", "out:outputImage", "in:inputImage")];
+    const result = evaluateCanvasConnection(nodes, edges, {
+      source: "b",
+      target: "crop",
+      sourceHandle: "out:outputImage",
+      targetHandle: "in:inputImage",
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe("duplicate-target");
+    expect(result.error).toMatch(/only one image/i);
+  });
+
   it("rejects a second wire to Merge A/V in:video_url", () => {
     const nodes = [node("a", "klingV3"), node("b", "mergeVideo"), node("mav", "mergeAV")];
     const edges = [edge("a", "mav", "out:outputVideo", "in:video_url")];

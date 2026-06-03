@@ -6,11 +6,31 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useState } from "react";
-import { Crop, Upload, Image, Minus, Plus, RotateCcw, Coins } from "lucide-react";
+import { Upload, X, Minus, Plus, RotateCcw, Coins } from "lucide-react";
+import FieldInfoTooltip from "./FieldInfoTooltip";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import NodeHeaderActions from "./NodeHeaderActions";
-import { generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
+import { parseMediaList } from "@/lib/media-list";
+import {
+  classifyMediaUrl,
+  generateEdgeId,
+  resolvePropagatedEdgeValue,
+  sanitizeError,
+} from "@/lib/utils";
+import { uploadFilesViaApi } from "@/lib/upload";
 import { NODE_ESTIMATE_LABEL } from "@/lib/node-estimates";
+
+/** Magica `border-workflow-accent-400/90` (violet-400 at 90% opacity). */
+const CROP_FRAME_BORDER = "rgba(167, 139, 250, 0.9)";
+const IMAGE_HANDLE_COLOR = "#3b82f6";
+const IMAGE_PREVIEW_BORDER = "rgba(59, 130, 246, 0.3)";
+
+const FIELD_TOOLTIPS: Record<"x" | "y" | "w" | "h", string> = {
+  x: "Left edge of the crop region as a percentage of image width (0–100%).",
+  y: "Top edge of the crop region as a percentage of image height (0–100%).",
+  w: "Width of the crop region as a percentage of image width (1–100%).",
+  h: "Height of the crop region as a percentage of image height (1–100%).",
+};
 
 interface CropImageData {
   label: string;
@@ -35,20 +55,76 @@ const CROP_SLIDER_DEFAULT: Record<"x" | "y" | "w" | "h", number> = {
 
 interface CropSliderRowProps {
   label: string;
+  tooltip: string;
   value: number;
   onChange: (v: number) => void;
   handleId: string;
   fieldKey: "x" | "y" | "w" | "h";
+  min: number;
+  max: number;
   disabled: boolean;
   /** Visual-only: "add to request" pressed → muted look */
   requestMuted: boolean;
   onRequestMutedChange: (muted: boolean) => void;
 }
 
-/** Clamps UX slider percentages to whole numbers within 0–100. */
-function clampPct(n: number): number {
-  const x = Number.isFinite(n) ? Math.round(n) : 0;
-  return Math.min(100, Math.max(0, x));
+/** Clamps UX slider percentages to whole numbers within min–max. */
+function clampPct(n: number, min = 0, max = 100): number {
+  const x = Number.isFinite(n) ? Math.round(n) : min;
+  return Math.min(max, Math.max(min, x));
+}
+
+/** Magica-style dimmed regions + accent crop frame. */
+function CropPreviewOverlay({
+  x,
+  y,
+  w,
+  h,
+}: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}) {
+  const xPct = clampPct(x);
+  const yPct = clampPct(y);
+  const wPct = clampPct(w, 1, 100);
+  const hPct = clampPct(h, 1, 100);
+  const rightPct = Math.min(100, xPct + wPct);
+  const bottomPct = Math.min(100, yPct + hPct);
+
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      <div className="absolute left-0 right-0 top-0 bg-black/35" style={{ height: `${yPct}%` }} />
+      <div
+        className="absolute left-0 right-0 bg-black/35"
+        style={{ top: `${bottomPct}%`, bottom: 0 }}
+      />
+      <div
+        className="absolute left-0 bg-black/35"
+        style={{ top: `${yPct}%`, width: `${xPct}%`, height: `${bottomPct - yPct}%` }}
+      />
+      <div
+        className="absolute bg-black/35"
+        style={{
+          top: `${yPct}%`,
+          left: `${rightPct}%`,
+          right: 0,
+          height: `${bottomPct - yPct}%`,
+        }}
+      />
+      <div
+        className="absolute border-2"
+        style={{
+          left: `${xPct}%`,
+          top: `${yPct}%`,
+          width: `${wPct}%`,
+          height: `${hPct}%`,
+          borderColor: CROP_FRAME_BORDER,
+        }}
+      />
+    </div>
+  );
 }
 
 /** + when unmuted, − when muted; same slot as Gemini node. */
@@ -81,77 +157,86 @@ function AddToRequestToggle({
 /** Row tying a magenta target handle to range input, reset shortcut, plus visual-only request muting parity with Gemini UX. */
 function CropSliderRow({
   label,
+  tooltip,
   value,
   onChange,
   handleId,
   fieldKey,
+  min,
+  max,
   disabled,
   requestMuted,
   onRequestMutedChange,
 }: CropSliderRowProps) {
-  const v = clampPct(value);
+  const v = clampPct(value, min, max);
   const sliderLocked = disabled || requestMuted;
 
   return (
     <div
-      className={`relative flex items-center gap-2 py-1.5 overflow-visible min-h-[36px] rounded-md transition-opacity ${
-        requestMuted && !disabled ? "opacity-60 bg-gray-50/80" : ""
+      className={`relative overflow-visible transition-opacity ${
+        requestMuted && !disabled ? "opacity-60" : ""
       }`}
     >
       <Handle
         type="target"
         position={Position.Left}
         id={handleId}
+        className="!relative !transform-none"
         style={{
           background: "#EC4899",
-          border: "2px solid #EC4899",
+          border: "2px solid rgba(236, 72, 153, 0.5)",
           width: 14,
           height: 14,
           left: -21,
-          boxShadow: "0 0 8px rgba(236,72,153,0.314)",
+          top: 14,
+          transform: "translateY(-50%)",
+          boxShadow: "rgba(236, 72, 153, 0.314) 0px 0px 8px",
         }}
       />
-      <label className="text-[12px] text-gray-600 w-[108px] flex-shrink-0 leading-tight">{label}</label>
-      <div
-        className={`flex flex-1 min-w-0 items-center gap-2 ${
-          disabled ? "input-connected rounded-md px-0.5" : ""
-        }`}
-      >
-        <div
-          className={`flex flex-1 min-w-0 items-center gap-2 ${
-            requestMuted && !disabled ? "pointer-events-none opacity-70" : ""
-          }`}
-        >
+      <div className="space-y-1.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            data-handle-anchor="label"
+            className="flex min-w-0 shrink items-center gap-0 text-xs text-gray-500"
+          >
+            <span className="truncate">{label}</span>
+            <FieldInfoTooltip text={tooltip} />
+          </span>
           <input
             type="range"
-            min={0}
-            max={100}
+            min={min}
+            max={max}
             step={1}
             value={v}
             disabled={sliderLocked}
-            onChange={(e) => onChange(clampPct(Number(e.target.value)))}
-            className={`nodrag nowheel flex-1 min-w-[56px] h-2 cursor-pointer accent-[#7C3AED] ${
-              sliderLocked ? "opacity-70" : "hover:accent-[#6D28D9]"
-            }`}
+            onChange={(e) => onChange(clampPct(Number(e.target.value), min, max))}
+            className="nodrag h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 accent-[#8B5CF6] disabled:opacity-50"
           />
-          <span className="w-8 text-center text-[13px] font-medium tabular-nums text-gray-800 flex-shrink-0">
-            {v}
-          </span>
+          <input
+            type="number"
+            min={min}
+            max={max}
+            step={1}
+            value={v}
+            disabled={sliderLocked}
+            onChange={(e) => onChange(clampPct(Number(e.target.value), min, max))}
+            className="nodrag w-12 shrink-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-1.5 py-1 text-center text-xs text-gray-900 outline-none disabled:opacity-50"
+          />
+          <button
+            type="button"
+            aria-label={`Reset ${label} to default`}
+            disabled={disabled}
+            onClick={() => onChange(CROP_SLIDER_DEFAULT[fieldKey])}
+            className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <AddToRequestToggle
+            muted={requestMuted}
+            disabled={disabled}
+            onMutedChange={onRequestMutedChange}
+          />
         </div>
-        <button
-          type="button"
-          aria-label={`Reset ${label} to default`}
-          disabled={disabled}
-          onClick={() => onChange(CROP_SLIDER_DEFAULT[fieldKey])}
-          className="nodrag flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40"
-        >
-          <RotateCcw className="w-3.5 h-3.5" strokeWidth={2.25} />
-        </button>
-        <AddToRequestToggle
-          muted={requestMuted}
-          disabled={disabled}
-          onMutedChange={onRequestMutedChange}
-        />
       </div>
     </div>
   );
@@ -168,6 +253,7 @@ export default function CropImageNode({ id, data }: NodeProps) {
 
   /** Visual-only: “add to request” mute per handle (not read by execution). */
   const [requestMuteByHandle, setRequestMuteByHandle] = useState<Record<string, boolean>>({});
+  const [uploading, setUploading] = useState(false);
 
   const connectedTargets = new Set(
     (edges ?? []).filter((e) => e.target === id).map((e) => e.targetHandle)
@@ -192,6 +278,35 @@ export default function CropImageNode({ id, data }: NodeProps) {
     updateNodeData(id, {
       inputs: { ...nodeData.inputs, [key]: val },
     } as Partial<CropImageData>);
+  };
+
+  const isInputWired = connectedTargets.has("in:inputImage");
+  /** Wired: preview upstream only. Unwired: local single upload (replace on re-upload). */
+  const previewImageUrl = isInputWired
+    ? upstreamInputImage
+    : nodeData.inputs.inputImage;
+
+  const wiredImageCount = (() => {
+    if (!isInputWired) return 0;
+    const edge = (edges ?? []).find(
+      (e) => e.target === id && e.targetHandle === "in:inputImage"
+    );
+    if (!edge) return 0;
+    const val = resolvePropagatedEdgeValue(edge, nodes ?? [], edgeResolveOpts);
+    return parseMediaList(val).filter((u) => classifyMediaUrl(u)?.kind === "image").length;
+  })();
+  const multiImageFromWire = isInputWired && wiredImageCount > 1;
+
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files?.length || isLocked || isInputWired) return;
+    setUploading(true);
+    try {
+      const { urls, firstError } = await uploadFilesViaApi([files[0]!]);
+      if (firstError) window.alert(firstError);
+      if (urls[0]) updateInput("inputImage", urls[0]);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSingleRun = () => {
@@ -269,18 +384,15 @@ export default function CropImageNode({ id, data }: NodeProps) {
       style={{ minWidth: 380 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
-            <Crop className="w-4 h-4 text-orange-500" />
-          </div>
-          <span className="text-[14px] font-semibold text-gray-900">
+      <div className="flex items-start justify-between border-b border-gray-100 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="w-full min-w-0 cursor-grab select-none truncate text-sm font-medium text-gray-900">
             Crop Image
-          </span>
+          </div>
         </div>
         <NodeHeaderActions
           nodeId={id}
-          description="Crop an image using percentage-based coordinates. Connect an image from a RequestInputs field or another node's output."
+          description="Crop an image to specified dimensions"
           isExecuting={isExecuting}
           isLocked={isLocked}
           onRun={handleSingleRun}
@@ -299,193 +411,216 @@ export default function CropImageNode({ id, data }: NodeProps) {
         </div>
       )}
 
-      {/* Inputs */}
       <div className="px-4 py-4 overflow-visible">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Inputs
-        </p>
-
-        {/* Input Image */}
-        <div className="relative flex items-start gap-2 py-1 overflow-visible mb-2">
-          <Handle
-            type="target"
-            position={Position.Left}
-            id="in:inputImage"
-            style={{
-              background: "#F97316",
-              border: "2px solid #F97316",
-              width: 14,
-              height: 14,
-              left: -21,
-              top: 14,
-              transform: "translateY(-50%)",
-              boxShadow: "0 0 8px rgba(249,115,22,0.314)",
-            }}
-          />
-          <label className="text-[12px] text-gray-500 w-24 flex-shrink-0 pt-1">
-            Input Image <span className="text-red-400">*</span>
-          </label>
-          {connectedTargets.has("in:inputImage") ? (
-            <div className="flex-1 space-y-1">
-              {/* Use upstreamInputImage (live) or stored inputImage (post-execution) */}
-              {(upstreamInputImage || nodeData.inputs.inputImage) ? (
-                /* Connected + image available — show preview with crop overlay */
-                <div className="relative w-full rounded-lg overflow-hidden border border-gray-200 bg-[#F5F5F5]">
-                  <img
-                    src={upstreamInputImage ?? nodeData.inputs.inputImage!}
-                    alt="Input"
-                    className="w-full object-contain block"
-                    style={{ maxHeight: 160 }}
-                  />
-                  {/* Dark overlay on areas outside the crop rectangle */}
-                  <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-                  {/* Crop window — transparent area with grey border */}
-                  <div
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${nodeData.inputs.x}%`,
-                      top: `${nodeData.inputs.y}%`,
-                      width: `${nodeData.inputs.w}%`,
-                      height: `${nodeData.inputs.h}%`,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.4)",
-                      border: "2px solid #6B7280",
-                      borderRadius: 2,
-                    }}
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="px-3 py-1.5 rounded-lg border border-gray-200 bg-[#F5F5F5] text-[12px] text-[#7C3AED]">
-                    Connected — waiting for image
-                  </div>
-                  {nodeData.output === null && (
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-700">
-                      <span className="font-semibold">⚠</span>
-                      No image received from upstream node yet.
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ) : nodeData.inputs.inputImage ? (
-            <img
-              src={nodeData.inputs.inputImage}
-              alt="Input"
-              className="w-12 h-12 object-cover rounded-lg border border-gray-200"
+        <div className="space-y-4">
+          {/* Input Image */}
+          <div className="relative overflow-visible">
+            <Handle
+              type="target"
+              position={Position.Left}
+              id="in:inputImage"
+              className="!relative !transform-none"
+              style={{
+                background: IMAGE_HANDLE_COLOR,
+                border: "2px solid rgba(59, 130, 246, 0.5)",
+                width: 14,
+                height: 14,
+                left: -21,
+                top: 12,
+                transform: "translateY(-50%)",
+                boxShadow: "rgba(59, 130, 246, 0.314) 0px 0px 8px",
+              }}
             />
-          ) : (
-            <label className="nodrag flex-1 flex items-center justify-center gap-2 h-9 rounded-lg border-2 border-dashed border-gray-200 bg-[#F5F5F5] hover:border-[#7C3AED] cursor-pointer text-[12px] text-gray-400">
-              <Upload className="w-3.5 h-3.5" />
-              Upload Image
-              <input type="file" accept="image/*" className="sr-only" />
-            </label>
-          )}
-        </div>
-
-        {/* Crop sliders (% ) */}
-        <CropSliderRow
-          label="X Position (%)"
-          value={nodeData.inputs.x}
-          onChange={(v) => updateInput("x", v)}
-          handleId="in:x"
-          fieldKey="x"
-          disabled={isLocked || connectedTargets.has("in:x")}
-          requestMuted={!!requestMuteByHandle["in:x"]}
-          onRequestMutedChange={(muted) =>
-            setRequestMuteByHandle((m) => ({ ...m, "in:x": muted }))
-          }
-        />
-        <CropSliderRow
-          label="Y Position (%)"
-          value={nodeData.inputs.y}
-          onChange={(v) => updateInput("y", v)}
-          handleId="in:y"
-          fieldKey="y"
-          disabled={isLocked || connectedTargets.has("in:y")}
-          requestMuted={!!requestMuteByHandle["in:y"]}
-          onRequestMutedChange={(muted) =>
-            setRequestMuteByHandle((m) => ({ ...m, "in:y": muted }))
-          }
-        />
-        <CropSliderRow
-          label="Width (%)"
-          value={nodeData.inputs.w}
-          onChange={(v) => updateInput("w", v)}
-          handleId="in:w"
-          fieldKey="w"
-          disabled={isLocked || connectedTargets.has("in:w")}
-          requestMuted={!!requestMuteByHandle["in:w"]}
-          onRequestMutedChange={(muted) =>
-            setRequestMuteByHandle((m) => ({ ...m, "in:w": muted }))
-          }
-        />
-        <CropSliderRow
-          label="Height (%)"
-          value={nodeData.inputs.h}
-          onChange={(v) => updateInput("h", v)}
-          handleId="in:h"
-          fieldKey="h"
-          disabled={isLocked || connectedTargets.has("in:h")}
-          requestMuted={!!requestMuteByHandle["in:h"]}
-          onRequestMutedChange={(muted) =>
-            setRequestMuteByHandle((m) => ({ ...m, "in:h": muted }))
-          }
-        />
-      </div>
-
-      {/* Divider */}
-      <div className="mx-4 border-t border-gray-100" />
-
-      {/* Output */}
-      <div className="px-4 py-4 overflow-visible">
-        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-3">
-          Output
-        </p>
-
-        <div className="relative overflow-visible">
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="out:outputImage"
-            style={{
-              background: "#F97316",
-              border: "2px solid #F97316",
-              width: 14,
-              height: 14,
-              right: -21,
-              boxShadow: "0 0 8px rgba(249,115,22,0.314)",
-            }}
-          />
-          <label className="text-[12px] font-medium text-gray-500 mb-2 block">
-            Output Image
-          </label>
-
-          {(isPreviewMode ? output : nodeData.output) ? (
-            <div className="nodrag nowheel rounded-lg border border-gray-200 bg-[#F5F5F5] p-3">
-              <div className="flex flex-col gap-2">
-                <img
-                  src={String(isPreviewMode ? output : nodeData.output)}
-                  alt="Output"
-                  className="mx-auto block w-full max-h-[200px] object-contain"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    const linkDiv = e.currentTarget.nextElementSibling as HTMLElement;
-                    if (linkDiv) linkDiv.style.display = 'block';
+            <div className="flex items-start gap-3">
+              <span data-handle-anchor="label" className="shrink-0 pt-2 text-xs text-gray-500">
+                Input Image<span className="text-red-400">*</span>
+              </span>
+              <div className="flex-1">
+                {!isLocked && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    disabled={isInputWired || uploading || multiImageFromWire}
+                    onClick={() => {
+                      if (!isInputWired) {
+                        document.getElementById(`crop-file-${id}`)?.click();
+                      }
+                    }}
+                    className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={
+                      isInputWired
+                        ? "Image is supplied by an upstream connection"
+                        : previewImageUrl
+                          ? "Change image"
+                          : "Upload image"
+                    }
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    <span className="capitalize">
+                      {uploading
+                        ? "Uploading..."
+                        : previewImageUrl
+                          ? "Change image"
+                          : "Upload image"}
+                    </span>
+                  </button>
+                )}
+                <input
+                  id={`crop-file-${id}`}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  disabled={isInputWired || isLocked}
+                  onChange={(e) => {
+                    void handleImageUpload(e.target.files).finally(() => {
+                      e.target.value = "";
+                    });
                   }}
                 />
-                <div style={{ display: 'none' }}>
-                  <a href={String(isPreviewMode ? output : nodeData.output)} target="_blank" rel="noreferrer" className="text-[12px] text-blue-500 hover:underline break-all">
-                    {String(isPreviewMode ? output : nodeData.output)}
-                  </a>
-                </div>
               </div>
             </div>
-          ) : (
-            <div className="nodrag nowheel flex min-h-[4.5rem] items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] p-3">
-              <div className="flex items-center gap-1.5 text-[12px] text-gray-400">
-                <Image className="w-3.5 h-3.5" />
-                <span>No output yet</span>
+            {multiImageFromWire && (
+              <p className="mt-2 text-[11px] text-amber-600">
+                Only one image is allowed. Upstream field has multiple images — use a single-image
+                source.
+              </p>
+            )}
+            {previewImageUrl && !multiImageFromWire ? (
+              <div className="mt-2 flex justify-end">
+                <div className="flex flex-col items-end gap-1">
+                  <div
+                    className="relative overflow-hidden rounded-md"
+                    style={{ border: `2px solid ${IMAGE_PREVIEW_BORDER}` }}
+                  >
+                    <div className="relative">
+                      <img
+                        alt=""
+                        src={previewImageUrl}
+                        className="block rounded-sm"
+                        style={{ maxWidth: 240, maxHeight: 160 }}
+                      />
+                      <CropPreviewOverlay
+                        x={nodeData.inputs.x}
+                        y={nodeData.inputs.y}
+                        w={nodeData.inputs.w}
+                        h={nodeData.inputs.h}
+                      />
+                      {!isInputWired && !isLocked && (
+                        <button
+                          type="button"
+                          onClick={() => updateInput("inputImage", null)}
+                          className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                          title="Remove image"
+                        >
+                          <X className="h-2.5 w-2.5" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
+            ) : isInputWired ? (
+              <p className="mt-2 text-[11px] text-gray-400 italic">Waiting for upstream image…</p>
+            ) : null}
+          </div>
+
+          <CropSliderRow
+            label="X Position (%)"
+            tooltip={FIELD_TOOLTIPS.x}
+            value={nodeData.inputs.x}
+            onChange={(v) => updateInput("x", v)}
+            handleId="in:x"
+            fieldKey="x"
+            min={0}
+            max={100}
+            disabled={isLocked || connectedTargets.has("in:x")}
+            requestMuted={!!requestMuteByHandle["in:x"]}
+            onRequestMutedChange={(muted) =>
+              setRequestMuteByHandle((m) => ({ ...m, "in:x": muted }))
+            }
+          />
+          <CropSliderRow
+            label="Y Position (%)"
+            tooltip={FIELD_TOOLTIPS.y}
+            value={nodeData.inputs.y}
+            onChange={(v) => updateInput("y", v)}
+            handleId="in:y"
+            fieldKey="y"
+            min={0}
+            max={100}
+            disabled={isLocked || connectedTargets.has("in:y")}
+            requestMuted={!!requestMuteByHandle["in:y"]}
+            onRequestMutedChange={(muted) =>
+              setRequestMuteByHandle((m) => ({ ...m, "in:y": muted }))
+            }
+          />
+          <CropSliderRow
+            label="Width (%)"
+            tooltip={FIELD_TOOLTIPS.w}
+            value={nodeData.inputs.w}
+            onChange={(v) => updateInput("w", v)}
+            handleId="in:w"
+            fieldKey="w"
+            min={1}
+            max={100}
+            disabled={isLocked || connectedTargets.has("in:w")}
+            requestMuted={!!requestMuteByHandle["in:w"]}
+            onRequestMutedChange={(muted) =>
+              setRequestMuteByHandle((m) => ({ ...m, "in:w": muted }))
+            }
+          />
+          <CropSliderRow
+            label="Height (%)"
+            tooltip={FIELD_TOOLTIPS.h}
+            value={nodeData.inputs.h}
+            onChange={(v) => updateInput("h", v)}
+            handleId="in:h"
+            fieldKey="h"
+            min={1}
+            max={100}
+            disabled={isLocked || connectedTargets.has("in:h")}
+            requestMuted={!!requestMuteByHandle["in:h"]}
+            onRequestMutedChange={(muted) =>
+              setRequestMuteByHandle((m) => ({ ...m, "in:h": muted }))
+            }
+          />
+        </div>
+
+        <div className="relative mt-4 overflow-visible border-t border-gray-100 pt-4">
+          <div
+            className="absolute flex items-center"
+            style={{ right: "-22px", top: "8px", transform: "translateY(-50%)", zIndex: 50 }}
+          >
+            <Handle
+              type="source"
+              position={Position.Right}
+              id="out:outputImage"
+              className="!relative !transform-none source connectable connectablestart connectableend connectionindicator"
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: "50%",
+                background: IMAGE_HANDLE_COLOR,
+                border: `2px solid ${IMAGE_HANDLE_COLOR}80`,
+                boxShadow: `${IMAGE_HANDLE_COLOR}50 0px 0px 8px`,
+                cursor: "crosshair",
+              }}
+            />
+          </div>
+          <div data-handle-anchor="label" className="mb-1.5 text-xs text-gray-500">
+            Output Image
+          </div>
+          {(isPreviewMode ? output : nodeData.output) ? (
+            <div className="nodrag nowheel min-h-[120px] rounded-lg border border-gray-200 bg-[#F5F5F5] p-2">
+              <img
+                src={String(isPreviewMode ? output : nodeData.output)}
+                alt="Output"
+                className="mx-auto block w-full max-h-[160px] object-contain rounded-sm"
+              />
+            </div>
+          ) : (
+            <div className="min-h-[120px] rounded-lg border border-gray-200 bg-[#F5F5F5] p-2">
+              <div className="py-10 text-center text-xs text-gray-400">No output yet</div>
             </div>
           )}
         </div>

@@ -295,6 +295,10 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
             evaluation.error ??
               "Merge Audio & Video accepts only one video input."
           );
+        } else if (evaluation.reason === "single-image-only") {
+          window.alert(
+            evaluation.error ?? "Crop Image accepts only one image input."
+          );
         } else if (evaluation.reason === "cycle") {
           console.warn("Connection would create a cycle:", evaluation.error);
         }
