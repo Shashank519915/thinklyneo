@@ -23,7 +23,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useWorkflowStore } from "@/store/workflow-store";
-import { isValidConnection, validateNewEdge } from "@/lib/execution";
+import { evaluateCanvasConnection } from "@/lib/canvas-connection";
 import { generateEdgeId, getSourceHandleColor } from "@/lib/utils";
 import {
   cropImageDefinition,
@@ -276,76 +276,28 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
 
   const isValidConnectionCallback = useCallback(
     (connection: Connection | Edge) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-
-      const valid = isValidConnection(
-        connection.sourceHandle,
-        connection.targetHandle,
-        sourceNode?.type,
-        targetNode?.type
-      );
-
-      if (!valid) return false;
-
-      // Prevent target handles (except multi-image "in:images") from accepting multiple incoming connections
-      if (connection.targetHandle !== "in:images") {
-        const hasExistingConnection = edges.some(
-          (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
-        );
-        if (hasExistingConnection) {
-          return false;
-        }
-      }
-
-      const cycleCheck = validateNewEdge(nodes, edges, {
-        source: connection.source ?? "",
-        target: connection.target ?? "",
-      });
-
-      if (!cycleCheck.valid) {
-        return false;
-      }
-
-      return true;
+      return evaluateCanvasConnection(nodes, edges, connection).allowed;
     },
     [nodes, edges]
   );
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const sourceNode = nodes.find((n) => n.id === connection.source);
-      const targetNode = nodes.find((n) => n.id === connection.target);
-
-      const valid = isValidConnection(
-        connection.sourceHandle,
-        connection.targetHandle,
-        sourceNode?.type,
-        targetNode?.type
-      );
-
-      if (!valid) return;
-
-      // Prevent target handles (except multi-image "in:images") from accepting multiple incoming connections
-      if (connection.targetHandle !== "in:images") {
-        const hasExistingConnection = edges.some(
-          (e) => e.target === connection.target && e.targetHandle === connection.targetHandle
-        );
-        if (hasExistingConnection) {
-          console.warn("Single connection enforced for target handle:", connection.targetHandle);
-          return;
+      const evaluation = evaluateCanvasConnection(nodes, edges, connection);
+      if (!evaluation.allowed) {
+        if (evaluation.reason === "duplicate-target") {
+          console.warn(
+            "Single connection enforced for target handle:",
+            connection.targetHandle
+          );
+        } else if (evaluation.reason === "cycle") {
+          console.warn("Connection would create a cycle:", evaluation.error);
         }
-      }
-
-      const cycleCheck = validateNewEdge(nodes, edges, {
-        source: connection.source ?? "",
-        target: connection.target ?? "",
-      });
-
-      if (!cycleCheck.valid) {
-        console.warn("Connection would create a cycle:", cycleCheck.error);
         return;
       }
+
+      const sourceNode = nodes.find((n) => n.id === connection.source);
+      const targetNode = nodes.find((n) => n.id === connection.target);
 
       let finalTargetHandle = connection.targetHandle;
 
