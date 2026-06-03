@@ -346,7 +346,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
     if (isWired) {
-      if (param.type === "image-array" || param.type === "video-array") {
+      if (param.type === "select" && param.key === "transition") {
+        const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
+        if (inboundEdge) {
+          wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
+        }
+      } else if (param.type === "image-array" || param.type === "video-array") {
         const inboundEdges = (edges ?? []).filter((e) => e.target === id && e.targetHandle === handleId);
         if (inboundEdges.length > 0) {
           wiredValue = inboundEdges
