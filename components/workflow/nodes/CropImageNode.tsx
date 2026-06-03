@@ -13,6 +13,7 @@ import {
   promoteInputToRequest,
   shouldShowAddToRequest,
 } from "@/lib/promote-to-request";
+import { resolveEffectiveParamValue } from "@/lib/promoted-input-value";
 import FieldInfoTooltip from "./FieldInfoTooltip";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import NodeHeaderActions from "./NodeHeaderActions";
@@ -216,7 +217,9 @@ function CropSliderRow({
             <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
           {showAddToRequest && (
-            <AddToRequestToggle disabled={disabled} onPromote={onPromote} />
+            <div className="ml-auto shrink-0">
+              <AddToRequestToggle disabled={disabled} onPromote={onPromote} />
+            </div>
           )}
         </div>
       </div>
@@ -250,6 +253,9 @@ export default function CropImageNode({ id, data }: NodeProps) {
         paramType: "number",
         handleType: "text",
         currentValue: value,
+        numberMin: 0,
+        numberMax: 100,
+        numberStep: 1,
       });
       if (result.error) {
         console.warn("[Add to request]", result.error);
@@ -302,6 +308,26 @@ export default function CropImageNode({ id, data }: NodeProps) {
     return parseMediaList(val).filter((u) => classifyMediaUrl(u)?.kind === "image").length;
   })();
   const multiImageFromWire = isInputWired && wiredImageCount > 1;
+
+  const resolveCropPct = (
+    fieldKey: "x" | "y" | "w" | "h",
+    handleId: string,
+    promoted: boolean
+  ): number => {
+    const raw = resolveEffectiveParamValue({
+      requestPromoted: promoted,
+      localValue: nodeData.inputs[fieldKey],
+      defaultValue: CROP_SLIDER_DEFAULT[fieldKey],
+      nodes: nodes ?? [],
+      edges: edges ?? [],
+      targetNodeId: id,
+      targetHandle: handleId,
+      paramType: "number",
+      previewOpts: edgeResolveOpts,
+    });
+    const n = typeof raw === "number" ? raw : Number(raw);
+    return clampPct(Number.isFinite(n) ? n : CROP_SLIDER_DEFAULT[fieldKey], 0, 100);
+  };
 
   const handleImageUpload = async (files: FileList | null) => {
     if (!files?.length || isLocked || isInputWired) return;
@@ -512,10 +538,10 @@ export default function CropImageNode({ id, data }: NodeProps) {
                         style={{ maxWidth: 240, maxHeight: 160 }}
                       />
                       <CropPreviewOverlay
-                        x={nodeData.inputs.x}
-                        y={nodeData.inputs.y}
-                        w={nodeData.inputs.w}
-                        h={nodeData.inputs.h}
+                        x={resolveCropPct("x", "in:x", isRequestPromoted(nodes ?? [], edges ?? [], id, "in:x"))}
+                        y={resolveCropPct("y", "in:y", isRequestPromoted(nodes ?? [], edges ?? [], id, "in:y"))}
+                        w={resolveCropPct("w", "in:w", isRequestPromoted(nodes ?? [], edges ?? [], id, "in:w"))}
+                        h={resolveCropPct("h", "in:h", isRequestPromoted(nodes ?? [], edges ?? [], id, "in:h"))}
                       />
                       {!isInputWired && !isLocked && (
                         <button
@@ -547,12 +573,13 @@ export default function CropImageNode({ id, data }: NodeProps) {
             const handleId = `in:${key}`;
             const wired = connectedTargets.has(handleId);
             const promoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
+            const effectiveVal = resolveCropPct(key, handleId, promoted);
             return (
               <CropSliderRow
                 key={key}
                 label={label}
                 tooltip={FIELD_TOOLTIPS[key]}
-                value={nodeData.inputs[key]}
+                value={effectiveVal}
                 onChange={(v) => updateInput(key, v)}
                 handleId={handleId}
                 fieldKey={key}

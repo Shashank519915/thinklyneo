@@ -29,6 +29,7 @@ export function getRequestFieldKind(field: Pick<WorkflowField, "id" | "type">): 
 
   switch (field.type) {
     case "text_field":
+    case "select_field":
       return "text";
     case "number_field":
       return "number";
@@ -51,8 +52,18 @@ export function getRequestFieldKind(field: Pick<WorkflowField, "id" | "type">): 
 }
 
 /** Whether the field supports multiple comma-separated asset URLs (images, videos). */
-export function isMultiAssetField(kind: RequestFieldKind): boolean {
+export function isMultiAssetField(
+  kind: RequestFieldKind,
+  mediaMaxCount?: number
+): boolean {
+  if (mediaMaxCount === 1) return false;
   return kind === "image" || kind === "video";
+}
+
+export function maxAssetsForField(field: Pick<WorkflowField, "type" | "mediaMaxCount">): number {
+  if (field.mediaMaxCount != null) return field.mediaMaxCount;
+  if (field.type === "video_field" || field.type === "image_field") return 10;
+  return 10;
 }
 
 /** Build playground/API input map from node field definitions. */

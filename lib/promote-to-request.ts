@@ -5,8 +5,13 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { NodeParameter } from "@galaxy/shared";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
+import { syncTargetFromRequestField } from "@/lib/promoted-input-value";
 import { generateEdgeId } from "@/lib/utils";
-import type { RequestInputsData, WorkflowField } from "@/store/workflow-store";
+import type {
+  RequestInputsData,
+  SelectFieldOption,
+  WorkflowField,
+} from "@/store/workflow-store";
 
 export function findRequestInputsNode(nodes: Node[]): Node | undefined {
   return nodes.find((n) => n.type === "requestInputs");
@@ -67,13 +72,15 @@ export function resolveRequestFieldType(
   paramType: NodeParameter["type"] | undefined,
   handleType: NodeParameter["handle"] extends infer H ? (H extends { type: infer T } ? T : never) : never
 ): WorkflowField["type"] {
+  if (paramType === "select") return "select_field";
+  if (paramType === "number" || paramType === "slider") return "number_field";
+  if (paramType === "boolean") return "boolean_field";
   const ht = handleType as string | undefined;
   if (ht === "image") return "image_field";
   if (ht === "video") return "video_field";
   if (ht === "audio") return "audio_field";
   if (ht === "file") return "file_field";
-  if (paramType === "number" || paramType === "slider") return "number_field";
-  if (paramType === "select" || paramType === "text" || paramType === "textarea") return "text_field";
+  if (paramType === "text" || paramType === "textarea") return "text_field";
   return "text_field";
 }
 
@@ -126,6 +133,11 @@ export interface PromoteInputOptions {
   handleType?: string;
   currentValue?: unknown;
   defaultValue?: unknown;
+  selectOptions?: SelectFieldOption[];
+  numberMin?: number;
+  numberMax?: number;
+  numberStep?: number;
+  mediaMaxCount?: number;
 }
 
 export interface PromoteInputResult {
@@ -154,6 +166,11 @@ export function promoteInputToRequest(opts: PromoteInputOptions): PromoteInputRe
     handleType,
     currentValue,
     defaultValue,
+    selectOptions,
+    numberMin,
+    numberMax,
+    numberStep,
+    mediaMaxCount,
   } = opts;
 
   const inbound = getInboundEdgeForHandle(edges, targetNodeId, targetHandle);
@@ -203,6 +220,11 @@ export function promoteInputToRequest(opts: PromoteInputOptions): PromoteInputRe
       label: paramLabel.trim() || paramKey,
       value: valueToRequestFieldValue(fieldType, currentValue, defaultValue),
       linkedTarget: { nodeId: targetNodeId, handle: targetHandle },
+      ...(selectOptions?.length ? { selectOptions } : {}),
+      ...(numberMin !== undefined ? { numberMin } : {}),
+      ...(numberMax !== undefined ? { numberMax } : {}),
+      ...(numberStep !== undefined ? { numberStep } : {}),
+      ...(mediaMaxCount !== undefined ? { mediaMaxCount } : {}),
     };
     const reqData = requestNode.data as unknown as RequestInputsData;
     const fields = [...(reqData.fields ?? []), newField];
@@ -247,6 +269,8 @@ export function promoteInputToRequest(opts: PromoteInputOptions): PromoteInputRe
       } as Edge,
     ];
   }
+
+  nextNodes = syncTargetFromRequestField(nextNodes, requestNode.id, fieldId);
 
   return {
     nodes: nextNodes,

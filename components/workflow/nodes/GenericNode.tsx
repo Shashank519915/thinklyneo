@@ -127,6 +127,7 @@ function getColorTheme(color: string) {
 }
 
 import { AddToRequestToggle } from "@/components/workflow/AddToRequestToggle";
+import { resolveEffectiveParamValue } from "@/lib/promoted-input-value";
 import {
   isRequestPromoted,
   promoteInputToRequest,
@@ -313,9 +314,28 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   };
 
   const handlePromoteInput = useCallback(
-    (param: { key: string; label: string; type?: string; handle?: { type?: string }; defaultValue?: unknown }) => {
+    (param: {
+      key: string;
+      label: string;
+      type?: string;
+      handle?: { type?: string };
+      defaultValue?: unknown;
+      options?: Array<{ value: string; label: string }>;
+      min?: number;
+      max?: number;
+      step?: number;
+    }) => {
       if (readOnly || isLocked) return;
       const handleId = `in:${param.key}`;
+      const limit = definition.limits?.[param.key as keyof typeof definition.limits];
+      let mediaMaxCount = limit?.maxCount;
+      if (mediaMaxCount == null) {
+        if (param.key === "video_url" || param.handle?.type === "video") {
+          mediaMaxCount = param.type === "video-array" || param.key === "video_urls" ? 10 : 1;
+        } else if (param.type === "image-array" || param.key === "images") {
+          mediaMaxCount = 10;
+        }
+      }
       const result = promoteInputToRequest({
         nodes: nodes ?? [],
         edges: edges ?? [],
@@ -327,6 +347,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         handleType: param.handle?.type,
         currentValue: nodeData.inputs?.[param.key],
         defaultValue: param.defaultValue,
+        selectOptions: param.type === "select" ? param.options : undefined,
+        numberMin: param.min,
+        numberMax: param.max,
+        numberStep: param.step,
+        mediaMaxCount,
       });
       if (result.error) {
         console.warn("[Add to request]", result.error);
@@ -335,7 +360,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       setNodes(result.nodes);
       setEdges(result.edges);
     },
-    [readOnly, isLocked, nodes, edges, id, nodeData.inputs, setNodes, setEdges]
+    [readOnly, isLocked, nodes, edges, id, nodeData.inputs, setNodes, setEdges, definition]
   );
 
   const removeFileValue = (key: string, indexToRemove?: number) => {
@@ -361,7 +386,23 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       isLocked,
       wired: isWired,
     });
-    const value = nodeData.inputs?.[param.key] ?? param.defaultValue ?? "";
+    const rawValue = resolveEffectiveParamValue({
+      requestPromoted,
+      localValue: nodeData.inputs?.[param.key],
+      defaultValue: param.defaultValue,
+      nodes: nodes ?? [],
+      edges: edges ?? [],
+      targetNodeId: id,
+      targetHandle: handleId,
+      paramType: param.type,
+      previewOpts: edgeResolveOpts,
+    });
+    const value =
+      param.type === "number" || param.type === "slider"
+        ? typeof rawValue === "number"
+          ? rawValue
+          : Number(rawValue)
+        : (rawValue ?? param.defaultValue ?? "");
 
     // Hide inputImage and uploadedImages if mode is text
     if ((param.key === "inputImage" || param.key === "uploadedImages") && hasModeTab && modeTab === "text") return null;
@@ -460,10 +501,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
               {showAddToRequestBtn && (
-                <AddToRequestToggle
-                  disabled={isLocked}
-                  onPromote={() => handlePromoteInput(param)}
-                />
+                <div className="ml-auto shrink-0">
+                  <AddToRequestToggle
+                    disabled={isLocked}
+                    onPromote={() => handlePromoteInput(param)}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -527,14 +570,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 {param.label}
                 {param.required && <span className="text-red-400">*</span>}
               </span>
-              {showAddToRequestBtn && (
-                <AddToRequestToggle
-                  disabled={isLocked}
-                  onPromote={() => handlePromoteInput(param)}
-                />
-              )}
             </span>
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               {!readOnly && (
                 <div className="relative">
                   <button
@@ -577,6 +614,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 </div>
               )}
             </div>
+            {showAddToRequestBtn && (
+              <div className="ml-auto shrink-0 self-start pt-2">
+                <AddToRequestToggle
+                  disabled={isLocked}
+                  onPromote={() => handlePromoteInput(param)}
+                />
+              </div>
+            )}
           </div>
           {multiVideoRejected && (
             <p className="mt-2 text-[11px] text-amber-600">
@@ -916,7 +961,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.type === "select" && (
               <div
                 className={`${
-                  param.key === "transition" ? "flex min-w-0 items-center gap-3" : "relative custom-select-container"
+                  param.key === "transition"
+                    ? "flex min-w-0 items-center gap-2"
+                    : "relative custom-select-container"
                 }`}
               >
                 {param.key === "transition" && (
@@ -926,15 +973,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   >
                     <span className="truncate">{param.label}</span>
                     {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
-                    {showAddToRequestBtn && (
-                      <AddToRequestToggle
-                        disabled={isLocked}
-                        onPromote={() => handlePromoteInput(param)}
-                      />
-                    )}
                   </span>
                 )}
-                <div className={`relative ${param.key === "transition" ? "flex-1 custom-select-container" : ""}`}>
+                <div
+                  className={`relative ${
+                    param.key === "transition" ? "min-w-0 flex-1 custom-select-container" : ""
+                  }`}
+                >
                 <button
                   type="button"
                   disabled={disabled}
@@ -983,6 +1028,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </div>
                 )}
                 </div>
+                {param.key === "transition" && param.handle && showAddToRequestBtn && (
+                  <div className="ml-auto shrink-0">
+                    <AddToRequestToggle
+                      disabled={isLocked}
+                      onPromote={() => handlePromoteInput(param)}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

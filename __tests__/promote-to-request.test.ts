@@ -5,6 +5,7 @@ import {
   isRequestPromoted,
   promoteInputToRequest,
   removeRequestFieldAndEdges,
+  resolveRequestFieldType,
   shouldShowAddToRequest,
 } from "@/lib/promote-to-request";
 
@@ -44,6 +45,7 @@ describe("promoteInputToRequest", () => {
     const fields = (req?.data as { fields: WorkflowField[] }).fields;
     expect(fields).toHaveLength(1);
     expect(fields[0].linkedTarget).toEqual({ nodeId: "mv", handle: "in:transition" });
+    expect(fields[0].type).toBe("select_field");
     expect(fields[0].value).toBe("fade");
     expect(result.edges).toHaveLength(1);
     expect(result.edges[0].targetHandle).toBe("in:transition");
@@ -141,6 +143,12 @@ describe("isRequestPromoted vs manual request wire", () => {
       },
     ];
     expect(isRequestPromoted(nodes, edges, "llm", "in:prompt")).toBe(false);
+  });
+});
+
+describe("resolveRequestFieldType", () => {
+  it("promotes audio_volume as number_field", () => {
+    expect(resolveRequestFieldType("slider", "text")).toBe("number_field");
   });
 });
 

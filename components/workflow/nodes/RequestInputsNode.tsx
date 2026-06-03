@@ -23,12 +23,15 @@ import {
   Video,
   FileText,
   AlignLeft,
+  ChevronDown,
 } from "lucide-react";
 import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/workflow-store";
 import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import { getNodeRunBorderClass } from "@/lib/node-run-chrome";
+import { syncLinkedTargetInputFromField } from "@/lib/promoted-input-value";
+import { maxAssetsForField } from "@/lib/request-inputs";
 import { removeRequestFieldAndEdges } from "@/lib/promote-to-request";
 
 interface RequestInputsData {
@@ -69,6 +72,7 @@ export default function RequestInputsNode({
   const [editingLabel, setEditingLabel] = useState("");
   const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
+  const [activeSelectFieldId, setActiveSelectFieldId] = useState<string | null>(null);
 
   const fields: WorkflowField[] = nodeData.fields ?? [];
 
@@ -121,11 +125,14 @@ export default function RequestInputsNode({
   };
 
   const updateField = (fieldId: string, updates: Partial<WorkflowField>) => {
-    updateNodeData(id, {
-      fields: fields.map((f) =>
-        f.id === fieldId ? { ...f, ...updates } : f
-      ),
-    } as Partial<RequestInputsData>);
+    const nextFields = fields.map((f) =>
+      f.id === fieldId ? { ...f, ...updates } : f
+    );
+    updateNodeData(id, { fields: nextFields } as Partial<RequestInputsData>);
+    const updated = nextFields.find((f) => f.id === fieldId);
+    if (updated?.linkedTarget) {
+      setNodes(syncLinkedTargetInputFromField(nodes, updated));
+    }
   };
 
   const startEditLabel = (field: WorkflowField) => {
@@ -154,11 +161,13 @@ export default function RequestInputsNode({
 
       const filesArray = Array.from(files);
       const field = fields.find((f) => f.id === fieldId);
+      const maxAssets = maxAssetsForField(
+        field ?? { type, mediaMaxCount: undefined }
+      );
       const currentVal = field?.value || "";
       const currentUrls = currentVal ? currentVal.split(",").filter(Boolean) : [];
-
-      if (currentUrls.length + filesArray.length > 10) {
-        alert("You can upload a maximum of 10 files.");
+      if (currentUrls.length + filesArray.length > maxAssets) {
+        alert(`You can upload a maximum of ${maxAssets} file(s).`);
         return;
       }
 
@@ -183,8 +192,13 @@ export default function RequestInputsNode({
           const latestUrls = latestVal ? latestVal.split(",").filter(Boolean) : [];
           
           const cleanUrls = latestUrls.filter((url) => !url.startsWith("data:"));
+          const cap = maxAssetsForField(latestField ?? { type, mediaMaxCount: undefined });
+          const nextUrls =
+            cap === 1
+              ? validUrls.slice(0, 1)
+              : [...cleanUrls, ...validUrls].slice(0, cap);
           updateField(fieldId, {
-            value: [...cleanUrls, ...validUrls].slice(0, 10).join(","),
+            value: nextUrls.length > 0 ? nextUrls.join(",") : null,
           });
         }
       } catch (err) {
@@ -203,6 +217,7 @@ export default function RequestInputsNode({
       case "image_field":
         return "#3b82f6"; // Blue
       case "text_field":
+      case "select_field":
         return "#f59e0b"; // Amber
       case "video_field":
         return "#22c55e"; // Green
@@ -336,6 +351,7 @@ export default function RequestInputsNode({
         {fields.map((field) => {
           const displayValue = getFieldDisplayValue(field) ?? "";
           const urls = displayValue ? displayValue.split(",").filter(Boolean) : [];
+          const maxAssets = maxAssetsForField(field);
           const handleColorVal = handleColor(field.type);
 
           return (
@@ -422,6 +438,59 @@ export default function RequestInputsNode({
                 </div>
 
                 {/* Field input */}
+                {field.type === "select_field" && (field.selectOptions?.length ?? 0) > 0 && (
+                  <div className="relative custom-select-container">
+                    <button
+                      type="button"
+                      disabled={isPreviewMode || readOnly}
+                      onClick={() =>
+                        setActiveSelectFieldId(
+                          activeSelectFieldId === field.id ? null : field.id
+                        )
+                      }
+                      className="nodrag flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer"
+                    >
+                      <span className="truncate">
+                        {field.selectOptions?.find((o) => o.value === displayValue)?.label ||
+                          displayValue ||
+                          "Select option..."}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 opacity-50" />
+                    </button>
+                    {activeSelectFieldId === field.id && !isPreviewMode && !readOnly && (
+                      <div className="absolute left-0 top-full z-50 mt-1.5 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 text-left shadow-xl">
+                        <div className="nowheel flex max-h-[260px] flex-col gap-0.5 overflow-y-auto">
+                          {field.selectOptions?.map((opt) => {
+                            const isSelected = opt.value === displayValue;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  updateField(field.id, { value: opt.value });
+                                  setActiveSelectFieldId(null);
+                                }}
+                                className={`flex w-full items-center gap-1.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition-colors ${
+                                  isSelected
+                                    ? "bg-gray-100/60 text-gray-900"
+                                    : "text-gray-700 hover:bg-gray-50"
+                                }`}
+                              >
+                                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                                  {isSelected && (
+                                    <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                  )}
+                                </span>
+                                <span className="truncate">{opt.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {field.type === "text_field" && (
                   <div className="relative">
                     <textarea
@@ -443,7 +512,47 @@ export default function RequestInputsNode({
                   </div>
                 )}
 
-                {field.type === "number_field" && (
+                {field.type === "number_field" &&
+                  field.numberMin !== undefined &&
+                  field.numberMax !== undefined && (
+                  <div className="flex min-w-0 items-center gap-2">
+                    <input
+                      type="range"
+                      min={field.numberMin}
+                      max={field.numberMax}
+                      step={field.numberStep ?? 1}
+                      value={
+                        displayValue !== ""
+                          ? Number(displayValue)
+                          : field.numberMin
+                      }
+                      disabled={isPreviewMode || readOnly}
+                      onChange={(e) =>
+                        !isPreviewMode &&
+                        !readOnly &&
+                        updateField(field.id, { value: e.target.value })
+                      }
+                      className="nodrag h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 accent-[#EC4899] disabled:opacity-50"
+                    />
+                    <input
+                      type="number"
+                      min={field.numberMin}
+                      max={field.numberMax}
+                      step={field.numberStep ?? 1}
+                      value={displayValue}
+                      disabled={isPreviewMode || readOnly}
+                      onChange={(e) =>
+                        !isPreviewMode &&
+                        !readOnly &&
+                        updateField(field.id, { value: e.target.value })
+                      }
+                      className="nodrag w-14 shrink-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-1.5 py-1 text-center text-xs text-gray-900 outline-none disabled:opacity-50"
+                    />
+                  </div>
+                )}
+
+                {field.type === "number_field" &&
+                  (field.numberMin === undefined || field.numberMax === undefined) && (
                   <input
                     type="number"
                     step="any"
@@ -475,7 +584,7 @@ export default function RequestInputsNode({
                 {field.type === "image_field" && (
                   <div className="space-y-2">
                     {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
+                      urls.length < maxAssets && (
                         <div className="relative">
                           <button
                             type="button"
@@ -491,7 +600,7 @@ export default function RequestInputsNode({
                             ) : (
                               <>
                                 <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/${maxAssets})`}</span>
                               </>
                             )}
                           </button>
@@ -560,7 +669,7 @@ export default function RequestInputsNode({
                 {field.type === "video_field" && (
                   <div className="space-y-2">
                     {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
+                      urls.length < maxAssets && (
                         <div className="relative">
                           <button
                             type="button"
@@ -576,7 +685,7 @@ export default function RequestInputsNode({
                             ) : (
                               <>
                                 <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/10)`}</span>
+                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/${maxAssets})`}</span>
                               </>
                             )}
                           </button>

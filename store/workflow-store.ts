@@ -12,6 +12,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
+import { isOutOfScopeSkippedNodeRun } from "@/lib/run-scope";
 
 /** When set, field was auto-created via “Add to request” on a target node handle. */
 export interface RequestFieldLink {
@@ -19,10 +20,16 @@ export interface RequestFieldLink {
   handle: string;
 }
 
+export interface SelectFieldOption {
+  value: string;
+  label: string;
+}
+
 export interface WorkflowField {
   id: string;
   type:
     | "text_field"
+    | "select_field"
     | "number_field"
     | "boolean_field"
     | "image_field"
@@ -33,6 +40,13 @@ export interface WorkflowField {
   label: string;
   value: string | null;
   linkedTarget?: RequestFieldLink;
+  /** Promoted select parameters (e.g. merge transition). */
+  selectOptions?: SelectFieldOption[];
+  numberMin?: number;
+  numberMax?: number;
+  numberStep?: number;
+  /** Max comma-separated assets when type is image/video (default 10). */
+  mediaMaxCount?: number;
 }
 
 export interface RequestInputsData {
@@ -231,9 +245,11 @@ export function useNodePreview(nodeId: string) {
   const isResponseNode = nodeType === "response";
 
   const output = isPreviewMode ? (previewNodeOutputs[nodeId] ?? null) : (nodeOutputs[nodeId] ?? null);
-  const error = isPreviewMode
+  const rawError = isPreviewMode
     ? (previewNodeErrors[nodeId] ?? null)
     : (nodeErrors[nodeId] ?? (node?.data as any)?.error ?? null);
+  // Out-of-scope nodes are blurred in preview — do not show skip/error chrome on them
+  const error = isPreviewMode && !inRunScope ? null : rawError;
   const hasError = !!error;
   // Field IDs that existed in the run for this node (undefined when not in preview)
   const runFieldIds: Set<string> | undefined = isPreviewMode ? (previewRunNodeFields[nodeId] ?? undefined) : undefined;
@@ -464,6 +480,9 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
     const previewGhostNodes: Array<{ nodeId: string; nodeName: string; fields?: string[] }> = [];
 
     for (const nr of run.nodeRuns) {
+      if (isOutOfScopeSkippedNodeRun(nr)) {
+        continue;
+      }
       previewRunNodeIds.add(nr.nodeId);
       if (nr.output !== undefined && nr.output !== null) {
         previewNodeOutputs[nr.nodeId] = nr.output;
