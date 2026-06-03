@@ -137,6 +137,17 @@ import {
   shouldShowAddToRequest,
 } from "@/lib/promote-to-request";
 
+/** Side-by-side label + dropdown (Merge Videos transition, Extract Audio format). */
+function isCompactSelectParam(
+  nodeType: string,
+  param: { key: string; type?: string }
+): boolean {
+  return (
+    param.type === "select" &&
+    (param.key === "transition" || (nodeType === "extractAudio" && param.key === "format"))
+  );
+}
+
 export default function GenericNode({ id, data, type }: NodeProps) {
   const definition = DEFINITIONS[type as string] || DEFINITIONS[data.type as string] || DEFINITIONS[data.model as string] || cropImageDefinition;
   const theme = getColorTheme(definition.color);
@@ -415,7 +426,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
     if (isWired) {
-      if (param.type === "select" && param.key === "transition") {
+      if (isCompactSelectParam(definition.type, param)) {
         const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
         if (inboundEdge) {
           wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
@@ -735,7 +746,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         )}
 
         {(param.type !== "image-array" && param.type !== "video-array" || isWired) &&
-          !(param.type === "select" && param.key === "transition") &&
+          !isCompactSelectParam(definition.type, param) &&
           param.uiVariant !== "magica-side-label" &&
           param.uiVariant !== "magica-volume-row" && (
           <div
@@ -990,12 +1001,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.type === "select" && (
               <div
                 className={`${
-                  param.key === "transition"
+                  isCompactSelectParam(definition.type, param)
                     ? "flex min-w-0 items-center gap-2"
                     : "relative custom-select-container"
                 }`}
               >
-                {param.key === "transition" && (
+                {isCompactSelectParam(definition.type, param) && (
                   <span
                     data-handle-anchor="label"
                     className="flex min-w-0 shrink items-center gap-1 text-xs text-gray-500"
@@ -1006,7 +1017,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 )}
                 <div
                   className={`relative ${
-                    param.key === "transition" ? "min-w-0 flex-1 custom-select-container" : ""
+                    isCompactSelectParam(definition.type, param)
+                      ? "min-w-0 flex-1 custom-select-container"
+                      : ""
                   }`}
                 >
                 <button
@@ -1057,7 +1070,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </div>
                 )}
                 </div>
-                {param.key === "transition" && param.handle && showAddToRequestBtn && (
+                {isCompactSelectParam(definition.type, param) && param.handle && showAddToRequestBtn && (
                   <div className="ml-auto shrink-0">
                     <AddToRequestToggle
                       disabled={isLocked}

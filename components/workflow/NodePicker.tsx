@@ -178,7 +178,7 @@ function createNode(nodeType: string): Node {
       position,
       data: {
         label: "Extract Audio",
-        inputs: { videoUrl: "" },
+        inputs: { videoUrl: "", format: "mp3" },
         output: null,
       },
     };
