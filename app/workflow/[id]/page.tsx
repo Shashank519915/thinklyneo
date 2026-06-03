@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Lock,
   FileText,
+  Coins,
 } from "lucide-react";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
@@ -132,6 +133,8 @@ export default function WorkflowWorkspacePage() {
     Record<string, { status: string; output?: unknown; error?: string }>
   >({});
   const [liveRunCreditsMicro, setLiveRunCreditsMicro] = useState<number | null>(null);
+  // Optimistic row shown in history table the moment Run is pressed, before DB confirms
+  const [optimisticRun, setOptimisticRun] = useState<WorkflowRunItem | null>(null);
 
   // History filtering
   const [runFilter, setRunFilter] = useState<"ui" | "api">("ui");
@@ -139,7 +142,9 @@ export default function WorkflowWorkspacePage() {
 
   // Code snippet dropdown
   const [codeLanguage, setCodeLanguage] = useState<"python" | "nodejs" | "curl">("python");
+  const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [inDetails, setInDetails] = useState(true);
   const [apiOrigin, setApiOrigin] = useState("https://api.galaxy.ai");
 
   useEffect(() => {
@@ -151,6 +156,7 @@ export default function WorkflowWorkspacePage() {
   // Execution states
   const [isRunning, setIsRunning] = useState(false);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const currentRunIdRef = useRef<string | null>(null);
   const [orchestratorState, setOrchestratorState] = useState<{
     orchestratorRunId: string;
     publicAccessToken: string;
@@ -332,6 +338,7 @@ export default function WorkflowWorkspacePage() {
 
       setIsRunning(true);
       setCurrentRunId(runningRun.id);
+      currentRunIdRef.current = runningRun.id;
       setOrchestratorState({
         orchestratorRunId: runningRun.orchestratorRunId,
         publicAccessToken,
@@ -377,6 +384,21 @@ export default function WorkflowWorkspacePage() {
     setLiveNodeStates({});
     setLiveRunCreditsMicro(null);
 
+    // Show an optimistic "running" row in the history table immediately
+    const optimistic: WorkflowRunItem = {
+      id: `optimistic-${Date.now()}`,
+      scope: "full",
+      status: "running",
+      startedAt: new Date().toISOString(),
+      finishedAt: null,
+      durationMs: null,
+      orchestratorRunId: null,
+      inputValues: payload,
+      nodeRuns: [],
+    };
+    setOptimisticRun(optimistic);
+    setSelectedRun(optimistic);
+
     try {
       const resp = await fetch(`/api/workflows/${workflowId}/execute`, {
         method: "POST",
@@ -391,6 +413,8 @@ export default function WorkflowWorkspacePage() {
         const err = await resp.json().catch(() => ({ error: "Failed to trigger run" }));
         alert(err.error || "Failed to trigger run");
         setIsRunning(false);
+        setOptimisticRun(null);
+        setSelectedRun(null);
         return;
       }
 
@@ -398,40 +422,51 @@ export default function WorkflowWorkspacePage() {
       const { runId, orchestratorRunId, publicAccessToken } = data.data ?? {};
 
       setCurrentRunId(runId);
+      currentRunIdRef.current = runId;
       setOrchestratorState({ orchestratorRunId, publicAccessToken });
     } catch (err) {
       console.error("Failed to run workflow:", err);
       setIsRunning(false);
+      setOptimisticRun(null);
+      setSelectedRun(null);
     }
   };
 
+  // Refresh history list silently (updates run list / credits in history table)
+  // without touching selectedRun or liveNodeStates while a run is in progress.
   const refreshCurrentRunSnapshot = useCallback(
     async (runId: string) => {
       const resp = await fetch(`/api/workflows/${workflowId}/history`);
       const data = await resp.json();
-      const match = (data.data as WorkflowRunItem[] | undefined)?.find((r) => r.id === runId);
-      if (match && workflow) selectHistoryRun(match, workflow);
+      if (data.data) {
+        setRuns(data.data as WorkflowRunItem[]);
+      }
     },
-    [workflowId, workflow, selectHistoryRun]
+    [workflowId]
   );
 
   const handleOrchestratorUpdate = useCallback(
     (nodeStates: Record<string, { status: string; output?: unknown; error?: string }>) => {
       setLiveNodeStates(nodeStates);
-      if (currentRunId) {
-        void refreshCurrentRunSnapshot(currentRunId);
-      }
+      // Accumulate live credits from completed node states
+      const total = Object.values(nodeStates).reduce((sum, ns: any) => {
+        return sum + (typeof ns.creditCost === "number" ? ns.creditCost : 0);
+      }, 0);
+      if (total > 0) setLiveRunCreditsMicro(total);
     },
-    [currentRunId, refreshCurrentRunSnapshot]
+    []
   );
 
   const handleOrchestratorComplete = useCallback(
     (finalStatus: string) => {
-      const finishedRunId = currentRunId;
+      // Use ref to avoid stale closure — currentRunId state may lag behind
+      const finishedRunId = currentRunIdRef.current;
       setIsRunning(false);
       setCurrentRunId(null);
+      currentRunIdRef.current = null;
       setOrchestratorState(null);
       setLiveNodeStates({});
+      setOptimisticRun(null); // drop optimistic row — real row will show from history
       void (async () => {
         const list = await fetchHistory();
         if (finishedRunId) {
@@ -440,7 +475,7 @@ export default function WorkflowWorkspacePage() {
         }
       })();
     },
-    [fetchHistory, currentRunId, workflow, selectHistoryRun]
+    [fetchHistory, workflow, selectHistoryRun]
   );
 
   const graphNodes = (workflow?.nodes || []).map((n: { id: string; type: string }) => ({
@@ -482,7 +517,11 @@ export default function WorkflowWorkspacePage() {
 
   const apiInputValues = normalizeInputValuesForRun(getRequestFields(), inputValues);
 
-  // Python, JS, cURL Script generator templates
+  const inputJson4  = JSON.stringify(apiInputValues, null, 4).replace(/\n/g, "\n    ");
+  const inputJson6  = JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n      ");
+  const inputJsonCurl = JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n    ");
+
+  // Code templates — wired to our actual POST /api/v1/runs and GET /api/v1/runs/:id
   const codeTemplates = {
     python: `import requests
 import time
@@ -493,96 +532,90 @@ url = "${apiOrigin}/api/v1/runs"
 
 data = {
     "workflowId": "${workflowId}",
-    "inputValues": ${JSON.stringify(apiInputValues, null, 4).replace(/\n/g, "\n    ")}
+    "inputValues": ${inputJson4}
 }
 
-# Start execution
+def poll_for_result(run_id):
+    """Poll until the run finishes"""
+    poll_url = f"${apiOrigin}/api/v1/runs/{'{run_id}'}"
+    while True:
+        response = requests.get(
+            poll_url,
+            headers={"Authorization": f"Bearer {'{api_key}'}"}
+        )
+        result = response.json()["data"]
+
+        if result["status"] == "success":
+            return result
+        elif result["status"] in ["failed", "canceled"]:
+            raise Exception(f"Run ended: {'{result.get(\\"status\\")}'}")
+
+        time.sleep(5)
+
+# Start the run
 response = requests.post(
     url,
     json=data,
     headers={
-        'Content-Type': 'application/json',
-        'Authorization': f'Bearer {api_key}'
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {'{api_key}'}"
     }
 )
 
 result = response.json()
-run_id = result['data']['runId']
-print(f"Run started: {run_id}")
+run_id = result["data"]["runId"]
+print(f"Run started: {'{run_id}'}")
 
-# Poll for status
-poll_url = f"${apiOrigin}/api/v1/runs/{run_id}"
-while True:
-    response = requests.get(
-        poll_url,
-        headers={'Authorization': f'Bearer {api_key}'}
-    )
-    res_data = response.json()
-    status = res_data['data']['status']
-    
-    if status == 'success':
-        print("Completed successfully!")
-        print(json.dumps(res_data['data']['nodeRuns'], indent=2))
-        break
-    elif status in ['failed', 'canceled']:
-        print(f"Run ended with status: {status}")
-        break
-    time.sleep(5)`,
+# Poll for result
+final = poll_for_result(run_id)
+print(json.dumps(final, indent=2))`,
 
-    nodejs: `const fetch = require('node-fetch');
+    nodejs: `const response = await fetch("${apiOrigin}/api/v1/runs", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_API_KEY",
+  },
+  body: JSON.stringify({
+    workflowId: "${workflowId}",
+    inputValues: ${inputJson6}
+  }),
+});
 
-const apiKey = 'YOUR_API_KEY';
-const url = '${apiOrigin}/api/v1/runs';
-const workflowId = '${workflowId}';
+const data = await response.json();
+const runId = data.data.runId;
+console.log("Run started:", runId);
 
-async function startRun() {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': \`Bearer \${apiKey}\`
-    },
-    body: JSON.stringify({
-      workflowId,
-      inputValues: ${JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n      ")}
-    })
-  });
-  const data = await response.json();
-  const runId = data.data.runId;
-  console.log(\`Run started: \${runId}\`);
-  pollResult(runId);
-}
-
-async function pollResult(runId) {
-  const pollUrl = \`\${apiOrigin}/api/v1/runs/\${runId}\`;
+// Poll for result
+async function pollForResult(runId) {
   while (true) {
-    const response = await fetch(pollUrl, {
-      headers: { 'Authorization': \`Bearer \${apiKey}\` }
+    const res = await fetch(\`${apiOrigin}/api/v1/runs/\${runId}\`, {
+      headers: { "Authorization": "Bearer YOUR_API_KEY" }
     });
-    const result = await response.json();
-    const run = result.data;
-    if (run.status === 'success') {
-      console.log('Success!', JSON.stringify(run.nodeRuns, null, 2));
-      break;
-    } else if (run.status === 'failed') {
-      console.error('Run failed:', run.error);
-      break;
+    const result = (await res.json()).data;
+
+    if (result.status === "success") {
+      return result;
+    } else if (["failed", "canceled"].includes(result.status)) {
+      throw new Error(\`Run ended: \${result.status}\`);
     }
+
     await new Promise(r => setTimeout(r, 5000));
   }
 }
 
-startRun();`,
+const final = await pollForResult(runId);
+console.log(JSON.stringify(final, null, 2));`,
 
     curl: `curl -X POST ${apiOrigin}/api/v1/runs \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
     "workflowId": "${workflowId}",
-    "inputValues": ${JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n    ")}
+    "inputValues": ${inputJsonCurl}
   }'
 
-# Poll execution status
+# Poll execution status (replace RUN_ID with the returned runId)
 curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
   -H "Authorization: Bearer YOUR_API_KEY"`,
   };
@@ -594,14 +627,22 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
   };
 
   // Filter history runs list
-  const filteredRuns = runs.filter((r) => {
-    const matchesSearch = r.id.toLowerCase().includes(historySearch.toLowerCase());
-    // In our backend, public API runs are triggered with an ApiKey linked,
-    // which has scope or keys in header. In local, we can check if scope exists.
-    const isApiRun = r.orchestratorRunId && !r.inputValues?.ClerkUser; // Mock indicator or scope checks
-    const matchesFilter = runFilter === "ui" ? true : true; // Keep list unified, can add dynamic indicator later
-    return matchesSearch;
-  });
+  // Build the live-credit-enriched optimistic row for the history table
+  const optimisticRowForTable: WorkflowRunItem | null = optimisticRun
+    ? {
+        ...optimisticRun,
+        // Reflect accumulated live credits directly in the optimistic row's nodeRuns credit total
+        nodeRuns:
+          liveRunCreditsMicro != null && liveRunCreditsMicro > 0
+            ? [{ id: "live", nodeId: "live", nodeName: "", status: "running", creditCost: liveRunCreditsMicro, output: null, error: null, inputs: null, providerUsed: null, durationMs: null, startedAt: optimisticRun.startedAt, finishedAt: null }]
+            : [],
+      }
+    : null;
+
+  const filteredRuns = [
+    ...(optimisticRowForTable ? [optimisticRowForTable] : []),
+    ...runs.filter((r) => r.id.toLowerCase().includes(historySearch.toLowerCase())),
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -770,20 +811,6 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                             </>
                           )}
                         </button>
-                        {!isRunning && selectedRun && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRun(null);
-                              setLiveNodeStates({});
-                              setLiveRunCreditsMicro(null);
-                              applyWorkflowFieldsToInputs(workflow ?? { nodes: [] });
-                            }}
-                            className="inline-flex h-9 w-full items-center justify-center rounded-[18px] border border-border bg-background text-sm font-medium hover:bg-muted cursor-pointer"
-                          >
-                            New Run
-                          </button>
-                        )}
                       </div>
 
                     </div>
@@ -953,16 +980,16 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 
                     <div className="p-0">
                       <div className="relative w-full overflow-auto">
-                        <table className="w-full caption-bottom text-sm border-collapse">
+                        <table className="w-full caption-bottom text-sm">
                           <thead className="[&_tr]:border-b">
-                            <tr className="border-b transition-colors hover:bg-muted/50 text-xs text-muted-foreground bg-muted/30">
-                              <th className="h-10 text-left align-middle px-5 py-2 font-medium">Date & Time</th>
-                              <th className="h-10 text-left align-middle px-3 py-2 font-medium">Status</th>
-                              <th className="h-10 text-left align-middle px-3 py-2 font-medium">Used Credits</th>
-                              <th className="h-10 text-right align-middle px-5 py-2 font-medium">Run ID</th>
+                            <tr className="border-b transition-colors hover:bg-muted/50 bg-muted/30 text-xs text-muted-foreground">
+                              <th className="h-12 text-left align-middle px-5 py-2 font-medium">Date & Time</th>
+                              <th className="h-12 text-left align-middle px-3 py-2 font-medium">Status</th>
+                              <th className="h-12 text-left align-middle px-3 py-2 font-medium">Used Credits</th>
+                              <th className="h-12 text-right align-middle px-5 py-2 font-medium">Run ID</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-border">
+                          <tbody className="[&_tr:last-child]:border-0">
                             {filteredRuns.length === 0 ? (
                               <tr>
                                 <td className="p-4 align-middle px-5 py-10 text-center text-xs text-muted-foreground" colSpan={4}>
@@ -973,37 +1000,81 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                               filteredRuns.map((r) => {
                                 const totalCost = r.nodeRuns.reduce((sum, nr) => sum + (nr.creditCost || 0), 0);
                                 const isSelected = selectedRun?.id === r.id;
+                                const isOptimistic = r.id.startsWith("optimistic-");
+                                const displayStatus =
+                                  r.status === "success" ? "completed" : r.status;
+                                const d = new Date(r.startedAt);
+                                const datePart = d.toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                });
+                                const timePart = d.toLocaleTimeString("en-GB", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                });
                                 return (
                                   <tr
                                     key={r.id}
-                                    onClick={() => workflow && selectHistoryRun(r, workflow)}
-                                    className={`border-b transition-colors cursor-pointer hover:bg-muted/10 ${
-                                      isSelected ? "bg-muted/30" : ""
-                                    }`}
+                                    onClick={() => !isOptimistic && workflow && selectHistoryRun(r, workflow)}
+                                    className={`border-b transition-colors ${
+                                      isOptimistic
+                                        ? "cursor-default"
+                                        : "cursor-pointer hover:bg-muted/40"
+                                    } ${isSelected ? "bg-primary/5" : ""}`}
                                   >
-                                    <td className="px-5 py-3 text-xs font-medium text-foreground">
-                                      {new Date(r.startedAt).toLocaleString()}
+                                    {/* Date & Time */}
+                                    <td className="p-4 align-middle px-5 py-2.5 text-[13px] text-foreground">
+                                      {datePart}{" "}
+                                      <span className="text-muted-foreground">{timePart}</span>
                                     </td>
-                                    <td className="px-3 py-3 text-xs">
+
+                                    {/* Status badge */}
+                                    <td className="p-4 align-middle px-3 py-2.5">
                                       <span
-                                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-semibold capitalize ${
-                                          r.status === "success"
-                                            ? "bg-green-50 text-green-700 border border-green-200"
+                                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${
+                                          r.status === "success" || r.status === "completed"
+                                            ? "border-green-300/40 bg-green-500/10 text-green-600 dark:text-green-400"
                                             : r.status === "running"
-                                            ? "bg-blue-50 text-blue-700 border border-blue-200 animate-pulse"
-                                            : "bg-red-50 text-red-700 border border-red-200"
+                                            ? "border-blue-300/40 bg-blue-500/10 text-blue-600 dark:text-blue-400 animate-pulse"
+                                            : "border-red-300/40 bg-red-500/10 text-red-600 dark:text-red-400"
                                         }`}
                                       >
-                                        {r.status}
+                                        {displayStatus}
                                       </span>
                                     </td>
-                                    <td className="px-3 py-3 text-xs">
+
+                                    {/* Credits badge with Coins icon */}
+                                    <td className="p-4 align-middle px-3 py-2.5">
                                       <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/30 bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                                        <Coins className="h-3 w-3" />
                                         {formatCreditsMillions(totalCost)}
                                       </span>
                                     </td>
-                                    <td className="px-5 py-3 text-right text-xs font-mono text-muted-foreground">
-                                      {r.id}
+
+                                    {/* Run ID with copy button */}
+                                    <td className="p-4 align-middle px-5 py-2.5 text-right">
+                                      {isOptimistic ? (
+                                        <span className="text-[13px] text-muted-foreground italic">pending…</span>
+                                      ) : (
+                                        <div className="ml-auto inline-flex max-w-[180px] items-center gap-1.5">
+                                          <span className="min-w-0 flex-1 truncate text-right text-[13px] text-muted-foreground">
+                                            {r.id}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            title="Copy Run ID"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigator.clipboard.writeText(r.id);
+                                            }}
+                                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground border-0 bg-transparent cursor-pointer"
+                                          >
+                                            <Copy className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      )}
                                     </td>
                                   </tr>
                                 );
@@ -1023,59 +1094,57 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
             {/* ──── Tab 2: API ──── */}
             {activeTab === "api" && (
               <div className="flex h-full gap-6 overflow-hidden p-6">
-                
-                {/* Code snippets block */}
+
+                {/* Left: Code snippets block */}
                 <div className="flex w-[45%] min-w-0 shrink-0 flex-col overflow-hidden rounded-xl border border-border bg-muted/30">
                   <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+                    {/* Language selector button */}
                     <div className="relative">
-                      <select
-                        value={codeLanguage}
-                        onChange={(e) => setCodeLanguage(e.target.value as any)}
-                        className="inline-flex items-center justify-center bg-background border border-border rounded-[18px] px-3 py-1 text-xs gap-2 outline-none cursor-pointer text-foreground"
+                      <button
+                        type="button"
+                        onClick={() => setLangDropdownOpen((o) => !o)}
+                        className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-border bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-8 rounded-[18px] px-3 text-xs cursor-pointer"
                       >
-                        <option value="python">Python</option>
-                        <option value="nodejs">Node.js</option>
-                        <option value="curl">cURL</option>
-                      </select>
+                        {codeLanguage === "python" ? "Python" : codeLanguage === "nodejs" ? "Node.js" : "cURL"}
+                        <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                      {langDropdownOpen && (
+                        <div className="absolute left-0 top-full z-50 mt-1 min-w-[120px] rounded-xl border border-border bg-card p-1 shadow-lg">
+                          {(["python", "nodejs", "curl"] as const).map((lang) => (
+                            <button
+                              key={lang}
+                              type="button"
+                              onClick={() => { setCodeLanguage(lang); setLangDropdownOpen(false); }}
+                              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs hover:bg-muted cursor-pointer border-0 bg-transparent ${codeLanguage === lang ? "font-semibold text-foreground" : "text-muted-foreground"}`}
+                            >
+                              {lang === "python" ? "Python" : lang === "nodejs" ? "Node.js" : "cURL"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                    {/* Copy button */}
                     <button
                       onClick={copyToClipboard}
-                      className="inline-flex items-center justify-center gap-1.5 bg-transparent hover:bg-muted px-3 py-1.5 border border-border rounded-lg text-xs font-medium text-foreground transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 rounded-[18px] px-3 text-xs bg-transparent border-0 cursor-pointer"
                     >
-                      {copiedCode ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedCode ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
                       {copiedCode ? "Copied" : "Copy"}
                     </button>
                   </div>
-                  <div className="flex-1 overflow-auto p-4 bg-muted/10">
-                    <pre className="font-mono text-[13px] leading-relaxed text-foreground select-all whitespace-pre-wrap">
+                  {/* Code body — select-text so user can select individual characters */}
+                  <div className="flex-1 overflow-auto p-4">
+                    <pre className="font-mono text-[13px] leading-relaxed select-text whitespace-pre">
                       {renderHighlightedCode(codeTemplates[codeLanguage])}
                     </pre>
                   </div>
                 </div>
 
-                {/* API Docs layout column */}
+                {/* Right: API Docs column */}
                 <div className="min-w-0 flex-1 overflow-y-auto">
                   <div className="space-y-6">
-                    <div>
-                      <h3 className="mb-3 text-base font-semibold text-foreground">Request body: inputValues</h3>
-                      <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground">
-                        <p className="mb-2">
-                          Keys match Request-Inputs field <code className="rounded bg-muted px-1 font-mono text-xs">id</code> values
-                          (including fields created via <strong>Add to request</strong> on the canvas).
-                        </p>
-                        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
-                          <li><code className="text-xs">text_field</code> / prompts — string</li>
-                          <li><code className="text-xs">select_field</code> — e.g. <code className="text-xs">transition</code>, <code className="text-xs">format</code> (default <code className="text-xs">mp3</code> when empty)</li>
-                          <li><code className="text-xs">number_field</code> — number as string</li>
-                          <li><code className="text-xs">boolean_field</code> — <code className="text-xs">&quot;true&quot;</code> or <code className="text-xs">&quot;false&quot;</code></li>
-                          <li>Media fields — HTTPS URL or comma-separated URLs for multi-image/video</li>
-                        </ul>
-                        <pre className="mt-3 max-h-48 overflow-auto rounded-lg border border-border bg-background p-3 font-mono text-xs">
-                          {JSON.stringify(apiInputValues, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
 
+                    {/* API Endpoint */}
                     <div>
                       <h3 className="mb-3 text-base font-semibold text-foreground">API Endpoint</h3>
                       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5">
@@ -1084,26 +1153,101 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                       </div>
                     </div>
 
+                    {/* Start response */}
                     <div>
-                      <h3 className="mb-3 text-base font-semibold text-foreground">Response Format</h3>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">Start Response</h3>
                       <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                        <p className="text-sm text-foreground">The start endpoint returns a <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">runId</code>. Poll <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /v1/runs/{"{runId}"}</code> to check status.</p>
+                        <p className="text-sm text-foreground">
+                          Returns a <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">runId</code> immediately. Use it to poll for status.
+                        </p>
                         <div className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3">
-                          <pre className="whitespace-pre font-mono text-xs text-foreground/80">{"{\n  \"runId\": \"run_abc123...\"\n}"}</pre>
+                          <pre className="whitespace-pre font-mono text-xs text-foreground/80">{`{
+  "data": {
+    "runId": "clxyz...",
+    "status": "running",
+    "orchestratorRunId": "run_abc123..."
+  }
+}`}</pre>
                         </div>
                       </div>
                     </div>
 
+                    {/* Polling */}
                     <div>
-                      <h3 className="mb-3 text-base font-semibold text-foreground">Polling Response</h3>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">Poll for Status</h3>
                       <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-                        <p className="text-sm text-foreground">Poll <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /v1/runs/{"{runId}"}</code> until status is terminal:</p>
+                        <p className="text-sm text-foreground">
+                          Poll <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">GET /api/v1/runs/{"{runId}"}</code> until status is terminal:
+                        </p>
+
+                        {/* Status badges — lowercase, matching our DB */}
                         <div className="mt-1 flex flex-wrap gap-1.5">
-                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-muted text-muted-foreground">QUEUED</span>
-                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-muted text-muted-foreground">RUNNING</span>
-                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-green-100 text-green-700">COMPLETED</span>
-                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-red-100 text-red-700">FAILED</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-muted text-muted-foreground">running</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400">success</span>
+                          <span className="rounded px-2 py-0.5 font-mono text-[11px] font-medium bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400">failed</span>
                         </div>
+
+                        {/* GET endpoint pill */}
+                        <div className="mt-3 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                          <div className="flex items-center gap-2 font-mono text-sm text-foreground">
+                            <span className="shrink-0 rounded bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-500/10 dark:text-blue-400">GET</span>
+                            <code className="truncate text-xs">/api/v1/runs/{"{runId}"}</code>
+                          </div>
+                        </div>
+
+                        <p className="mt-2 text-xs text-muted-foreground">Always returns full node runs. Sample response:</p>
+                        <div className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3">
+                          <pre className="whitespace-pre font-mono text-xs text-foreground/80">{`{
+  "data": {
+    "id": "clxyz...",
+    "workflowId": "${workflowId}",
+    "scope": "full",
+    "status": "success",
+    "startedAt": "2025-01-01T00:00:00.000Z",
+    "finishedAt": "2025-01-01T00:00:12.000Z",
+    "durationMs": 12000,
+    "inputValues": { ... },
+    "nodeRuns": [
+      {
+        "id": "nr_abc...",
+        "nodeId": "node_proc...",
+        "nodeName": "Generate Image",
+        "status": "success",
+        "startedAt": "2025-01-01T00:00:01.000Z",
+        "finishedAt": "2025-01-01T00:00:11.000Z",
+        "durationMs": 10000,
+        "inputs": { "prompt": "a horse running in fields" },
+        "output": { "result": "https://cdn.example.com/output.png" },
+        "error": null,
+        "providerUsed": "fal",
+        "creditCost": 100000
+      }
+    ]
+  }
+}`}</pre>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Webhooks */}
+                    <div>
+                      <h3 className="mb-2 text-base font-semibold text-foreground">Webhooks (Optional)</h3>
+                      <p className="mb-3 text-sm text-muted-foreground">
+                        Configure a webhook URL on your workflow to receive push notifications when a run completes or fails. Events fired:{" "}
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">run.started</code>,{" "}
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">run.completed</code>,{" "}
+                        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">run.failed</code>.
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3">
+                        <pre className="whitespace-pre font-mono text-xs text-foreground/80">{`// Payload delivered to your webhook URL
+{
+  "success": true,
+  "type": "run.completed",
+  "runId": "clxyz...",
+  "workflowId": "${workflowId}",
+  "data": { ... },
+  "error": null
+}`}</pre>
                       </div>
                     </div>
 
