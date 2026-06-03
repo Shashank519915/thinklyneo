@@ -521,12 +521,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
     if (definition.type === "mergeAV" && param.uiVariant === "magica-side-label") {
       const isVideoField = param.key === "video_url";
-      const mediaUrls = showUpstreamPanel ? parseMediaList(wiredValue) : parseMediaList(value);
+      /** Any inbound wire (upstream node or Request-Inputs) — mirrors Crop Image `isInputWired`. */
+      const isMediaWired = isWired;
+      const canEditLocally = !isMediaWired && !readOnly && !isLocked;
+      const mediaSource = isMediaWired
+        ? requestPromoted
+          ? value
+          : wiredValue
+        : value;
+      const mediaUrls = parseMediaList(mediaSource);
       const videoUrls = isVideoField ? mediaUrls.filter(isLikelyVideoUrl) : mediaUrls;
       const displayUrls = isVideoField && videoUrls.length > 0 ? videoUrls : mediaUrls;
       const primaryUrl = displayUrls[0];
       const multiVideoRejected =
-        isVideoField && showUpstreamPanel && (videoUrls.length > 1 || mediaUrls.length > 1);
+        isVideoField && isMediaWired && (videoUrls.length > 1 || mediaUrls.length > 1);
       const accept =
         param.key === "video_url"
           ? "video/*"
@@ -537,6 +545,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         param.handle?.color === "#06b6d4"
           ? "rgba(6, 182, 212, 0.3)"
           : "rgba(34, 197, 94, 0.3)";
+      const mediaLabel = param.label.toLowerCase();
 
       return (
         <div key={param.key} className="relative overflow-visible">
@@ -564,7 +573,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           )}
           <div
             className={`flex items-start gap-3 ${
-              requestPromoted && !isLocked ? "opacity-60" : ""
+              (requestPromoted || isMediaWired) && !isLocked ? "opacity-60" : ""
             }`}
           >
             <span
@@ -582,14 +591,24 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <button
                     type="button"
                     tabIndex={-1}
-                    disabled={disabled || multiVideoRejected}
+                    disabled={
+                      !canEditLocally ||
+                      uploadingField === param.key ||
+                      multiVideoRejected
+                    }
                     onClick={() => {
-                      if (!showUpstreamPanel) {
+                      if (canEditLocally) {
                         document.getElementById(`file-input-${param.key}`)?.click();
                       }
                     }}
-                    className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:opacity-50"
-                    title={primaryUrl ? `Change ${param.label.toLowerCase()}` : `Upload ${param.label.toLowerCase()}`}
+                    className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    title={
+                      isMediaWired
+                        ? `${param.label} is supplied by a connection`
+                        : primaryUrl
+                          ? `Change ${mediaLabel}`
+                          : `Upload ${mediaLabel}`
+                    }
                   >
                     {uploadingField === param.key ? (
                       <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -600,8 +619,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       {uploadingField === param.key
                         ? "Uploading..."
                         : primaryUrl
-                          ? `Change ${param.label.toLowerCase()}`
-                          : `Upload ${param.label.toLowerCase()}`}
+                          ? `Change ${mediaLabel}`
+                          : `Upload ${mediaLabel}`}
                     </span>
                   </button>
                   <input
@@ -609,7 +628,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     type="file"
                     hidden
                     accept={accept}
-                    disabled={disabled}
+                    disabled={!canEditLocally}
                     onChange={(e) => {
                       void handleFileUpload(param.key, e.target.files).finally(() => {
                         e.target.value = "";
@@ -639,12 +658,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               /\.(mp3|wav|ogg|m4a)(\?|$)/i.test(primaryUrl) ? (
                 <div className="relative inline-block">
                   <audio src={primaryUrl} controls className="w-[160px]" />
-                  {!readOnly && !showUpstreamPanel && (
+                  {canEditLocally && (
                     <button
                       type="button"
-                      disabled={isLocked}
                       onClick={() => removeFileValue(param.key)}
                       className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                      title={`Remove ${mediaLabel}`}
                     >
                       <LucideIcons.X className="h-2.5 w-2.5" />
                     </button>
@@ -661,12 +680,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     className="w-full rounded-sm"
                     style={{ maxHeight: 120 }}
                   />
-                  {!readOnly && !showUpstreamPanel && (
+                  {canEditLocally && (
                     <button
                       type="button"
-                      disabled={isLocked}
                       onClick={() => removeFileValue(param.key)}
                       className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                      title={`Remove ${mediaLabel}`}
                     >
                       <LucideIcons.X className="h-2.5 w-2.5" />
                     </button>
@@ -674,6 +693,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 </div>
               )}
             </div>
+          )}
+          {isMediaWired && !primaryUrl && !multiVideoRejected && (
+            <p className="mt-2 text-[11px] text-gray-400 italic">
+              Waiting for upstream {mediaLabel}…
+            </p>
           )}
         </div>
       );
