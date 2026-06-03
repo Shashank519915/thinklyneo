@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import {
+  normalizeArrayParamValue,
   resolveEffectiveParamValue,
   syncLinkedTargetInputFromField,
 } from "@/lib/promoted-input-value";
@@ -115,5 +116,43 @@ describe("syncLinkedTargetInputFromField", () => {
     expect((merge?.data as { inputs: { transition: string } }).inputs.transition).toBe(
       "dissolve"
     );
+  });
+
+  it("syncs promoted image_field to images array on target node", () => {
+    const nodes: Node[] = [
+      {
+        id: "ri",
+        type: "requestInputs",
+        position: { x: 0, y: 0 },
+        data: { label: "R", fields: [] },
+      },
+      {
+        id: "llm",
+        type: "openRouter",
+        position: { x: 0, y: 0 },
+        data: { label: "LLM", inputs: { images: [] } },
+      },
+    ];
+    const synced = syncLinkedTargetInputFromField(nodes, {
+      id: "field_image_1",
+      type: "image_field",
+      label: "Images",
+      value: "https://example.com/a.jpg,https://example.com/b.jpg",
+      linkedTarget: { nodeId: "llm", handle: "in:images" },
+    });
+    const llm = synced.find((n) => n.id === "llm");
+    expect((llm?.data as { inputs: { images: string[] } }).inputs.images).toEqual([
+      "https://example.com/a.jpg",
+      "https://example.com/b.jpg",
+    ]);
+  });
+});
+
+describe("normalizeArrayParamValue", () => {
+  it("parses comma-separated promoted string for image-array UI", () => {
+    expect(normalizeArrayParamValue("https://a.jpg,https://b.jpg")).toEqual([
+      "https://a.jpg",
+      "https://b.jpg",
+    ]);
   });
 });

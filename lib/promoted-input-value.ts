@@ -3,15 +3,18 @@
  */
 
 import type { Edge, Node } from "@xyflow/react";
+import { parseMediaList } from "@/lib/media-list";
 import {
   getInboundRequestEdge,
-  findLinkedRequestField,
 } from "@/lib/promote-to-request";
 import {
   resolvePropagatedEdgeValue,
   type ResolvePropagatedEdgeOptions,
 } from "@/lib/utils";
 import type { WorkflowField } from "@/store/workflow-store";
+
+/** Node input keys that store comma-separated media as string arrays. */
+const ARRAY_MEDIA_INPUT_KEYS = new Set(["images", "uploadedImages", "video_urls"]);
 
 export function getPromotedFieldValue(
   nodes: Node[],
@@ -39,6 +42,44 @@ export function parseWorkflowFieldValue(
   return v;
 }
 
+/** Coerce request field storage into the shape expected on the target node's inputs. */
+export function coerceSyncedInputValue(
+  field: WorkflowField,
+  paramKey: string
+): unknown {
+  const parsed = parseWorkflowFieldValue(field);
+  if (parsed === undefined) return undefined;
+
+  if (field.type === "image_field" || field.type === "video_field") {
+    const urls = parseMediaList(parsed);
+    if (ARRAY_MEDIA_INPUT_KEYS.has(paramKey)) return urls;
+    if (field.mediaMaxCount === 1) return urls[0] ?? null;
+    return urls.length <= 1 ? (urls[0] ?? null) : urls.join(",");
+  }
+
+  if (field.type === "audio_field" || field.type === "file_field") {
+    const urls = parseMediaList(parsed);
+    return urls[0] ?? (typeof parsed === "string" ? parsed : null);
+  }
+
+  return parsed;
+}
+
+/** Normalize image/video array param values for UI (always string[]). */
+export function normalizeArrayParamValue(
+  raw: unknown,
+  defaultValue?: unknown
+): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === "string" && x.length > 0);
+  }
+  if (typeof raw === "string" && raw.length > 0) return parseMediaList(raw);
+  if (Array.isArray(defaultValue)) {
+    return defaultValue.filter((x): x is string => typeof x === "string");
+  }
+  return [];
+}
+
 /** Value shown on a muted/promoted target control (request field wins when set). */
 export function resolveEffectiveParamValue(opts: {
   requestPromoted: boolean;
@@ -52,7 +93,12 @@ export function resolveEffectiveParamValue(opts: {
   previewOpts?: ResolvePropagatedEdgeOptions;
 }): unknown {
   const fallback = opts.localValue ?? opts.defaultValue ?? "";
-  if (!opts.requestPromoted) return fallback;
+  if (!opts.requestPromoted) {
+    if (opts.paramType === "image-array" || opts.paramType === "video-array") {
+      return normalizeArrayParamValue(fallback, opts.defaultValue);
+    }
+    return fallback;
+  }
 
   const promoted = getPromotedFieldValue(
     opts.nodes,
@@ -62,6 +108,9 @@ export function resolveEffectiveParamValue(opts: {
     opts.previewOpts
   );
   if (promoted === undefined || promoted === null || promoted === "") {
+    if (opts.paramType === "image-array" || opts.paramType === "video-array") {
+      return normalizeArrayParamValue(fallback, opts.defaultValue);
+    }
     return fallback;
   }
 
@@ -69,6 +118,11 @@ export function resolveEffectiveParamValue(opts: {
     const n = typeof promoted === "number" ? promoted : Number(promoted);
     return Number.isFinite(n) ? n : fallback;
   }
+
+  if (opts.paramType === "image-array" || opts.paramType === "video-array") {
+    return normalizeArrayParamValue(promoted, opts.defaultValue);
+  }
+
   return promoted;
 }
 
@@ -81,7 +135,7 @@ export function syncLinkedTargetInputFromField(
   if (!link) return nodes;
 
   const paramKey = link.handle.replace(/^in:/, "");
-  const parsed = parseWorkflowFieldValue(field);
+  const parsed = coerceSyncedInputValue(field, paramKey);
   if (parsed === undefined) return nodes;
 
   return nodes.map((n) => {

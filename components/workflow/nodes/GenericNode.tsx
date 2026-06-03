@@ -127,7 +127,10 @@ function getColorTheme(color: string) {
 }
 
 import { AddToRequestToggle } from "@/components/workflow/AddToRequestToggle";
-import { resolveEffectiveParamValue } from "@/lib/promoted-input-value";
+import {
+  normalizeArrayParamValue,
+  resolveEffectiveParamValue,
+} from "@/lib/promoted-input-value";
 import {
   isRequestPromoted,
   promoteInputToRequest,
@@ -402,7 +405,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         ? typeof rawValue === "number"
           ? rawValue
           : Number(rawValue)
-        : (rawValue ?? param.defaultValue ?? "");
+        : param.type === "image-array" || param.type === "video-array"
+          ? normalizeArrayParamValue(rawValue, param.defaultValue)
+          : (rawValue ?? param.defaultValue ?? "");
 
     // Hide inputImage and uploadedImages if mode is text
     if ((param.key === "inputImage" || param.key === "uploadedImages") && hasModeTab && modeTab === "text") return null;
@@ -1142,7 +1147,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <div className="relative">
                         <button
                           type="button"
-                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          disabled={disabled || value.length >= 10}
                           onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
                           className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                           title="Upload image"
@@ -1162,7 +1167,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           accept="image/*"
                           multiple
                           className="hidden"
-                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          disabled={disabled || value.length >= 10}
                           onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
                         />
 
@@ -1196,7 +1201,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         )}
                       </div>
                     ) : (
-                      ((value as string[]) || []).length === 0 && (
+                      value.length === 0 && (
                         <div className="text-xs text-gray-400 italic">No images uploaded</div>
                       )
                     )}
@@ -1230,9 +1235,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 </div>
 
                 {/* Grid of thumbnails */}
-                {((value as string[]) || []).length > 0 && (
+                {value.length > 0 && (
                   <div className="grid grid-cols-5 gap-2 pt-1">
-                    {((value as string[]) || []).map((url, idx) => (
+                    {value.map((url: string, idx: number) => (
                       <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
                         <img src={url} alt="" className="w-full h-full object-cover" />
                         {!readOnly && (
@@ -1265,7 +1270,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <div className="relative">
                         <button
                           type="button"
-                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          disabled={disabled || value.length >= 10}
                           onClick={() => document.getElementById(`file-input-${param.key}`)?.click()}
                           className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                           title="Upload video"
@@ -1285,7 +1290,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           accept="video/*"
                           multiple
                           className="hidden"
-                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          disabled={disabled || value.length >= 10}
                           onChange={(e) => {
                             void handleFileUpload(param.key, e.target.files, true).finally(() => {
                               e.target.value = "";
@@ -1296,7 +1301,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     )}
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {((value as string[]) || []).map((url, idx) => (
+                      {value.map((url: string, idx: number) => (
                         <div
                           key={idx}
                           className="group relative overflow-hidden rounded-lg border border-gray-200 bg-black"

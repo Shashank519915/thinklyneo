@@ -125,14 +125,24 @@ export default function RequestInputsNode({
   };
 
   const updateField = (fieldId: string, updates: Partial<WorkflowField>) => {
-    const nextFields = fields.map((f) =>
+    const store = useWorkflowStore.getState();
+    const reqNode = store.nodes.find((n) => n.id === id);
+    if (!reqNode) return;
+    const currentFields = ((reqNode.data as unknown as RequestInputsData).fields ??
+      []) as WorkflowField[];
+    const nextFields = currentFields.map((f) =>
       f.id === fieldId ? { ...f, ...updates } : f
     );
-    updateNodeData(id, { fields: nextFields } as Partial<RequestInputsData>);
+    let nextNodes = store.nodes.map((n) =>
+      n.id === id
+        ? { ...n, data: { ...(n.data as object), fields: nextFields } }
+        : n
+    );
     const updated = nextFields.find((f) => f.id === fieldId);
     if (updated?.linkedTarget) {
-      setNodes(syncLinkedTargetInputFromField(nodes, updated));
+      nextNodes = syncLinkedTargetInputFromField(nextNodes, updated);
     }
+    setNodes(nextNodes);
   };
 
   const startEditLabel = (field: WorkflowField) => {
