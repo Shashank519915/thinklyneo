@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
+import { parseMediaList } from "@/lib/media-list";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import NodeHeaderActions from "./NodeHeaderActions";
@@ -345,7 +346,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
     if (isWired) {
-      if (param.type === "image-array") {
+      if (param.type === "image-array" || param.type === "video-array") {
         const inboundEdges = (edges ?? []).filter((e) => e.target === id && e.targetHandle === handleId);
         if (inboundEdges.length > 0) {
           wiredValue = inboundEdges
@@ -394,7 +395,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           </div>
         )}
 
-        {(param.type !== "image-array" || isWired) && (
+        {(param.type !== "image-array" && param.type !== "video-array" || isWired) &&
+          !(param.type === "select" && param.key === "transition") && (
           <div
             data-handle-anchor="label"
             className="mb-1.5 flex items-center text-xs text-gray-500"
@@ -421,6 +423,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         {isWired ? (() => {
           const wiredIsMedia =
             param.type === "image-array" ||
+            param.type === "video-array" ||
             param.type === "file-upload" ||
             param.handle?.type === "image" ||
             param.handle?.type === "video" ||
@@ -433,73 +436,134 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
               Connected upstream
             </p>
-            {param.type === "image-array" ? (() => {
-              let imagesArray: string[] = [];
-              if (Array.isArray(wiredValue)) {
-                imagesArray = wiredValue.map(String);
-              } else if (typeof wiredValue === "string" && wiredValue) {
-                imagesArray = wiredValue.split(",").filter(Boolean);
-              }
+            {param.type === "image-array" || param.type === "video-array" ? (() => {
+              const mediaUrls = parseMediaList(wiredValue);
+              const isVideo = param.type === "video-array";
 
-              if (imagesArray.length > 0) {
+              if (mediaUrls.length > 0) {
                 return (
                   <div className="flex flex-col gap-2 mt-1">
-                    <div className="flex flex-wrap gap-2">
-                      {imagesArray.map((url, idx) => (
+                    <div className={`grid gap-2 ${isVideo ? "grid-cols-2" : "flex flex-wrap"}`}>
+                      {mediaUrls.map((url, idx) => (
                         <div
                           key={idx}
-                          className="relative w-12 h-12 rounded overflow-hidden bg-white"
-                          style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}
+                          className={`relative overflow-hidden bg-white ${isVideo ? "rounded-lg" : "w-12 h-12 rounded"}`}
+                          style={{
+                            border: isVideo
+                              ? "2px solid rgba(34, 197, 94, 0.3)"
+                              : "2px solid rgba(59, 130, 246, 0.3)",
+                            aspectRatio: isVideo ? "4 / 3" : undefined,
+                          }}
                         >
-                          <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                          {isVideo ? (
+                            <video src={url} className="w-full h-full object-cover" preload="metadata" playsInline />
+                          ) : (
+                            <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                          )}
                         </div>
                       ))}
                     </div>
-                    <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
-                      {imagesArray.map((url, idx) => (
-                        <a
-                          key={idx}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="truncate text-[10px] text-blue-500 hover:underline font-mono"
-                        >
-                          {url}
-                        </a>
-                      ))}
-                    </div>
+                    {!isVideo && (
+                      <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
+                        {mediaUrls.map((url, idx) => (
+                          <a
+                            key={idx}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="truncate text-[10px] text-blue-500 hover:underline font-mono"
+                          >
+                            {url}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               }
-              return <span className="italic text-xs text-gray-400">Waiting for images...</span>;
+              return (
+                <span className="italic text-xs text-gray-400">
+                  {isVideo ? "Waiting for videos..." : "Waiting for images..."}
+                </span>
+              );
             })() : param.type === "file-upload" || param.handle?.type === "image" || param.handle?.type === "video" || param.handle?.type === "audio" || param.handle?.type === "file" ? (
-              wiredValue ? (
+              (() => {
+                const mediaUrls = parseMediaList(wiredValue);
+                const primaryUrl = mediaUrls[0];
+                const wiredStr = typeof wiredValue === "string" ? wiredValue : primaryUrl ?? "";
+
+                if (!primaryUrl) {
+                  return (
+                    <span className="italic text-xs text-gray-400">Waiting for file URL...</span>
+                  );
+                }
+
+                return (
                 <div className="mt-2">
                   {/* Audio handle type check FIRST — mp4 files in audio fields must render as <audio> */}
-                  {param.handle?.type === "audio" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp3") || wiredValue.endsWith(".wav") || wiredValue.endsWith(".ogg") || wiredValue.endsWith(".m4a"))) ? (
-                    <div className="relative inline-block w-full">
-                      <audio src={String(wiredValue)} controls preload="metadata" className="nodrag w-full" style={{ minWidth: 160 }} />
+                  {param.handle?.type === "audio" || (wiredStr.endsWith(".mp3") || wiredStr.endsWith(".wav") || wiredStr.endsWith(".ogg") || wiredStr.endsWith(".m4a")) ? (
+                    <div className="flex flex-col gap-2">
+                      {mediaUrls.map((url, idx) => (
+                        <div key={idx} className="relative inline-block w-full">
+                          <audio src={url} controls preload="metadata" className="nodrag w-full" style={{ minWidth: 160 }} />
+                        </div>
+                      ))}
                     </div>
-                  ) : param.handle?.type === "video" || (typeof wiredValue === "string" && (wiredValue.endsWith(".mp4") || wiredValue.endsWith(".webm") || wiredValue.endsWith(".mov"))) ? (
-                    <div className="relative w-full max-w-[260px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
-                      <video src={String(wiredValue)} controls preload="metadata" className="nodrag w-full rounded-sm" style={{ maxHeight: 160 }} />
-                    </div>
-                  ) : param.handle?.type === "image" || (typeof wiredValue === "string" && (wiredValue.startsWith("data:image") || wiredValue.match(/\.(jpeg|jpg|gif|png|webp)/i))) ? (
-                    <div className="relative max-w-[200px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
-                      <img src={String(wiredValue)} alt="Inbound preview" className="nodrag w-full h-full object-cover" style={{ maxHeight: 140 }} />
-                    </div>
+                  ) : param.handle?.type === "video" || mediaUrls.some((u) => /\.(mp4|webm|mov)(\?|$)/i.test(u)) ? (
+                    mediaUrls.length > 1 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {mediaUrls.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="relative w-full overflow-hidden rounded-md"
+                            style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}
+                          >
+                            <video src={url} controls preload="metadata" className="nodrag w-full rounded-sm" style={{ maxHeight: 120 }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="relative w-full max-w-[260px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
+                        <video src={primaryUrl} controls preload="metadata" className="nodrag w-full rounded-sm" style={{ maxHeight: 160 }} />
+                      </div>
+                    )
+                  ) : param.handle?.type === "image" || primaryUrl.startsWith("data:image") || /\.(jpeg|jpg|gif|png|webp)(\?|$)/i.test(primaryUrl) ? (
+                    mediaUrls.length > 1 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {mediaUrls.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="relative max-w-[100px] overflow-hidden rounded-md"
+                            style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}
+                          >
+                            <img src={url} alt={`Inbound preview ${idx + 1}`} className="nodrag w-full h-full object-cover" style={{ maxHeight: 100 }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="relative max-w-[200px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
+                        <img src={primaryUrl} alt="Inbound preview" className="nodrag w-full h-full object-cover" style={{ maxHeight: 140 }} />
+                      </div>
+                    )
                   ) : (
-                    <div className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]" style={{ border: "2px solid rgba(168, 85, 247, 0.3)" }}>
-                      <LucideIcons.FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                      <span className="truncate text-xs text-gray-600 font-mono">
-                        {String(wiredValue).split("/").pop() || "Document"}
-                      </span>
+                    <div className="flex flex-col gap-1">
+                      {mediaUrls.map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]"
+                          style={{ border: "2px solid rgba(168, 85, 247, 0.3)" }}
+                        >
+                          <LucideIcons.FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                          <span className="truncate text-xs text-gray-600 font-mono">
+                            {url.split("/").pop() || "Document"}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              ) : (
-                <span className="italic text-xs text-gray-400">Waiting for file URL...</span>
-              )
+                );
+              })()
             ) : (
               <div className="max-h-[120px] overflow-y-auto nowheel whitespace-pre-wrap break-words text-xs leading-normal text-gray-500">
                 {wiredValue !== null && wiredValue !== undefined ? String(wiredValue) : "Waiting for upstream value..."}
@@ -586,12 +650,26 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             )}
 
             {param.type === "select" && (
-              <div className="relative custom-select-container">
+              <div
+                className={`${
+                  param.key === "transition" ? "flex min-w-0 items-center gap-3" : "relative custom-select-container"
+                }`}
+              >
+                {param.key === "transition" && (
+                  <span
+                    data-handle-anchor="label"
+                    className="flex min-w-0 shrink items-center truncate text-xs text-gray-500"
+                  >
+                    {param.label}
+                    <LucideIcons.Info className="ml-1 h-3 w-3 shrink-0 text-gray-400" aria-hidden="true" />
+                  </span>
+                )}
+                <div className={`relative ${param.key === "transition" ? "flex-1 custom-select-container" : ""}`}>
                 <button
                   type="button"
                   disabled={disabled}
                   onClick={() => setActiveDropdown(activeDropdown === param.key ? null : param.key)}
-                  className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer"
+                  className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer nodrag"
                 >
                   <span className="truncate">
                     {param.options?.find((opt: any) => opt.value === value)?.label || value || "Select option..."}
@@ -634,6 +712,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             )}
 
@@ -852,6 +931,100 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 )}
               </div>
             )}
+
+            {param.type === "video-array" && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span data-handle-anchor="label" className="shrink-0 pt-2 text-xs text-gray-500">
+                    {param.label}
+                    {param.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </span>
+
+                  <div className="flex-1">
+                    {!readOnly && !isWired && (
+                      <div className="relative">
+                        <button
+                          type="button"
+                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          onClick={() => document.getElementById(`file-input-${param.key}`)?.click()}
+                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
+                          title="Upload video"
+                        >
+                          {uploadingField === param.key ? (
+                            <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <LucideIcons.Upload className="h-3.5 w-3.5" />
+                          )}
+                          <span className="capitalize">
+                            {uploadingField === param.key ? "Uploading..." : "Upload video"}
+                          </span>
+                        </button>
+                        <input
+                          id={`file-input-${param.key}`}
+                          type="file"
+                          accept="video/*"
+                          multiple
+                          className="hidden"
+                          disabled={disabled || ((value as string[]) || []).length >= 10}
+                          onChange={(e) => {
+                            void handleFileUpload(param.key, e.target.files, true).finally(() => {
+                              e.target.value = "";
+                            });
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {((value as string[]) || []).map((url, idx) => (
+                        <div
+                          key={idx}
+                          className="group relative overflow-hidden rounded-lg border border-gray-200 bg-black"
+                          style={{ aspectRatio: "4 / 3" }}
+                        >
+                          <div className="absolute left-1 top-1 z-10 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                            {idx + 1}
+                          </div>
+                          <video
+                            src={url}
+                            className="h-full w-full object-cover"
+                            preload="metadata"
+                            playsInline
+                          />
+                          {!readOnly && !isWired && (
+                            <button
+                              type="button"
+                              disabled={isLocked}
+                              onClick={() => removeFileValue(param.key, idx)}
+                              className="nodrag absolute right-1 top-1 rounded bg-black/60 p-1 text-white hover:bg-red-500 disabled:opacity-50"
+                              title="Remove"
+                            >
+                              <LucideIcons.X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {!readOnly &&
+                        !isWired &&
+                        ((value as string[]) || []).length < 10 && (
+                          <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => document.getElementById(`file-input-${param.key}`)?.click()}
+                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] hover:border-workflow-accent-400 dark:bg-zinc-800/60"
+                            style={{ aspectRatio: "4 / 3" }}
+                            title="Add video"
+                          >
+                            <span className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-400">
+                              Add Video
+                            </span>
+                          </button>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -885,7 +1058,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         {!readOnly && (
           <NodeHeaderActions
             nodeId={id}
-            description={`Execute a ${definition.name} operation inside the workflow.`}
+            description={definition.description ?? `Execute a ${definition.name} operation inside the workflow.`}
             isExecuting={isExecuting}
             isLocked={isLocked}
             onRun={handleSingleRun}

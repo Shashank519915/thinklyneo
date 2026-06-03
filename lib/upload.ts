@@ -23,13 +23,20 @@ export async function uploadFileViaApi(
   }
 }
 
-/** Upload many files; returns URLs and the first error message if any failed. */
+/** Upload many files sequentially; returns URLs and the first error message if any failed. */
 export async function uploadFilesViaApi(files: File[]): Promise<{
   urls: string[];
   firstError: string | null;
 }> {
-  const results = await Promise.all(files.map((file) => uploadFileViaApi(file)));
-  const urls = results.filter((r): r is { ok: true; url: string } => r.ok).map((r) => r.url);
-  const firstFail = results.find((r): r is { ok: false; error: string } => !r.ok);
-  return { urls, firstError: firstFail?.error ?? null };
+  const urls: string[] = [];
+  let firstError: string | null = null;
+  for (const file of files) {
+    const result = await uploadFileViaApi(file);
+    if (result.ok) {
+      urls.push(result.url);
+    } else if (!firstError) {
+      firstError = result.error;
+    }
+  }
+  return { urls, firstError };
 }

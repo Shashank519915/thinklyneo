@@ -63,6 +63,20 @@ describe("evaluateCanvasConnection", () => {
     expect(result.reason).toBe("duplicate-target");
   });
 
+  it("allows multiple wires into Merge Videos in:video_urls", () => {
+    const nodes = [node("ri", "requestInputs"), node("mv", "mergeVideo")];
+    const edges = [
+      edge("ri", "mv", "field_video_a", "in:video_urls"),
+    ];
+    const result = evaluateCanvasConnection(nodes, edges, {
+      source: "ri",
+      target: "mv",
+      sourceHandle: "field_video_b",
+      targetHandle: "in:video_urls",
+    });
+    expect(result.allowed).toBe(true);
+  });
+
   it("allows multiple wires into Gemini in:images", () => {
     const nodes = [
       node("crop1", "cropImage"),

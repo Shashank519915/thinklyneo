@@ -162,6 +162,10 @@ export default function RequestInputsNode({
           window.alert(firstError);
         }
 
+        if (validUrls.length === 0 && filesArray.length > 0 && !firstError) {
+          window.alert("Upload failed. No files were saved.");
+        }
+
         if (validUrls.length > 0) {
           const latestState = useWorkflowStore.getState();
           const latestNode = latestState.nodes.find((n) => n.id === id);
@@ -177,7 +181,9 @@ export default function RequestInputsNode({
         }
       } catch (err) {
         console.error("Upload error:", err);
+        window.alert("Upload failed. Please try again.");
       } finally {
+        e.target.value = "";
         setUploadingFields((prev) => ({ ...prev, [fieldId]: false }));
       }
     },

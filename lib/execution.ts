@@ -137,6 +137,7 @@ function getHandleDataType(
   )
     return "image";
   if (handleId === "in:images") return "image"; // gemini vision multi-input
+  if (handleId === "in:video_urls") return "video"; // merge videos multi-input
   if (handleId.includes("Video") || handleId.includes("video")) return "video";
   if (handleId.includes("Audio") || handleId.includes("audio")) return "audio";
   if (handleId.includes("media") || handleId.includes("Media")) return "media";
@@ -176,6 +177,9 @@ export function isValidConnection(
 
   // Image fan-in for Gemini Vision
   if (targetHandle === "in:images" && sourceType === "image") return true;
+
+  // Video fan-in for Merge Videos
+  if (targetHandle === "in:video_urls" && sourceType === "video") return true;
 
   return sourceType === targetType;
 }

@@ -96,12 +96,9 @@ describe("buildInputValuesFromFields", () => {
 });
 
 describe("isMultiAssetField", () => {
-  it("image is the only multi-asset kind", () => {
+  it("image and video support multiple assets", () => {
     expect(isMultiAssetField("image")).toBe(true);
-  });
-
-  it("video is not multi-asset", () => {
-    expect(isMultiAssetField("video")).toBe(false);
+    expect(isMultiAssetField("video")).toBe(true);
   });
 
   it("audio is not multi-asset", () => {

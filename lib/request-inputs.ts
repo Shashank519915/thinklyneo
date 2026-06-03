@@ -50,9 +50,9 @@ export function getRequestFieldKind(field: Pick<WorkflowField, "id" | "type">): 
   return "text";
 }
 
-/** Whether the field supports multiple comma-separated asset URLs (images). */
+/** Whether the field supports multiple comma-separated asset URLs (images, videos). */
 export function isMultiAssetField(kind: RequestFieldKind): boolean {
-  return kind === "image";
+  return kind === "image" || kind === "video";
 }
 
 /** Build playground/API input map from node field definitions. */

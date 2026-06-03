@@ -128,3 +128,71 @@ describe("GenericNode wired states", () => {
     expect(screen.getByPlaceholderText(promptPlaceholder)).toBeDisabled();
   });
 });
+
+describe("GenericNode wired image-array", () => {
+  const imageUrl1 = "https://cdn.example/a.webp";
+  const imageUrl2 = "https://cdn.example/b.webp";
+
+  const geminiNodes: Node[] = [
+    {
+      id: "ri",
+      type: "requestInputs",
+      position: { x: 0, y: 0 },
+      data: {
+        label: "Request",
+        fields: [
+          {
+            id: "field_image_1",
+            type: "image_field",
+            label: "Images",
+            value: `${imageUrl1},${imageUrl2}`,
+          },
+        ],
+      },
+    },
+    {
+      id: "gem",
+      type: "gemini",
+      position: { x: 200, y: 0 },
+      data: { label: "Gemini", inputs: {} },
+    },
+  ];
+
+  const imageEdges: Edge[] = [
+    {
+      id: "e-img",
+      source: "ri",
+      target: "gem",
+      sourceHandle: "field_image_1",
+      targetHandle: "in:images",
+    },
+  ];
+
+  it("renders separate previews when one field has comma-separated image URLs", () => {
+    storeState.nodes = geminiNodes;
+    storeState.edges = imageEdges;
+    render(
+      <ReactFlowTestWrapper>
+        <GenericNode
+          {...({
+            id: "gem",
+            type: "gemini",
+            data: geminiNodes[1].data,
+            selected: false,
+            dragging: false,
+            zIndex: 0,
+            isConnectable: true,
+            positionAbsoluteX: 200,
+            positionAbsoluteY: 0,
+          } as NodeProps)}
+        />
+      </ReactFlowTestWrapper>
+    );
+
+    expect(screen.getByText("Connected upstream")).toBeInTheDocument();
+    const imgs = screen.getAllByRole("img");
+    expect(imgs).toHaveLength(2);
+    expect(imgs[0]).toHaveAttribute("src", imageUrl1);
+    expect(imgs[1]).toHaveAttribute("src", imageUrl2);
+  });
+});

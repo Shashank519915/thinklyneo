@@ -192,10 +192,13 @@ export default function WorkflowWorkspacePage() {
     }
 
     try {
-      // Upload all files in parallel
       const { urls: validUrls, firstError } = await uploadFilesViaApi(filesArray);
       if (firstError) {
         window.alert(firstError);
+      }
+
+      if (validUrls.length === 0 && filesArray.length > 0 && !firstError) {
+        window.alert("Upload failed. No files were saved.");
       }
 
       if (validUrls.length > 0) {
@@ -212,6 +215,7 @@ export default function WorkflowWorkspacePage() {
       }
     } catch (err) {
       console.error("Upload error:", err);
+      window.alert("Upload failed. Please try again.");
     } finally {
       setUploadingFields((prev) => ({ ...prev, [fieldId]: false }));
     }
@@ -716,7 +720,13 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                                 accept="image/*"
                                                 multiple
                                                 type="file"
-                                                onChange={(e) => handleFileUpload(field.id, e.target.files, kind)}
+                                                onChange={(e) => {
+                                                  void handleFileUpload(field.id, e.target.files, kind).finally(
+                                                    () => {
+                                                      e.target.value = "";
+                                                    }
+                                                  );
+                                                }}
                                               />
                                             </div>
                                             
@@ -795,7 +805,13 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                                 accept={acceptForFieldKind(kind)}
                                                 multiple={isMultiAssetField(kind)}
                                                 type="file"
-                                                onChange={(e) => handleFileUpload(field.id, e.target.files, kind)}
+                                                onChange={(e) => {
+                                                  void handleFileUpload(field.id, e.target.files, kind).finally(
+                                                    () => {
+                                                      e.target.value = "";
+                                                    }
+                                                  );
+                                                }}
                                               />
                                             </div>
 

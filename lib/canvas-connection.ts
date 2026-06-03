@@ -44,7 +44,8 @@ export function evaluateCanvasConnection(
     return { allowed: false, reason: "invalid-type" };
   }
 
-  if (connection.targetHandle !== "in:images") {
+  const multiFanInHandles = ["in:images", "in:video_urls"];
+  if (!multiFanInHandles.includes(connection.targetHandle ?? "")) {
     const hasExisting = edges.some(
       (e) =>
         e.target === connection.target &&
