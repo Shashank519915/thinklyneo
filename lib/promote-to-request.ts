@@ -86,13 +86,16 @@ export function resolveRequestFieldType(
 function valueToRequestFieldValue(
   fieldType: WorkflowField["type"],
   currentValue: unknown,
-  defaultValue?: unknown
+  defaultValue?: unknown,
+  paramKey?: string
 ): string | null {
   const raw = currentValue !== undefined && currentValue !== null && currentValue !== ""
     ? currentValue
     : defaultValue;
   if (raw === undefined || raw === null || raw === "") {
-    return fieldType === "boolean_field" ? "false" : null;
+    if (fieldType === "boolean_field") return "false";
+    if (fieldType === "select_field" && paramKey && /format/i.test(paramKey)) return "mp3";
+    return null;
   }
   if (typeof raw === "boolean") return raw ? "true" : "false";
   if (typeof raw === "number") return String(raw);
@@ -217,7 +220,7 @@ export function promoteInputToRequest(opts: PromoteInputOptions): PromoteInputRe
       id: fieldId,
       type: fieldType,
       label: paramLabel.trim() || paramKey,
-      value: valueToRequestFieldValue(fieldType, currentValue, defaultValue),
+      value: valueToRequestFieldValue(fieldType, currentValue, defaultValue, paramKey),
       linkedTarget: { nodeId: targetNodeId, handle: targetHandle },
       ...(selectOptions?.length ? { selectOptions } : {}),
       ...(numberMin !== undefined ? { numberMin } : {}),

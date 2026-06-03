@@ -3,6 +3,9 @@ import {
   getRequestFieldKind,
   buildInputValuesFromFields,
   isMultiAssetField,
+  defaultSelectFieldValue,
+  normalizeInputValuesForRun,
+  hydrateInputValuesFromRun,
 } from "@/lib/request-inputs";
 import type { WorkflowField } from "@/store/workflow-store";
 
@@ -38,6 +41,10 @@ describe("getRequestFieldKind — explicit type mapping", () => {
 
   it("maps text_field to text", () => {
     expect(getRequestFieldKind(field("x", "text_field"))).toBe("text");
+  });
+
+  it("maps select_field to select", () => {
+    expect(getRequestFieldKind(field("x", "select_field"))).toBe("select");
   });
 
   it("maps plain text type to text", () => {
@@ -111,5 +118,48 @@ describe("isMultiAssetField", () => {
 
   it("file is not multi-asset", () => {
     expect(isMultiAssetField("file")).toBe(false);
+  });
+});
+
+describe("select defaults", () => {
+  it("defaultSelectFieldValue uses mp3 for format fields", () => {
+    expect(
+      defaultSelectFieldValue({
+        id: "field_select_format",
+        label: "format",
+        selectOptions: [
+          { value: "mp3", label: "MP3" },
+          { value: "wav", label: "WAV" },
+        ],
+      })
+    ).toBe("mp3");
+  });
+
+  it("hydrateInputValuesFromRun overlays run payload", () => {
+    const fields: WorkflowField[] = [
+      { id: "field_text_a", type: "text_field", label: "a", value: null },
+      { id: "field_select_format", type: "select_field", label: "format", value: null, selectOptions: [{ value: "mp3", label: "MP3" }] },
+    ];
+    const hydrated = hydrateInputValuesFromRun(fields, {
+      field_text_a: "hello",
+      field_select_format: "wav",
+    });
+    expect(hydrated.field_text_a).toBe("hello");
+    expect(hydrated.field_select_format).toBe("wav");
+  });
+
+  it("normalizeInputValuesForRun fills empty format", () => {
+    const fields: WorkflowField[] = [
+      {
+        id: "field_select_format",
+        type: "select_field",
+        label: "format",
+        value: null,
+        selectOptions: [{ value: "mp3", label: "MP3" }],
+      },
+    ];
+    expect(normalizeInputValuesForRun(fields, { field_select_format: "" }).field_select_format).toBe(
+      "mp3"
+    );
   });
 });

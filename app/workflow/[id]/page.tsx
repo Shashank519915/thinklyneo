@@ -13,14 +13,7 @@ import {
   Terminal,
   ExternalLink,
   Lock,
-  AlignLeft,
-  Image,
-  Video,
-  Trash2,
-  Volume2,
   FileText,
-  Maximize2,
-  X,
 } from "lucide-react";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
@@ -31,12 +24,23 @@ import TextExpandModal from "@/components/workflow/TextExpandModal";
 import { useWorkflowStore, type WorkflowField } from "@/store/workflow-store";
 import { type Node, type Edge } from "@xyflow/react";
 import {
-  getRequestFieldKind,
   buildInputValuesFromFields,
-  acceptForFieldKind,
-  isMultiAssetField,
+  hydrateInputValuesFromRun,
+  normalizeInputValuesForRun,
+  type RequestFieldKind,
 } from "@/lib/request-inputs";
 import { uploadFilesViaApi } from "@/lib/upload";
+import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
+import PlaygroundFieldRow from "@/components/playground/PlaygroundFieldRow";
+import {
+  buildPlaygroundOutputSections,
+  countCompletedFromStates,
+  countRunnableNodes,
+  formatCreditsMillions,
+  mergeNodeRunsWithLive,
+  resolvePlaygroundRunStatus,
+  sumRunCreditsMicro,
+} from "@/lib/playground-output";
 
 interface NodeRunItem {
   id: string;
@@ -123,7 +127,11 @@ export default function WorkflowWorkspacePage() {
 
   // Playground form state
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
-  const [estimatedCost, setEstimatedCost] = useState(0.25);
+  const [estimatedCost, setEstimatedCost] = useState(0.1);
+  const [liveNodeStates, setLiveNodeStates] = useState<
+    Record<string, { status: string; output?: unknown; error?: string }>
+  >({});
+  const [liveRunCreditsMicro, setLiveRunCreditsMicro] = useState<number | null>(null);
 
   // History filtering
   const [runFilter, setRunFilter] = useState<"ui" | "api">("ui");
@@ -151,7 +159,11 @@ export default function WorkflowWorkspacePage() {
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
 
-  const handleFileUpload = async (fieldId: string, files: FileList | null, kind?: ReturnType<typeof getRequestFieldKind>) => {
+  const handleFileUpload = async (
+    fieldId: string,
+    files: FileList | null,
+    kind?: RequestFieldKind
+  ) => {
     if (!files || files.length === 0) return;
 
     const filesArray = Array.from(files);
@@ -224,6 +236,36 @@ export default function WorkflowWorkspacePage() {
   // Load Canvas workspace data for the readonly Workflow Tab
   const { setNodes, setEdges, setWorkflowId, setWorkflowName } = useWorkflowStore();
 
+  const applyWorkflowFieldsToInputs = useCallback(
+    (wf: { nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }> }) => {
+      const requestNode = (wf.nodes || []).find((n) => n.type === "requestInputs");
+      if (requestNode) {
+        const fields = (requestNode.data?.fields || []) as WorkflowField[];
+        setInputValues(buildInputValuesFromFields(fields));
+      } else {
+        setInputValues({});
+      }
+    },
+    []
+  );
+
+  const selectHistoryRun = useCallback(
+    (
+      run: WorkflowRunItem,
+      wf: { nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }> } | null
+    ) => {
+      setSelectedRun(run);
+      setLiveNodeStates({});
+      setLiveRunCreditsMicro(sumRunCreditsMicro(run.nodeRuns));
+      const requestNode = (wf?.nodes || []).find((n) => n.type === "requestInputs");
+      if (requestNode) {
+        const fields = (requestNode.data?.fields || []) as WorkflowField[];
+        setInputValues(hydrateInputValuesFromRun(fields, run.inputValues));
+      }
+    },
+    []
+  );
+
   const fetchWorkflow = useCallback(async () => {
     try {
       const resp = await fetch(`/api/workflows/${workflowId}`);
@@ -232,31 +274,19 @@ export default function WorkflowWorkspacePage() {
         setWorkflow(data.data);
         setWorkflowId(workflowId);
         setWorkflowName(data.data.name);
-        
-        // Populates Zustand store for the read-only Canvas view
         setNodes(data.data.nodes || []);
         setEdges(data.data.edges || []);
-
-        // Load input fields from Request-Inputs node
-        const requestNode = (data.data.nodes || []).find((n: any) => n.type === "requestInputs");
-        if (requestNode) {
-          const fields = (requestNode.data?.fields || []) as WorkflowField[];
-          setInputValues((prev) => buildInputValuesFromFields(fields, prev));
-        } else {
-          setInputValues({});
-        }
-
-        // Calculate estimated cost
-        let est = 0;
-        (data.data.nodes || []).forEach((n: any) => {
-          if (n.type === "gemini" || n.type === "gptImage2") est += 1.0;
-          if (n.type === "klingV3") est += 2.0;
-        });
-        setEstimatedCost(est || 0.25);
+        setEstimatedCost(
+          sumWorkflowEstimateMillions(data.data.nodes || []) || 0.1
+        );
+        return data.data as {
+          nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }>;
+        };
       }
     } catch (err) {
       console.error("Failed to fetch workflow details:", err);
     }
+    return null;
   }, [workflowId, setNodes, setEdges, setWorkflowId, setWorkflowName]);
 
   const fetchHistory = useCallback(async () => {
@@ -264,23 +294,66 @@ export default function WorkflowWorkspacePage() {
       const resp = await fetch(`/api/workflows/${workflowId}/history`);
       const data = await resp.json();
       if (data.data) {
-        setRuns(data.data);
-        // By default, select the latest run to display outputs if available
-        if (data.data.length > 0 && !selectedRun) {
-          setSelectedRun(data.data[0]);
-        }
+        const list = data.data as WorkflowRunItem[];
+        setRuns(list);
+        return list;
       }
     } catch (err) {
       console.error("Failed to fetch history:", err);
-    } finally {
-      setLoading(false);
     }
-  }, [workflowId, selectedRun]);
+    return [] as WorkflowRunItem[];
+  }, [workflowId]);
+
+  const restoreLiveRun = useCallback(
+    async (
+      runsList: WorkflowRunItem[],
+      wf: { nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }> } | null
+    ) => {
+      const runningRun = runsList.find((r) => r.status === "running");
+      if (!runningRun?.orchestratorRunId) {
+        setSelectedRun(null);
+        setLiveNodeStates({});
+        setLiveRunCreditsMicro(null);
+        if (wf) applyWorkflowFieldsToInputs(wf);
+        return;
+      }
+
+      selectHistoryRun(runningRun, wf);
+
+      const tokenResp = await fetch(`/api/workflows/${workflowId}/node-runs/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orchestratorRunId: runningRun.orchestratorRunId }),
+      });
+      if (!tokenResp.ok) return;
+      const tokenData = await tokenResp.json();
+      const { publicAccessToken } = tokenData.data ?? {};
+      if (!publicAccessToken) return;
+
+      setIsRunning(true);
+      setCurrentRunId(runningRun.id);
+      setOrchestratorState({
+        orchestratorRunId: runningRun.orchestratorRunId,
+        publicAccessToken,
+      });
+    },
+    [workflowId, selectHistoryRun, applyWorkflowFieldsToInputs]
+  );
 
   useEffect(() => {
-    fetchWorkflow();
-    fetchHistory();
-  }, [workflowId]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const wf = await fetchWorkflow();
+      const runsList = await fetchHistory();
+      if (cancelled) return;
+      await restoreLiveRun(runsList, wf);
+      if (!cancelled) setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workflowId, fetchWorkflow, fetchHistory, restoreLiveRun]);
 
   // Check if response node is connected
   const hasResponseConnection = useCallback(() => {
@@ -290,10 +363,19 @@ export default function WorkflowWorkspacePage() {
   }, [workflow]);
 
   // Starts workflow execution run
+  const getRequestFields = useCallback((): WorkflowField[] => {
+    const requestNode = (workflow?.nodes || []).find((n: { type: string }) => n.type === "requestInputs");
+    return (requestNode?.data?.fields || []) as WorkflowField[];
+  }, [workflow]);
+
   const handleStartRun = async () => {
     if (isRunning) return;
+    const fields = getRequestFields();
+    const payload = normalizeInputValuesForRun(fields, inputValues);
+    setInputValues(payload);
     setIsRunning(true);
-    setSelectedRun(null);
+    setLiveNodeStates({});
+    setLiveRunCreditsMicro(null);
 
     try {
       const resp = await fetch(`/api/workflows/${workflowId}/execute`, {
@@ -301,7 +383,7 @@ export default function WorkflowWorkspacePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           scope: "full",
-          inputValues,
+          inputValues: payload,
         }),
       });
 
@@ -323,48 +405,82 @@ export default function WorkflowWorkspacePage() {
     }
   };
 
-  const handleOrchestratorUpdate = useCallback(
-    (nodeStates: Record<string, { status: string; output?: any; error?: string }>) => {
-      // Stream state update
-      console.log("[Playground] Real-time orchestrator update:", nodeStates);
+  const refreshCurrentRunSnapshot = useCallback(
+    async (runId: string) => {
+      const resp = await fetch(`/api/workflows/${workflowId}/history`);
+      const data = await resp.json();
+      const match = (data.data as WorkflowRunItem[] | undefined)?.find((r) => r.id === runId);
+      if (match && workflow) selectHistoryRun(match, workflow);
     },
-    []
+    [workflowId, workflow, selectHistoryRun]
+  );
+
+  const handleOrchestratorUpdate = useCallback(
+    (nodeStates: Record<string, { status: string; output?: unknown; error?: string }>) => {
+      setLiveNodeStates(nodeStates);
+      if (currentRunId) {
+        void refreshCurrentRunSnapshot(currentRunId);
+      }
+    },
+    [currentRunId, refreshCurrentRunSnapshot]
   );
 
   const handleOrchestratorComplete = useCallback(
     (finalStatus: string) => {
+      const finishedRunId = currentRunId;
       setIsRunning(false);
       setCurrentRunId(null);
       setOrchestratorState(null);
-      // Reload history to fetch new outputs
-      fetchHistory();
+      setLiveNodeStates({});
+      void (async () => {
+        const list = await fetchHistory();
+        if (finishedRunId) {
+          const match = list.find((r) => r.id === finishedRunId);
+          if (match && workflow) selectHistoryRun(match, workflow);
+        }
+      })();
     },
-    [fetchHistory]
+    [fetchHistory, currentRunId, workflow, selectHistoryRun]
   );
 
-  // Extract Response Node outputs for display
-  const getOutputData = () => {
-    const targetRun = selectedRun;
-    if (!targetRun) return null;
+  const graphNodes = (workflow?.nodes || []).map((n: { id: string; type: string }) => ({
+    id: n.id,
+    type: n.type,
+  }));
+  const graphEdges = (workflow?.edges || []).map((e: { source: string; target: string }) => ({
+    source: e.source,
+    target: e.target,
+  }));
 
-    const responseNodeRun = targetRun.nodeRuns.find((nr) => nr.nodeId === "response" || nr.nodeName === "Output");
-    if (!responseNodeRun || responseNodeRun.status !== "success" || !responseNodeRun.output) {
-      // Check if there are other completed media nodes to show partial assets
-      const mediaNode = targetRun.nodeRuns
-        .slice()
-        .reverse()
-        .find((nr) => nr.status === "success" && nr.output && (nr.output.result || nr.output.outputUrl));
-      
-      if (mediaNode) {
-        return mediaNode.output;
-      }
-      return null;
+  const activeRun = selectedRun;
+  const displayNodeRuns = mergeNodeRunsWithLive(
+    activeRun?.nodeRuns ?? [],
+    isRunning ? liveNodeStates : null
+  );
+  const runStatus = resolvePlaygroundRunStatus(activeRun?.status, isRunning);
+  const usedCreditsMicro =
+    liveRunCreditsMicro ??
+    (activeRun ? sumRunCreditsMicro(activeRun.nodeRuns) : 0);
+  const runnableTotal = countRunnableNodes(graphNodes, graphEdges);
+  const runnableDone = isRunning
+    ? countCompletedFromStates(graphNodes, graphEdges, liveNodeStates)
+    : displayNodeRuns.filter((nr) => {
+        if (nr.status !== "success") return false;
+        const t = graphNodes.find((n: { id: string; type: string }) => n.id === nr.nodeId)?.type ?? "";
+        return !["requestInputs", "response"].includes(t);
+      }).length;
+
+  const { sections: outputSections, workflowError } = buildPlaygroundOutputSections(
+    workflow?.nodes || [],
+    displayNodeRuns,
+    {
+      workflowFailed: runStatus === "failed",
+      workflowError:
+        activeRun?.nodeRuns?.find((nr) => nr.status === "failed")?.error ?? null,
     }
+  );
 
-    return responseNodeRun.output;
-  };
-
-  const outputContent = getOutputData();
+  const apiInputValues = normalizeInputValuesForRun(getRequestFields(), inputValues);
 
   // Python, JS, cURL Script generator templates
   const codeTemplates = {
@@ -377,7 +493,7 @@ url = "${apiOrigin}/api/v1/runs"
 
 data = {
     "workflowId": "${workflowId}",
-    "inputValues": ${JSON.stringify(inputValues, null, 4).replace(/\n/g, "\n    ")}
+    "inputValues": ${JSON.stringify(apiInputValues, null, 4).replace(/\n/g, "\n    ")}
 }
 
 # Start execution
@@ -428,7 +544,7 @@ async function startRun() {
     },
     body: JSON.stringify({
       workflowId,
-      inputValues: ${JSON.stringify(inputValues, null, 6).replace(/\n/g, "\n      ")}
+      inputValues: ${JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n      ")}
     })
   });
   const data = await response.json();
@@ -463,7 +579,7 @@ startRun();`,
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -d '{
     "workflowId": "${workflowId}",
-    "inputValues": ${JSON.stringify(inputValues, null, 6).replace(/\n/g, "\n    ")}
+    "inputValues": ${JSON.stringify(apiInputValues, null, 6).replace(/\n/g, "\n    ")}
   }'
 
 # Poll execution status
@@ -610,280 +726,64 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 
                           return (
                             <div className="space-y-5">
-                              {fields.map((field: WorkflowField) => {
-                                const kind = getRequestFieldKind(field);
-                                const displayValue = inputValues[field.id] ?? "";
-
-                                return (
-                                  <div key={field.id} className="space-y-1.5">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="text-muted-foreground/70">
-                                        {kind === "image" && <Image className="h-4 w-4" />}
-                                        {kind === "video" && <Video className="h-4 w-4" />}
-                                        {kind === "audio" && <Volume2 className="h-4 w-4" />}
-                                        {kind === "text" && <AlignLeft className="h-4 w-4" />}
-                                        {kind === "number" && <FileText className="h-4 w-4" />}
-                                        {kind === "boolean" && <Check className="h-4 w-4" />}
-                                        {(kind === "file") && <FileText className="h-4 w-4" />}
-                                      </span>
-                                      <label className="text-[13px] font-medium text-foreground">{field.label}</label>
-                                      <span className="ml-auto text-[11px] capitalize text-muted-foreground/50">{kind}</span>
-                                    </div>
-
-                                    {kind === "number" ? (
-                                      <input
-                                        type="number"
-                                        value={displayValue}
-                                        onChange={(e) =>
-                                          setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))
-                                        }
-                                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                                        placeholder={`Enter ${field.label}...`}
-                                      />
-                                    ) : kind === "boolean" ? (
-                                      <select
-                                        value={displayValue === "true" ? "true" : "false"}
-                                        onChange={(e) =>
-                                          setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))
-                                        }
-                                        className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
-                                      >
-                                        <option value="false">false</option>
-                                        <option value="true">true</option>
-                                      </select>
-                                    ) : kind === "text" ? (
-                                      <div className="relative">
-                                        <textarea
-                                          placeholder={`Enter ${field.label}...`}
-                                          rows={3}
-                                          value={displayValue}
-                                          onChange={(e) => setInputValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                          className="min-h-[60px] w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 focus:border-primary focus:ring-1 focus:ring-primary/30"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => setActiveExpandFieldId(field.id)}
-                                          className="absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-muted/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer border-0"
-                                          title="Expand"
-                                        >
-                                          <Maximize2 className="h-3 w-3" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      /* File upload fields (image, video, audio, generic file) */
-                                      <div className="space-y-2">
-                                        {isMultiAssetField(kind) ? (
-                                          /* Multi-image grid field */
-                                          <div className="space-y-2">
-                                            <div className="relative">
-                                              <button
-                                                type="button"
-                                                tabIndex={-1}
-                                                disabled={uploadingFields[field.id] || (displayValue.split(",").filter(Boolean).length >= 10)}
-                                                onClick={() => {
-                                                  const input = document.getElementById(`file-input-${field.id}`);
-                                                  if (input) input.click();
-                                                }}
-                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-border bg-background px-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer"
-                                                title="Upload image"
-                                              >
-                                                {uploadingFields[field.id] ? (
-                                                  <>
-                                                    <SpinningLogo size="sm" />
-                                                    <span>Uploading...</span>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <svg
-                                                      xmlns="http://www.w3.org/2000/svg"
-                                                      width="24"
-                                                      height="24"
-                                                      viewBox="0 0 24 24"
-                                                      fill="none"
-                                                      stroke="currentColor"
-                                                      strokeWidth="2"
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                      className="tabler-icon tabler-icon-cloud-upload h-4 w-4"
-                                                    >
-                                                      <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
-                                                      <path d="M9 15l3 -3l3 3" />
-                                                      <path d="M12 12l0 9" />
-                                                    </svg>
-                                                    <span className="capitalize">Upload image</span>
-                                                  </>
-                                                )}
-                                              </button>
-                                              <input
-                                                id={`file-input-${field.id}`}
-                                                hidden
-                                                accept="image/*"
-                                                multiple
-                                                type="file"
-                                                onChange={(e) => {
-                                                  void handleFileUpload(field.id, e.target.files, kind).finally(
-                                                    () => {
-                                                      e.target.value = "";
-                                                    }
-                                                  );
-                                                }}
-                                              />
-                                            </div>
-                                            
-                                            {displayValue && (
-                                              <div className="grid grid-cols-3 gap-2">
-                                                {displayValue.split(",").filter(Boolean).map((url: string, idx: number) => (
-                                                  <div key={idx} className="group relative">
-                                                    <div className="overflow-hidden rounded-lg bg-muted/30" style={{ border: "2px solid rgba(59, 130, 246, 0.3)", aspectRatio: "1 / 1" }}>
-                                                      <img src={url} alt="" className="h-full w-full object-cover" />
-                                                    </div>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => {
-                                                        const urls = displayValue.split(",").filter(Boolean);
-                                                        const newUrls = urls.filter((_, i) => i !== idx);
-                                                        setInputValues((prev) => ({ ...prev, [field.id]: newUrls.join(",") }));
-                                                      }}
-                                                      className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                                      title="Remove"
-                                                    >
-                                                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-x h-2.5 w-2.5" aria-hidden="true">
-                                                        <path d="M18 6 6 18"></path>
-                                                        <path d="m6 6 12 12"></path>
-                                                      </svg>
-                                                    </button>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ) : (
-                                          /* Single/Multi file upload (video, audio, other) */
-                                          <div className="space-y-2">
-                                            <div className="relative">
-                                              <button
-                                                type="button"
-                                                tabIndex={-1}
-                                                disabled={uploadingFields[field.id] || (displayValue.split(",").filter(Boolean).length >= 10)}
-                                                onClick={() => {
-                                                  const input = document.getElementById(`file-input-${field.id}`);
-                                                  if (input) input.click();
-                                                }}
-                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 h-10 border-border bg-background px-4 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground cursor-pointer"
-                                                title={`Upload ${kind}`}
-                                              >
-                                                {uploadingFields[field.id] ? (
-                                                  <>
-                                                    <SpinningLogo size="sm" />
-                                                    <span>Uploading...</span>
-                                                  </>
-                                                ) : (
-                                                  <>
-                                                    <svg
-                                                      xmlns="http://www.w3.org/2000/svg"
-                                                      width="24"
-                                                      height="24"
-                                                      viewBox="0 0 24 24"
-                                                      fill="none"
-                                                      stroke="currentColor"
-                                                      strokeWidth="2"
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                      className="tabler-icon tabler-icon-cloud-upload h-4 w-4"
-                                                    >
-                                                      <path d="M7 18a4.6 4.4 0 0 1 0 -9a5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
-                                                      <path d="M9 15l3 -3l3 3" />
-                                                      <path d="M12 12l0 9" />
-                                                    </svg>
-                                                    <span className="capitalize">Upload {kind}</span>
-                                                  </>
-                                                )}
-                                              </button>
-                                              <input
-                                                id={`file-input-${field.id}`}
-                                                hidden
-                                                accept={acceptForFieldKind(kind)}
-                                                multiple={isMultiAssetField(kind)}
-                                                type="file"
-                                                onChange={(e) => {
-                                                  void handleFileUpload(field.id, e.target.files, kind).finally(
-                                                    () => {
-                                                      e.target.value = "";
-                                                    }
-                                                  );
-                                                }}
-                                              />
-                                            </div>
-
-                                            {displayValue && (
-                                              <div className="space-y-2">
-                                                {displayValue.split(",").filter(Boolean).map((url: string, idx: number) => (
-                                                  <div key={idx} className="flex items-center gap-3 rounded-lg border border-border bg-muted/20 p-2 relative group">
-                                                    {kind === "video" && (
-                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-zinc-800 text-white border border-border">
-                                                        <Video className="h-4 w-4" />
-                                                      </div>
-                                                    )}
-                                                    {kind === "audio" && (
-                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-indigo-50 text-indigo-500 border border-border">
-                                                        <Volume2 className="h-4 w-4" />
-                                                      </div>
-                                                    )}
-                                                    {kind !== "video" && kind !== "audio" && (
-                                                      <div className="flex h-10 w-10 items-center justify-center rounded bg-muted text-muted-foreground border border-border">
-                                                        <FileText className="h-4 w-4" />
-                                                      </div>
-                                                    )}
-                                                    <div className="min-w-0 flex-1">
-                                                      <span className="block truncate text-xs text-muted-foreground font-mono">{url}</span>
-                                                    </div>
-                                                    <button
-                                                      type="button"
-                                                      onClick={() => {
-                                                        const urls = displayValue.split(",").filter(Boolean);
-                                                        const newUrls = urls.filter((_, i) => i !== idx);
-                                                        setInputValues((prev) => ({ ...prev, [field.id]: newUrls.join(",") }));
-                                                      }}
-                                                      className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-red-500 transition-colors cursor-pointer border-0 bg-transparent"
-                                                      title="Remove file"
-                                                    >
-                                                      <Trash2 className="h-3.5 w-3.5" />
-                                                    </button>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                              {fields.map((field: WorkflowField) => (
+                                <PlaygroundFieldRow
+                                  key={field.id}
+                                  field={field}
+                                  value={inputValues[field.id] ?? ""}
+                                  disabled={isRunning}
+                                  isPromoted={!!field.linkedTarget}
+                                  uploading={!!uploadingFields[field.id]}
+                                  onChange={(val) =>
+                                    setInputValues((prev) => ({ ...prev, [field.id]: val }))
+                                  }
+                                  onUpload={(files, kind) => handleFileUpload(field.id, files, kind)}
+                                  onExpandText={() => setActiveExpandFieldId(field.id)}
+                                />
+                              ))}
                             </div>
                           );
                         })()}
                       </div>
                       
                       {/* Run Action Container */}
-                      <div className="flex items-center p-6 flex-col gap-2 bg-muted/30 px-5 py-4">
+                      <div className="flex flex-col gap-2 bg-muted/30 px-5 py-4">
                         <button
                           onClick={handleStartRun}
                           disabled={isRunning || !hasResponseConnection()}
-                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg transition-all duration-300 w-full px-4 py-6 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg transition-all w-full h-10 px-4 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {isRunning ? (
                             <>
                               <SpinningLogo size="sm" />
                               Running...
+                              {runnableTotal > 0 && (
+                                <span className="text-xs text-white/70">
+                                  ({runnableDone}/{runnableTotal})
+                                </span>
+                              )}
                             </>
                           ) : (
                             <>
-                              <Play className="w-5 h-5 mr-2" />
+                              <Play className="w-5 h-5" />
                               Run
                             </>
                           )}
                         </button>
+                        {!isRunning && selectedRun && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRun(null);
+                              setLiveNodeStates({});
+                              setLiveRunCreditsMicro(null);
+                              applyWorkflowFieldsToInputs(workflow ?? { nodes: [] });
+                            }}
+                            className="inline-flex h-9 w-full items-center justify-center rounded-[18px] border border-border bg-background text-sm font-medium hover:bg-muted cursor-pointer"
+                          >
+                            New Run
+                          </button>
+                        )}
                       </div>
 
                     </div>
@@ -892,77 +792,108 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                   {/* Output Column */}
                   <div className="flex min-h-0 min-w-0 flex-col">
                     <div className="rounded-[18px] border bg-card text-card-foreground shadow-sm flex h-full flex-col overflow-hidden">
-                      <div className="flex p-6 flex-row items-center justify-between space-y-0 px-5 py-4">
+                      <div className="flex flex-row items-center justify-between px-5 py-4">
                         <div>
                           <h2 className="text-sm font-semibold text-foreground">Output</h2>
                           <p className="mt-0.5 text-xs text-muted-foreground">Results from workflow execution</p>
                         </div>
+                        <div className="flex items-center gap-2">
+                          {(runStatus !== "idle" || usedCreditsMicro > 0) && (
+                            <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
+                              Used ~{formatCreditsMillions(usedCreditsMicro)}
+                            </span>
+                          )}
+                          {runStatus === "running" && (
+                            <span className="rounded-full border border-amber-300/40 bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600">
+                              RUNNING
+                            </span>
+                          )}
+                          {runStatus === "success" && (
+                            <span className="rounded-full border border-green-300/40 bg-green-500/10 px-2.5 py-0.5 text-xs font-semibold text-green-600">
+                              COMPLETED
+                            </span>
+                          )}
+                          {runStatus === "failed" && (
+                            <span className="rounded-full border border-red-300/40 bg-red-500/10 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                              FAILED
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="shrink-0 bg-border h-[1px] w-full"></div>
+                      <div className="shrink-0 bg-border h-[1px] w-full" />
                       
-                      <div className="min-h-0 flex-1 overflow-y-auto p-5 flex flex-col justify-center items-center">
-                        {!outputContent ? (
-                          <div className="flex flex-col items-center justify-center text-muted-foreground">
-                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+                        {runStatus === "running" && outputSections.length === 0 && (
+                          <div className="flex h-full flex-col items-center justify-center gap-4 py-12">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+                              <SpinningLogo size="md" />
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-medium text-foreground">Running workflow...</p>
+                              {runnableTotal > 0 && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {runnableDone} of {runnableTotal} nodes completed
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {workflowError && (
+                          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                            <p className="text-sm font-medium text-destructive">Error</p>
+                            <p className="mt-1 text-sm text-destructive/80">{workflowError}</p>
+                          </div>
+                        )}
+
+                        {runStatus === "idle" && !workflowError && outputSections.length === 0 && (
+                          <div className="flex h-full flex-col items-center justify-center gap-4 py-12 text-muted-foreground">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted/50">
                               <Play className="h-7 w-7 opacity-30" />
                             </div>
-                            <p className="text-sm font-medium text-muted-foreground/70">No output yet</p>
-                            <p className="mt-1 text-xs text-muted-foreground/50">Run the workflow to see results here</p>
+                            <p className="text-sm font-medium">No output yet</p>
+                            <p className="text-xs">Run the workflow to see results here</p>
                           </div>
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
-                            {/* Formatted Output rendering depending on media type */}
-                            {typeof outputContent === "string" && (outputContent.startsWith("http://") || outputContent.startsWith("https://")) ? (
-                              outputContent.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
-                                <img
-                                  src={outputContent}
-                                  alt="Generated asset result"
-                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
-                                />
-                              ) : outputContent.match(/\.(mp4|webm)/i) ? (
-                                <video
-                                  src={outputContent}
-                                  controls
-                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
-                                />
-                              ) : (
-                                <a
-                                  href={outputContent}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-card rounded-lg text-sm text-foreground hover:bg-muted"
-                                >
-                                  Download Asset <ExternalLink className="w-4 h-4" />
-                                </a>
-                              )
-                            ) : outputContent.result && typeof outputContent.result === "string" && (outputContent.result.startsWith("http://") || outputContent.result.startsWith("https://")) ? (
-                              outputContent.result.match(/\.(jpeg|jpg|gif|png|webp)/i) ? (
-                                <img
-                                  src={outputContent.result}
-                                  alt="Generated asset result"
-                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
-                                />
-                              ) : outputContent.result.match(/\.(mp4|webm)/i) ? (
-                                <video
-                                  src={outputContent.result}
-                                  controls
-                                  className="max-h-[60vh] rounded-xl object-contain border border-border shadow-md"
-                                />
-                              ) : (
-                                <a
-                                  href={outputContent.result}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-border bg-card rounded-lg text-sm text-foreground hover:bg-muted"
-                                >
-                                  Download Result <ExternalLink className="w-4 h-4" />
-                                </a>
-                              )
-                            ) : (
-                              <pre className="p-4 rounded-xl border border-border bg-muted/30 font-mono text-xs w-full max-h-[60vh] overflow-auto text-foreground">
-                                {JSON.stringify(outputContent, null, 2)}
-                              </pre>
-                            )}
+                        )}
+
+                        {outputSections.length > 0 && (
+                          <div className="space-y-6">
+                            {outputSections.map((sec) => (
+                              <div key={sec.nodeId}>
+                                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {sec.label}
+                                </p>
+                                {sec.kind === "error" && sec.error && (
+                                  <p className="text-sm text-destructive">{sec.error}</p>
+                                )}
+                                {sec.url && sec.kind === "image" && (
+                                  <div className="flex justify-center">
+                                    <img
+                                      src={sec.url}
+                                      alt=""
+                                      className="max-h-[400px] max-w-full rounded-lg border border-border object-contain"
+                                    />
+                                  </div>
+                                )}
+                                {sec.url && sec.kind === "video" && (
+                                  <div className="flex justify-center">
+                                    <video
+                                      src={sec.url}
+                                      controls
+                                      className="max-h-[400px] max-w-full rounded-lg border border-border"
+                                    />
+                                  </div>
+                                )}
+                                {sec.url && sec.kind === "audio" && (
+                                  <audio src={sec.url} controls className="w-full" />
+                                )}
+                                {sec.text && (
+                                  <pre className="max-h-48 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs">
+                                    {sec.text}
+                                  </pre>
+                                )}
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1045,7 +976,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                 return (
                                   <tr
                                     key={r.id}
-                                    onClick={() => setSelectedRun(r)}
+                                    onClick={() => workflow && selectHistoryRun(r, workflow)}
                                     className={`border-b transition-colors cursor-pointer hover:bg-muted/10 ${
                                       isSelected ? "bg-muted/30" : ""
                                     }`}
@@ -1066,8 +997,10 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                                         {r.status}
                                       </span>
                                     </td>
-                                    <td className="px-3 py-3 text-xs font-medium text-foreground tabular-nums">
-                                      {(totalCost / 1000000).toFixed(2)}M
+                                    <td className="px-3 py-3 text-xs">
+                                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-300/30 bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                                        {formatCreditsMillions(totalCost)}
+                                      </span>
                                     </td>
                                     <td className="px-5 py-3 text-right text-xs font-mono text-muted-foreground">
                                       {r.id}
@@ -1123,6 +1056,26 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                 {/* API Docs layout column */}
                 <div className="min-w-0 flex-1 overflow-y-auto">
                   <div className="space-y-6">
+                    <div>
+                      <h3 className="mb-3 text-base font-semibold text-foreground">Request body: inputValues</h3>
+                      <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 text-sm text-foreground">
+                        <p className="mb-2">
+                          Keys match Request-Inputs field <code className="rounded bg-muted px-1 font-mono text-xs">id</code> values
+                          (including fields created via <strong>Add to request</strong> on the canvas).
+                        </p>
+                        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+                          <li><code className="text-xs">text_field</code> / prompts — string</li>
+                          <li><code className="text-xs">select_field</code> — e.g. <code className="text-xs">transition</code>, <code className="text-xs">format</code> (default <code className="text-xs">mp3</code> when empty)</li>
+                          <li><code className="text-xs">number_field</code> — number as string</li>
+                          <li><code className="text-xs">boolean_field</code> — <code className="text-xs">&quot;true&quot;</code> or <code className="text-xs">&quot;false&quot;</code></li>
+                          <li>Media fields — HTTPS URL or comma-separated URLs for multi-image/video</li>
+                        </ul>
+                        <pre className="mt-3 max-h-48 overflow-auto rounded-lg border border-border bg-background p-3 font-mono text-xs">
+                          {JSON.stringify(apiInputValues, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+
                     <div>
                       <h3 className="mb-3 text-base font-semibold text-foreground">API Endpoint</h3>
                       <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5">

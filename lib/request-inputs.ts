@@ -7,6 +7,7 @@ import type { WorkflowField } from "@/store/workflow-store";
 /** Normalized UI / upload kind for a request field. */
 export type RequestFieldKind =
   | "text"
+  | "select"
   | "number"
   | "boolean"
   | "image"
@@ -29,8 +30,9 @@ export function getRequestFieldKind(field: Pick<WorkflowField, "id" | "type">): 
 
   switch (field.type) {
     case "text_field":
-    case "select_field":
       return "text";
+    case "select_field":
+      return "select";
     case "number_field":
       return "number";
     case "boolean_field":
@@ -66,6 +68,15 @@ export function maxAssetsForField(field: Pick<WorkflowField, "type" | "mediaMaxC
   return 10;
 }
 
+/** Default for select fields (extract format → mp3). */
+export function defaultSelectFieldValue(field: Pick<WorkflowField, "id" | "label" | "selectOptions">): string {
+  if (/format/i.test(field.id) || /format/i.test(field.label)) {
+    const hasMp3 = field.selectOptions?.some((o) => o.value === "mp3");
+    if (hasMp3) return "mp3";
+  }
+  return field.selectOptions?.[0]?.value ?? "";
+}
+
 /** Build playground/API input map from node field definitions. */
 export function buildInputValuesFromFields(
   fields: WorkflowField[],
@@ -74,13 +85,53 @@ export function buildInputValuesFromFields(
   const next: Record<string, string> = {};
   for (const f of fields) {
     const prior = existing?.[f.id];
-    if (prior !== undefined) {
+    if (prior !== undefined && prior !== "") {
       next[f.id] = prior;
     } else if (f.value != null && f.value !== "") {
       next[f.id] = f.value;
+    } else if (f.type === "boolean_field") {
+      next[f.id] = "false";
+    } else if (f.type === "select_field") {
+      next[f.id] = defaultSelectFieldValue(f);
     } else {
-      next[f.id] = f.type === "boolean_field" ? "false" : "";
+      next[f.id] = "";
     }
+  }
+  return next;
+}
+
+/** Playground/history: overlay a past run's inputValues onto current field definitions. */
+export function hydrateInputValuesFromRun(
+  fields: WorkflowField[],
+  runInputValues: Record<string, unknown> | null | undefined,
+  fallback?: Record<string, string>
+): Record<string, string> {
+  const fromRun: Record<string, string> = {};
+  if (runInputValues && typeof runInputValues === "object") {
+    for (const [key, val] of Object.entries(runInputValues)) {
+      if (val == null) continue;
+      if (Array.isArray(val)) {
+        fromRun[key] = val.map(String).filter(Boolean).join(",");
+      } else if (typeof val === "boolean") {
+        fromRun[key] = val ? "true" : "false";
+      } else {
+        fromRun[key] = String(val);
+      }
+    }
+  }
+  return buildInputValuesFromFields(fields, { ...fallback, ...fromRun });
+}
+
+/** Fill empty select values before execute / API (e.g. format → mp3). */
+export function normalizeInputValuesForRun(
+  fields: WorkflowField[],
+  values: Record<string, string>
+): Record<string, string> {
+  const next = { ...values };
+  for (const f of fields) {
+    if (f.type !== "select_field") continue;
+    const v = (next[f.id] ?? "").trim();
+    if (!v) next[f.id] = defaultSelectFieldValue(f);
   }
   return next;
 }
