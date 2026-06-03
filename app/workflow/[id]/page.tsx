@@ -15,6 +15,7 @@ import {
   Lock,
   FileText,
   Coins,
+  Pencil,
 } from "lucide-react";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
@@ -1259,19 +1260,30 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 
             {/* ──── Tab 3: Workflow Canvas ──── */}
             {activeTab === "workflow" && (
-              <div className="relative h-full w-full flex flex-col overflow-hidden">
-                <div className="absolute right-4 top-4 z-10">
-                  <button
-                    onClick={() => router.push(`/workflow/${workflowId}/canvas`)}
-                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-[18px] bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold px-4 py-2 border-0 cursor-pointer shadow-md"
+              <div className="p-6 pb-10">
+                <div className="rounded-[18px] border border-gray-200 bg-white text-gray-900 shadow-sm">
+                  {/* Header: title + white Edit button */}
+                  <div className="flex flex-row items-center justify-between px-6 py-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Workflow Structure</h3>
+                    <button
+                      onClick={() => router.push(`/workflow/${workflowId}/canvas`)}
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 cursor-pointer"
+                    >
+                      <Pencil className="h-3.5 w-3.5" aria-hidden />
+                      Edit Workflow
+                    </button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="h-px w-full bg-gray-200" />
+
+                  {/* Canvas box (read-only) */}
+                  <div
+                    className="relative overflow-hidden rounded-b-[18px] p-0"
+                    style={{ height: "clamp(400px, calc(-260px + 100vh), 700px)" }}
                   >
-                    Edit Workflow
-                  </button>
-                </div>
-                
-                {/* Render Canvas in non-editable mode */}
-                <div className="flex-1 w-full h-full relative overflow-hidden">
-                  <Canvas readOnly={true} />
+                    <Canvas readOnly={true} />
+                  </div>
                 </div>
               </div>
             )}
