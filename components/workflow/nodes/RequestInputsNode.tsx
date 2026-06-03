@@ -28,6 +28,7 @@ import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/wo
 import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
+import { getNodeRunBorderClass } from "@/lib/node-run-chrome";
 
 interface RequestInputsData {
   label: string;
@@ -41,7 +42,8 @@ export default function RequestInputsNode({
 }: NodeProps) {
   const nodeData = data as unknown as RequestInputsData;
   const { updateNodeData, readOnly } = useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, error, runFieldIds, output } = useNodePreview(id);
+  const { isPreviewMode, isDimmed, isExecuting, isRunPending, error, runFieldIds, output } =
+    useNodePreview(id);
   const nodeError = error as string | null;
 
   // In preview mode, show field values from the historical run output
@@ -214,9 +216,14 @@ export default function RequestInputsNode({
 
   return (
     <div
-      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] border-gray-200 overflow-visible transition-all ${
-        isExecuting ? "node-executing" : ""
-      } ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] overflow-visible transition-all ${getNodeRunBorderClass(
+        {
+          isDimmed,
+          isExecuting,
+          hasError: !!error,
+          isRunPending,
+        }
+      )} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ minWidth: 380 }}
     >
       {/* Header */}

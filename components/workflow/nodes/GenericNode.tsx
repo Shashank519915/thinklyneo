@@ -8,6 +8,10 @@ import { parseMediaList } from "@/lib/media-list";
 import { isLikelyVideoUrl } from "@galaxy/shared";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
+import {
+  getNodeRunBorderClass,
+  getNodeRunButtonState,
+} from "@/lib/node-run-chrome";
 import NodeHeaderActions from "./NodeHeaderActions";
 import FieldInfoTooltip from "./FieldInfoTooltip";
 import TextExpandModal from "../TextExpandModal";
@@ -153,7 +157,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const nodeData = data as any;
   const { updateNodeData, deleteNode, setNodes, setEdges, edges, nodes, previewRunId, previewNodeOutputs, readOnly } =
     useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, output, error } = useNodePreview(id);
+  const { isPreviewMode, isDimmed, isExecuting, isRunPending, output, error } =
+    useNodePreview(id);
 
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
@@ -1274,15 +1279,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   return (
     <div
       data-locked={isLocked ? "true" : undefined}
-      className={`w-[380px] max-w-[380px] rounded-xl border bg-white shadow-2xl transition-all duration-300 overflow-visible ${
-        isExecuting ? "node-executing border-green-500" : ""
-      } ${
-        isLocked
-          ? "border-yellow-400"
-          : nodeError
-          ? "border-red-300"
-          : "border-gray-200"
-      } ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+      className={`w-[380px] max-w-[380px] rounded-xl border bg-white shadow-2xl transition-all duration-300 overflow-visible ${getNodeRunBorderClass(
+        {
+          isDimmed,
+          isLocked,
+          isExecuting,
+          hasError: !!nodeError,
+          isRunPending,
+        }
+      )} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ overflow: "visible", width: "380px" }}
     >
       {/* Header */}
@@ -1296,7 +1301,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           <NodeHeaderActions
             nodeId={id}
             description={definition.description ?? `Execute a ${definition.name} operation inside the workflow.`}
-            isExecuting={isExecuting}
+            runState={getNodeRunButtonState(isExecuting, isRunPending)}
             isLocked={isLocked}
             onRun={handleSingleRun}
             onReset={handleReset}

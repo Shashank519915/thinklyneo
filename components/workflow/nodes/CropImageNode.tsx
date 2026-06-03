@@ -19,6 +19,10 @@ import {
 } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import { NODE_ESTIMATE_LABEL } from "@/lib/node-estimates";
+import {
+  getNodeRunBorderClass,
+  getNodeRunButtonState,
+} from "@/lib/node-run-chrome";
 
 /** Magica `border-workflow-accent-400/90` (violet-400 at 90% opacity). */
 const CROP_FRAME_BORDER = "rgba(167, 139, 250, 0.9)";
@@ -247,7 +251,8 @@ export default function CropImageNode({ id, data }: NodeProps) {
   const nodeData = data as unknown as CropImageData;
   const { updateNodeData, deleteNode, addNode, setEdges, setNodes, edges, nodes, previewRunId, previewNodeOutputs } =
     useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, output, error } = useNodePreview(id);
+  const { isPreviewMode, isDimmed, isExecuting, isRunPending, output, error } =
+    useNodePreview(id);
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
 
@@ -378,9 +383,15 @@ export default function CropImageNode({ id, data }: NodeProps) {
   return (
     <div
       data-locked={isLocked ? "true" : undefined}
-      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] overflow-visible transition-all ${
-        isExecuting ? "node-executing" : ""
-      } ${isLocked ? "border-yellow-400" : nodeError ? "border-red-300" : "border-gray-200"} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] overflow-visible transition-all ${getNodeRunBorderClass(
+        {
+          isDimmed,
+          isLocked,
+          isExecuting,
+          hasError: !!nodeError,
+          isRunPending,
+        }
+      )} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ minWidth: 380 }}
     >
       {/* Header */}
@@ -393,7 +404,7 @@ export default function CropImageNode({ id, data }: NodeProps) {
         <NodeHeaderActions
           nodeId={id}
           description="Crop an image to specified dimensions"
-          isExecuting={isExecuting}
+          runState={getNodeRunButtonState(isExecuting, isRunPending)}
           isLocked={isLocked}
           onRun={handleSingleRun}
           onReset={handleReset}
@@ -587,29 +598,30 @@ export default function CropImageNode({ id, data }: NodeProps) {
         </div>
 
         <div className="relative mt-4 overflow-visible border-t border-gray-100 pt-4">
-          <div
-            className="absolute flex items-center"
-            style={{ right: "-22px", top: "8px", transform: "translateY(-50%)", zIndex: 50 }}
-          >
-            <Handle
-              type="source"
-              position={Position.Right}
-              id="out:outputImage"
-              className="!relative !transform-none source connectable connectablestart connectableend connectionindicator"
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: "50%",
-                background: IMAGE_HANDLE_COLOR,
-                border: `2px solid ${IMAGE_HANDLE_COLOR}80`,
-                boxShadow: `${IMAGE_HANDLE_COLOR}50 0px 0px 8px`,
-                cursor: "crosshair",
-              }}
-            />
-          </div>
           <div data-handle-anchor="label" className="mb-1.5 text-xs text-gray-500">
             Output Image
           </div>
+          <div className="relative">
+            <div
+              className="absolute flex items-center"
+              style={{ right: "-22px", top: "50%", transform: "translateY(-50%)", zIndex: 50 }}
+            >
+              <Handle
+                type="source"
+                position={Position.Right}
+                id="out:outputImage"
+                className="!relative !transform-none source connectable connectablestart connectableend connectionindicator"
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: IMAGE_HANDLE_COLOR,
+                  border: `2px solid ${IMAGE_HANDLE_COLOR}80`,
+                  boxShadow: `${IMAGE_HANDLE_COLOR}50 0px 0px 8px`,
+                  cursor: "crosshair",
+                }}
+              />
+            </div>
           {(isPreviewMode ? output : nodeData.output) ? (
             <div className="nodrag nowheel min-h-[120px] rounded-lg border border-gray-200 bg-[#F5F5F5] p-2">
               <img
@@ -623,6 +635,7 @@ export default function CropImageNode({ id, data }: NodeProps) {
               <div className="py-10 text-center text-xs text-gray-400">No output yet</div>
             </div>
           )}
+          </div>
         </div>
       </div>
 

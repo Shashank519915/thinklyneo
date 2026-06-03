@@ -203,24 +203,46 @@ export function useNodePreview(nodeId: string) {
     nodeOutputs,
     nodeErrors,
     nodes,
+    isRunning,
   } = useWorkflowStore();
 
   const isPreviewMode = previewRunId !== null;
+  const isRunSession = isRunning || isPreviewMode;
   // In preview: node is dimmed if it's NOT in the previewed run's node set
   const isDimmed = isPreviewMode && !previewRunNodeIds.has(nodeId);
-  // Suppress glow during preview
   const isExecuting = isPreviewMode ? false : executingNodeIds.includes(nodeId);
 
   const node = nodes.find((n) => n.id === nodeId);
+  const nodeType = node?.type;
+  const isResponseNode = nodeType === "response";
 
   const output = isPreviewMode ? (previewNodeOutputs[nodeId] ?? null) : (nodeOutputs[nodeId] ?? null);
   const error = isPreviewMode
     ? (previewNodeErrors[nodeId] ?? null)
     : (nodeErrors[nodeId] ?? (node?.data as any)?.error ?? null);
+  const hasError = !!error;
   // Field IDs that existed in the run for this node (undefined when not in preview)
   const runFieldIds: Set<string> | undefined = isPreviewMode ? (previewRunNodeFields[nodeId] ?? undefined) : undefined;
 
-  return { isPreviewMode, isDimmed, isExecuting, output, error, runFieldIds };
+  /** Yellow outline + Pending run button (Magica-style) for all nodes except Response. */
+  const isRunPending =
+    isRunSession &&
+    !isResponseNode &&
+    !isDimmed &&
+    !isExecuting &&
+    !hasError &&
+    (isRunning || previewRunNodeIds.has(nodeId));
+
+  return {
+    isPreviewMode,
+    isDimmed,
+    isExecuting,
+    isRunSession,
+    isRunPending,
+    output,
+    error,
+    runFieldIds,
+  };
 }
 
 /**

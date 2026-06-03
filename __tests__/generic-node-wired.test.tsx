@@ -61,6 +61,8 @@ vi.mock("@/store/workflow-store", () => ({
     isPreviewMode: false,
     isDimmed: false,
     isExecuting: false,
+    isRunSession: false,
+    isRunPending: false,
     output: null,
     error: null,
   }),
