@@ -144,7 +144,11 @@ function isCompactSelectParam(
 ): boolean {
   return (
     param.type === "select" &&
-    (param.key === "transition" || (nodeType === "extractAudio" && param.key === "format"))
+    (
+      param.key === "transition" ||
+      (nodeType === "extractAudio" && param.key === "format") ||
+      (nodeType === "klingV3" && (param.key === "aspect_ratio" || param.key === "duration"))
+    )
   );
 }
 
@@ -393,8 +397,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const handleId = `in:${param.key}`;
     const isWired = connectedTargets.has(handleId);
     const requestPromoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
-    // crop-overlay-preview params stay in their own layout even when wired — no upstream panel
-    const showUpstreamPanel = isWired && !requestPromoted && param.uiVariant !== "crop-overlay-preview";
+    // boolean and crop-overlay-preview params stay in their own layout even when wired — no upstream panel
+    const showUpstreamPanel = isWired && !requestPromoted && param.uiVariant !== "crop-overlay-preview" && param.type !== "boolean";
     const showAddToRequestBtn = shouldShowAddToRequest({
       hasHandle: !!param.handle,
       readOnly,
@@ -947,7 +951,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </button>
                 </div>
                 <div className="mt-1 text-right text-[10px] tabular-nums text-gray-400">
-                  {value ? String(value).length : 0}/4000
+                  {value ? String(value).length : 0}/{definition.limits?.[param.key]?.maxLength ?? 4000}
                 </div>
               </div>
             )}
@@ -1113,6 +1117,50 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       onPromote={() => handlePromoteInput(param)}
                     />
                   </div>
+                )}
+              </div>
+            )}
+
+            {param.type === "boolean" && (
+              // Single-line: [label] [False] [toggle switch] [True] [+ add-to-request?]
+              <div className="flex min-w-0 items-center gap-3">
+                <span
+                  data-handle-anchor="label"
+                  className="flex min-w-0 shrink items-center truncate text-xs text-gray-500"
+                >
+                  {param.label}
+                  {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
+                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className={`text-[10px] font-medium ${!value ? "text-gray-600" : "text-gray-400"}`}>False</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!value}
+                    data-state={value ? "checked" : "unchecked"}
+                    disabled={disabled}
+                    onClick={() => updateInput(param.key, !value)}
+                    className={`nodrag peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                      value ? "bg-[#7C3AED]" : "bg-input bg-gray-200"
+                    }`}
+                  >
+                    <span
+                      data-state={value ? "checked" : "unchecked"}
+                      className="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
+                    />
+                  </button>
+                  <span className={`text-[10px] font-medium ${value ? "text-gray-600" : "text-gray-400"}`}>True</span>
+                </div>
+                {showAddToRequestBtn && (
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => handlePromoteInput(param)}
+                    className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Add to request inputs"
+                  >
+                    <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
+                  </button>
                 )}
               </div>
             )}
