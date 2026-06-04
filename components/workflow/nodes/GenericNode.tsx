@@ -809,7 +809,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     </span>
                   </button>
                   <input
-                    id={`file-input-${param.key}`}
+                    id={`file-input-${id}-${param.key}`}
                     type="file"
                     hidden
                     accept={accept}
@@ -825,7 +825,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <UploadPopup
                     open={activeUploadPopup === param.key}
                     onClose={() => setActiveUploadPopup(null)}
-                    onUpload={() => document.getElementById(`file-input-${param.key}`)?.click()}
+                    onUpload={() => document.getElementById(`file-input-${id}-${param.key}`)?.click()}
                   />
                 </div>
               )}
@@ -1788,7 +1788,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         </span>
                       </button>
                       <input
-                        id={`file-input-${param.key}`}
+                        id={`file-input-${id}-${param.key}`}
                         type="file"
                         disabled={disabled}
                         accept={
@@ -1810,7 +1810,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       <UploadPopup
                         open={activeUploadPopup === param.key}
                         onClose={() => setActiveUploadPopup(null)}
-                        onUpload={() => { const input = document.getElementById(`file-input-${param.key}`); if (input) (input as HTMLInputElement).click(); }}
+                        onUpload={() => { const input = document.getElementById(`file-input-${id}-${param.key}`); if (input) (input as HTMLInputElement).click(); }}
                       />
                     </div>
                   )}
@@ -2327,7 +2327,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             </span>
                           </button>
                           <input
-                            id={`file-input-${param.key}`}
+                            id={`file-input-${id}-${param.key}`}
                             type="file"
                             accept="image/*"
                             multiple
@@ -2348,7 +2348,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             onClose={() => setActiveUploadPopup(null)}
                             onUpload={() =>
                               document
-                                .getElementById(`file-input-${param.key}`)
+                                .getElementById(`file-input-${id}-${param.key}`)
                                 ?.click()
                             }
                           />
@@ -2495,7 +2495,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             </span>
                           </button>
                           <input
-                            id={`file-input-${param.key}`}
+                            id={`file-input-${id}-${param.key}`}
                             type="file"
                             accept="video/*"
                             multiple
@@ -2516,7 +2516,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             onClose={() => setActiveUploadPopup(null)}
                             onUpload={() =>
                               document
-                                .getElementById(`file-input-${param.key}`)
+                                .getElementById(`file-input-${id}-${param.key}`)
                                 ?.click()
                             }
                           />
@@ -2643,7 +2643,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             </span>
                           </button>
                           <input
-                            id={`file-input-${param.key}`}
+                            id={`file-input-${id}-${param.key}`}
                             type="file"
                             accept="audio/*,video/*"
                             multiple
@@ -2664,7 +2664,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             onClose={() => setActiveUploadPopup(null)}
                             onUpload={() =>
                               document
-                                .getElementById(`file-input-${param.key}`)
+                                .getElementById(`file-input-${id}-${param.key}`)
                                 ?.click()
                             }
                           />

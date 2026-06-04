@@ -5,7 +5,10 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { NodeParameter } from "@shashank519915/shared";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
-import { syncTargetFromRequestField } from "@/lib/promoted-input-value";
+import {
+  syncLinkedTargetInputFromField,
+  syncTargetFromRequestField,
+} from "@/lib/promoted-input-value";
 import { generateEdgeId } from "@/lib/utils";
 import type {
   RequestInputsData,
@@ -294,7 +297,8 @@ export function removeRequestFieldAndEdges(
   if (!req) return { nodes, edges };
   const reqData = req.data as unknown as RequestInputsData;
 
-  // Find the field before removing it so we can clear linked target inputs
+  // Snapshot the promoted field's value back onto the linked target so the
+  // local input is preserved (not cleared) once the request field is removed.
   const removedField = (reqData.fields ?? []).find((f) => f.id === fieldId);
 
   const fields = (reqData.fields ?? []).filter((f) => f.id !== fieldId);
@@ -302,27 +306,8 @@ export function removeRequestFieldAndEdges(
     n.id === requestNodeId ? { ...n, data: { ...reqData, fields } } : n
   );
 
-  // Clear the linked target's local input so stale values don't re-appear
   if (removedField?.linkedTarget) {
-    const { nodeId, handle } = removedField.linkedTarget;
-    const paramKey = handle.replace(/^in:/, "");
-    const isMediaArray =
-      removedField.type === "image_field" ||
-      removedField.type === "video_field" ||
-      removedField.type === "audio_field";
-    const isBoolean = removedField.type === "boolean_field";
-    const clearValue = isMediaArray ? [] : isBoolean ? false : undefined;
-    nextNodes = nextNodes.map((n) => {
-      if (n.id !== nodeId) return n;
-      const data = n.data as { inputs?: Record<string, unknown> };
-      const inputs = { ...(data.inputs ?? {}) };
-      if (clearValue === undefined) {
-        delete inputs[paramKey];
-      } else {
-        inputs[paramKey] = clearValue;
-      }
-      return { ...n, data: { ...data, inputs } };
-    });
+    nextNodes = syncLinkedTargetInputFromField(nextNodes, removedField);
   }
 
   const nextEdges = edges.filter((e) => e.sourceHandle !== fieldId);
