@@ -106,7 +106,7 @@ afterEach(() => {
   cleanup();
 });
 
-const promptPlaceholder = /describe the prompt you want to create/i;
+const promptPlaceholder = /enter your prompt/i;
 
 describe("GenericNode wired states", () => {
   it("shows upstream wired preview when prompt handle is connected", () => {
@@ -168,7 +168,7 @@ describe("GenericNode wired image-array", () => {
       source: "ri",
       target: "gem",
       sourceHandle: "field_image_1",
-      targetHandle: "in:images",
+      targetHandle: "in:image_urls",
     },
   ];
 
