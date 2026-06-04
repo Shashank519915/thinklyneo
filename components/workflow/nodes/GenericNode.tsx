@@ -6,7 +6,12 @@ import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { parseMediaList } from "@/lib/media-list";
 import { isLikelyVideoUrl } from "@shashank519915/shared";
-import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
+import {
+  classifyMediaUrl,
+  generateEdgeId,
+  resolvePropagatedEdgeValue,
+  sanitizeError,
+} from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import {
   getNodeRunBorderClass,
@@ -140,37 +145,71 @@ import {
 /** Side-by-side label + dropdown (Merge Videos transition, Extract Audio format). */
 function isCompactSelectParam(
   nodeType: string,
-  param: { key: string; type?: string }
+  param: { key: string; type?: string },
 ): boolean {
   return (
     param.type === "select" &&
-    (
-      param.key === "transition" ||
+    (param.key === "transition" ||
       (nodeType === "extractAudio" && param.key === "format") ||
-      (nodeType === "klingV3" && (param.key === "aspect_ratio" || param.key === "duration"))
-    )
+      (nodeType === "klingV3" &&
+        (param.key === "aspect_ratio" || param.key === "duration")))
   );
 }
 
 export default function GenericNode({ id, data, type }: NodeProps) {
-  const definition = DEFINITIONS[type as string] || DEFINITIONS[data.type as string] || DEFINITIONS[data.model as string] || cropImageDefinition;
+  const definition =
+    DEFINITIONS[type as string] ||
+    DEFINITIONS[data.type as string] ||
+    DEFINITIONS[data.model as string] ||
+    cropImageDefinition;
   const theme = getColorTheme(definition.color);
 
   const nodeData = data as any;
-  const { updateNodeData, deleteNode, setNodes, setEdges, edges, nodes, previewRunId, previewNodeOutputs, readOnly } =
-    useWorkflowStore();
-  const { isPreviewMode, isDimmed, isExecuting, isRunPending, isRunCompleted, isRunFailed, output, error } =
-    useNodePreview(id);
+  const {
+    updateNodeData,
+    deleteNode,
+    setNodes,
+    setEdges,
+    edges,
+    nodes,
+    previewRunId,
+    previewNodeOutputs,
+    readOnly,
+  } = useWorkflowStore();
+  const {
+    isPreviewMode,
+    isDimmed,
+    isExecuting,
+    isRunPending,
+    isRunCompleted,
+    isRunFailed,
+    output,
+    error,
+  } = useNodePreview(id);
 
   const nodeError = error as string | null;
   const isLocked = !!nodeData.locked;
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
+  // Elements array state for Kling v3 Image-to-Video
+  const [elementItems, setElementItems] = useState<Record<string, Record<string, string | string[]>>>(() => {
+    const saved = (nodeData.inputs as any)?.elements;
+    if (Array.isArray(saved) && saved.length > 0) {
+      return Object.fromEntries(saved.map((el: any, i: number) => [String(i), el]));
+    }
+    return {};
+  });
+  const [uploadingElementField, setUploadingElementField] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState<Record<string, boolean>>({});
-  const [activeUploadPopup, setActiveUploadPopup] = useState<string | null>(null);
+  const [activeUploadPopup, setActiveUploadPopup] = useState<string | null>(
+    null,
+  );
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
-  const [activeExpandParamKey, setActiveExpandParamKey] = useState<string | null>(null);
+  const [activeExpandParamKey, setActiveExpandParamKey] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!activeUploadPopup && !activeDropdown) return;
@@ -188,17 +227,28 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   }, [activeUploadPopup, activeDropdown]);
 
   const hasModeTab = type === "gptImage2" || type === "klingV3";
-  const modeLabels = type === "gptImage2" ? ["Text to Image", "Image to Image"] : ["Text to Video", "Image to Video"];
-  const [modeTab, setModeTab] = useState<"text" | "image" >(() => 
-    (nodeData.inputs?.inputImage || (nodeData.inputs?.uploadedImages && nodeData.inputs.uploadedImages.length > 0)) ? "image" : "text"
+  const modeLabels =
+    type === "gptImage2"
+      ? ["Text to Image", "Image to Image"]
+      : ["Text to Video", "Image to Video"];
+  const [modeTab, setModeTab] = useState<"text" | "image">(() =>
+    nodeData.inputs?.inputImage ||
+    (nodeData.inputs?.inputImage as any)?.start_image_url ||
+    (nodeData.inputs as any)?.start_image_url ||
+    (nodeData.inputs?.uploadedImages &&
+      nodeData.inputs.uploadedImages.length > 0)
+      ? "image"
+      : "text",
   );
 
   const connectedTargets = new Set(
-    (edges ?? []).filter((e) => e.target === id).map((e) => e.targetHandle)
+    (edges ?? []).filter((e) => e.target === id).map((e) => e.targetHandle),
   );
 
   const edgeResolveOpts =
-    previewRunId !== null ? { previewOutputsByNodeId: previewNodeOutputs } : undefined;
+    previewRunId !== null
+      ? { previewOutputsByNodeId: previewNodeOutputs }
+      : undefined;
 
   const updateInput = (key: string, val: any) => {
     if (isLocked || readOnly) return;
@@ -222,14 +272,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
   const handleSingleRun = () => {
     window.dispatchEvent(
-      new CustomEvent("nextflow:run-node", { detail: { nodeId: id } })
+      new CustomEvent("nextflow:run-node", { detail: { nodeId: id } }),
     );
   };
 
   const handleReset = () => {
     const defaultInputs: Record<string, any> = {};
     definition.inputs.forEach((param) => {
-      defaultInputs[param.key] = param.defaultValue !== undefined ? param.defaultValue : null;
+      defaultInputs[param.key] =
+        param.defaultValue !== undefined ? param.defaultValue : null;
     });
     updateNodeData(id, {
       inputs: defaultInputs,
@@ -243,13 +294,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       nodes.map((n) =>
         n.id === id
           ? {
-               ...n,
-               draggable: !nextLocked,
-               selected: nextLocked ? false : n.selected,
-               data: { ...n.data, locked: nextLocked },
-             }
-          : n
-      )
+              ...n,
+              draggable: !nextLocked,
+              selected: nextLocked ? false : n.selected,
+              data: { ...n.data, locked: nextLocked },
+            }
+          : n,
+      ),
     );
   };
 
@@ -264,7 +315,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       selected: true,
       data: JSON.parse(JSON.stringify(thisNode.data)),
     };
-    setNodes([...nodes.map((n) => n.id === id ? { ...n, selected: false } : n), newNode]);
+    setNodes([
+      ...nodes.map((n) => (n.id === id ? { ...n, selected: false } : n)),
+      newNode,
+    ]);
   };
 
   const handleDuplicateWithEdges = () => {
@@ -278,7 +332,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       selected: true,
       data: JSON.parse(JSON.stringify(thisNode.data)),
     };
-    setNodes([...nodes.map((n) => n.id === id ? { ...n, selected: false } : n), newNode]);
+    setNodes([
+      ...nodes.map((n) => (n.id === id ? { ...n, selected: false } : n)),
+      newNode,
+    ]);
     const incomingEdges = edges.filter((e) => e.target === id);
     const newEdges = incomingEdges.map((e) => ({
       ...e,
@@ -288,7 +345,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     setEdges([...edges, ...newEdges]);
   };
 
-  const handleFileUpload = async (key: string, files: FileList | null, isArray = false) => {
+  const handleFileUpload = async (
+    key: string,
+    files: FileList | null,
+    isArray = false,
+  ) => {
     if (!files?.length || isLocked || readOnly) return;
     setUploadingField(key);
 
@@ -306,7 +367,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         filesToUpload = filesToUpload.slice(0, remaining);
       }
 
-      const { urls: validUrls, firstError } = await uploadFilesViaApi(filesToUpload);
+      const { urls: validUrls, firstError } =
+        await uploadFilesViaApi(filesToUpload);
       if (firstError) {
         window.alert(firstError);
       }
@@ -318,7 +380,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
         if (isArray) {
           const arr = currentInputs[key] || [];
-          const cleanArr = arr.filter((url: string) => !url.startsWith("data:"));
+          const cleanArr = arr.filter(
+            (url: string) => !url.startsWith("data:"),
+          );
           updateInput(key, [...cleanArr, ...validUrls].slice(0, 10));
         } else {
           updateInput(key, validUrls[0]);
@@ -345,11 +409,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     }) => {
       if (readOnly || isLocked) return;
       const handleId = `in:${param.key}`;
-      const limit = definition.limits?.[param.key as keyof typeof definition.limits];
+      const limit =
+        definition.limits?.[param.key as keyof typeof definition.limits];
       let mediaMaxCount = limit?.maxCount;
       if (mediaMaxCount == null) {
         if (param.key === "video_url" || param.handle?.type === "video") {
-          mediaMaxCount = param.type === "video-array" || param.key === "video_urls" ? 10 : 1;
+          mediaMaxCount =
+            param.type === "video-array" || param.key === "video_urls" ? 10 : 1;
         } else if (param.type === "image-array" || param.key === "images") {
           mediaMaxCount = 10;
         }
@@ -378,7 +444,17 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       setNodes(result.nodes);
       setEdges(result.edges);
     },
-    [readOnly, isLocked, nodes, edges, id, nodeData.inputs, setNodes, setEdges, definition]
+    [
+      readOnly,
+      isLocked,
+      nodes,
+      edges,
+      id,
+      nodeData.inputs,
+      setNodes,
+      setEdges,
+      definition,
+    ],
   );
 
   const removeFileValue = (key: string, indexToRemove?: number) => {
@@ -396,9 +472,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const renderParameterInput = (param: any) => {
     const handleId = `in:${param.key}`;
     const isWired = connectedTargets.has(handleId);
-    const requestPromoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
-    // boolean and crop-overlay-preview params stay in their own layout even when wired — no upstream panel
-    const showUpstreamPanel = isWired && !requestPromoted && param.uiVariant !== "crop-overlay-preview" && param.type !== "boolean";
+    const requestPromoted = isRequestPromoted(
+      nodes ?? [],
+      edges ?? [],
+      id,
+      handleId,
+    );
+    // boolean and crop-overlay-preview/kling-image-upload params stay in their own layout even when wired — no upstream panel
+    const showUpstreamPanel =
+      isWired &&
+      !requestPromoted &&
+      param.uiVariant !== "crop-overlay-preview" &&
+      param.uiVariant !== "kling-image-upload" &&
+      param.type !== "boolean" &&
+      param.type !== "element-array";
     const showAddToRequestBtn = shouldShowAddToRequest({
       hasHandle: !!param.handle,
       readOnly,
@@ -426,27 +513,48 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           : (rawValue ?? param.defaultValue ?? "");
 
     // Hide inputImage and uploadedImages if mode is text
-    if ((param.key === "inputImage" || param.key === "uploadedImages") && hasModeTab && modeTab === "text") return null;
+    if (
+      (param.key === "inputImage" || param.key === "uploadedImages") &&
+      hasModeTab &&
+      modeTab === "text"
+    )
+      return null;
 
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
     if (isWired) {
       if (isCompactSelectParam(definition.type, param)) {
-        const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
+        const inboundEdge = (edges ?? []).find(
+          (e) => e.target === id && e.targetHandle === handleId,
+        );
         if (inboundEdge) {
-          wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
+          wiredValue = resolvePropagatedEdgeValue(
+            inboundEdge,
+            nodes ?? [],
+            edgeResolveOpts,
+          );
         }
       } else if (param.type === "image-array" || param.type === "video-array") {
-        const inboundEdges = (edges ?? []).filter((e) => e.target === id && e.targetHandle === handleId);
+        const inboundEdges = (edges ?? []).filter(
+          (e) => e.target === id && e.targetHandle === handleId,
+        );
         if (inboundEdges.length > 0) {
           wiredValue = inboundEdges
-            .map((e) => resolvePropagatedEdgeValue(e, nodes ?? [], edgeResolveOpts))
+            .map((e) =>
+              resolvePropagatedEdgeValue(e, nodes ?? [], edgeResolveOpts),
+            )
             .filter((v) => v !== undefined && v !== null);
         }
       } else {
-        const inboundEdge = (edges ?? []).find((e) => e.target === id && e.targetHandle === handleId);
+        const inboundEdge = (edges ?? []).find(
+          (e) => e.target === id && e.targetHandle === handleId,
+        );
         if (inboundEdge) {
-          wiredValue = resolvePropagatedEdgeValue(inboundEdge, nodes ?? [], edgeResolveOpts);
+          wiredValue = resolvePropagatedEdgeValue(
+            inboundEdge,
+            nodes ?? [],
+            edgeResolveOpts,
+          );
         }
       }
     }
@@ -454,7 +562,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const disabled = readOnly || isLocked || requestPromoted;
     const expanded = !!isExpanded[param.key];
 
-    if (definition.type === "mergeAV" && param.uiVariant === "magica-volume-row") {
+    if (
+      definition.type === "mergeAV" &&
+      param.uiVariant === "magica-volume-row"
+    ) {
       const vol =
         value !== "" && value !== null && value !== undefined
           ? Number(value)
@@ -464,7 +575,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           {param.handle && (
             <div
               className="absolute flex items-center"
-              style={{ left: "-22px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+              style={{
+                left: "-22px",
+                top: "14px",
+                transform: "translateY(-50%)",
+                zIndex: 50,
+              }}
             >
               <Handle
                 type="target"
@@ -490,7 +606,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 className="flex min-w-0 shrink items-center text-xs text-gray-500"
               >
                 <span className="truncate">{param.label}</span>
-                {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
+                {param.tooltip ? (
+                  <FieldInfoTooltip text={param.tooltip} />
+                ) : null}
               </span>
               <input
                 type="range"
@@ -515,11 +633,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => updateInput(param.key, param.defaultValue ?? 0.5)}
+                onClick={() =>
+                  updateInput(param.key, param.defaultValue ?? 0.5)
+                }
                 className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 title="Reset to default"
               >
-                <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                <LucideIcons.RotateCcw
+                  className="h-3.5 w-3.5"
+                  aria-hidden="true"
+                />
               </button>
               {showAddToRequestBtn && (
                 <div className="ml-auto shrink-0">
@@ -535,7 +658,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       );
     }
 
-    if (definition.type === "mergeAV" && param.uiVariant === "magica-side-label") {
+    if (
+      definition.type === "mergeAV" &&
+      param.uiVariant === "magica-side-label"
+    ) {
       const isVideoField = param.key === "video_url";
       /** Any inbound wire (upstream node or Request-Inputs) — mirrors Crop Image `isInputWired`. */
       const isMediaWired = isWired;
@@ -546,11 +672,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           : wiredValue
         : value;
       const mediaUrls = parseMediaList(mediaSource);
-      const videoUrls = isVideoField ? mediaUrls.filter(isLikelyVideoUrl) : mediaUrls;
-      const displayUrls = isVideoField && videoUrls.length > 0 ? videoUrls : mediaUrls;
+      const videoUrls = isVideoField
+        ? mediaUrls.filter(isLikelyVideoUrl)
+        : mediaUrls;
+      const displayUrls =
+        isVideoField && videoUrls.length > 0 ? videoUrls : mediaUrls;
       const primaryUrl = displayUrls[0];
       const multiVideoRejected =
-        isVideoField && isMediaWired && (videoUrls.length > 1 || mediaUrls.length > 1);
+        isVideoField &&
+        isMediaWired &&
+        (videoUrls.length > 1 || mediaUrls.length > 1);
       const accept =
         param.key === "video_url"
           ? "video/*"
@@ -568,7 +699,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           {param.handle && (
             <div
               className="absolute flex items-center"
-              style={{ left: "-22px", top: "12px", transform: "translateY(-50%)", zIndex: 50 }}
+              style={{
+                left: "-22px",
+                top: "12px",
+                transform: "translateY(-50%)",
+                zIndex: 50,
+              }}
             >
               <Handle
                 type="target"
@@ -614,7 +750,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     }
                     onClick={() => {
                       if (canEditLocally) {
-                        document.getElementById(`file-input-${param.key}`)?.click();
+                        document
+                          .getElementById(`file-input-${param.key}`)
+                          ?.click();
                       }
                     }}
                     className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -646,9 +784,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     accept={accept}
                     disabled={!canEditLocally}
                     onChange={(e) => {
-                      void handleFileUpload(param.key, e.target.files).finally(() => {
-                        e.target.value = "";
-                      });
+                      void handleFileUpload(param.key, e.target.files).finally(
+                        () => {
+                          e.target.value = "";
+                        },
+                      );
                     }}
                   />
                 </div>
@@ -665,7 +805,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           </div>
           {multiVideoRejected && (
             <p className="mt-2 text-[11px] text-amber-600">
-              Only one video is allowed. Use Merge Videos to combine multiple clips.
+              Only one video is allowed. Use Merge Videos to combine multiple
+              clips.
             </p>
           )}
           {primaryUrl && !multiVideoRejected && (
@@ -723,14 +864,21 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       <div
         key={param.key}
         className={`relative overflow-visible transition-opacity ${
-          requestPromoted && !isLocked ? "opacity-60 bg-gray-50/50 rounded-lg p-1" : ""
+          requestPromoted && !isLocked
+            ? "opacity-60 bg-gray-50/50 rounded-lg p-1"
+            : ""
         }`}
       >
         {/* Render Handle if specified */}
         {param.handle && (
           <div
             className="absolute flex items-center"
-            style={{ left: "-22px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+            style={{
+              left: "-22px",
+              top: "14px",
+              transform: "translateY(-50%)",
+              zIndex: 50,
+            }}
           >
             <Handle
               type="target"
@@ -750,193 +898,290 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           </div>
         )}
 
-        {(param.type !== "image-array" && param.type !== "video-array" || isWired) &&
+        {((param.type !== "image-array" && param.type !== "video-array") ||
+          isWired) &&
           !isCompactSelectParam(definition.type, param) &&
           param.uiVariant !== "magica-side-label" &&
           param.uiVariant !== "magica-volume-row" &&
           param.uiVariant !== "crop-overlay-preview" &&
+          param.uiVariant !== "kling-image-upload" &&
           param.type !== "slider" &&
-          param.type !== "boolean" && (
-          <div
-            data-handle-anchor="label"
-            className="mb-1.5 flex items-center text-xs text-gray-500"
-          >
-            <span>{param.label}</span>
-            {param.required && <span className="text-red-400 ml-0.5">*</span>}
-            {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
-            {param.handle && (
-              <span className="ml-auto">
-                {showAddToRequestBtn && (
-                  <AddToRequestToggle
-                    disabled={isLocked}
-                    onPromote={() => handlePromoteInput(param)}
-                  />
-                )}
-              </span>
-            )}
-          </div>
-        )}
+          param.type !== "boolean" &&
+          param.type !== "element-array" && (
+            <div
+              data-handle-anchor="label"
+              className="mb-1.5 flex items-center text-xs text-gray-500"
+            >
+              <span>{param.label}</span>
+              {param.required && <span className="text-red-400 ml-0.5">*</span>}
+              {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
+              {param.handle && (
+                <span className="ml-auto">
+                  {showAddToRequestBtn && (
+                    <AddToRequestToggle
+                      disabled={isLocked}
+                      onPromote={() => handlePromoteInput(param)}
+                    />
+                  )}
+                </span>
+              )}
+            </div>
+          )}
 
         {/* Dynamic Controls based on type */}
-        {showUpstreamPanel ? (() => {
-          const wiredIsMedia =
-            param.type === "image-array" ||
-            param.type === "video-array" ||
-            param.type === "file-upload" ||
-            param.handle?.type === "image" ||
-            param.handle?.type === "video" ||
-            param.handle?.type === "audio" ||
-            param.handle?.type === "file" ||
-            (typeof wiredValue === "string" && wiredValue.length > 0 && classifyMediaUrl(wiredValue) !== null);
+        {showUpstreamPanel ? (
+          (() => {
+            const wiredIsMedia =
+              param.type === "image-array" ||
+              param.type === "video-array" ||
+              param.type === "file-upload" ||
+              param.handle?.type === "image" ||
+              param.handle?.type === "video" ||
+              param.handle?.type === "audio" ||
+              param.handle?.type === "file" ||
+              (typeof wiredValue === "string" &&
+                wiredValue.length > 0 &&
+                classifyMediaUrl(wiredValue) !== null);
 
-          return (
-          <div className={`nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] text-[13px] ${wiredIsMedia ? "input-connected-media" : "input-connected"}`}>
-            <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
-              Connected upstream
-            </p>
-            {param.type === "image-array" || param.type === "video-array" ? (() => {
-              const mediaUrls = parseMediaList(wiredValue);
-              const isVideo = param.type === "video-array";
+            return (
+              <div
+                className={`nodrag rounded-lg border border-gray-100 bg-[#FAFAFB] px-3 py-2 min-h-[3rem] text-[13px] ${wiredIsMedia ? "input-connected-media" : "input-connected"}`}
+              >
+                <p className="text-[9px] font-medium uppercase tracking-wide text-gray-400 mb-1">
+                  Connected upstream
+                </p>
+                {param.type === "image-array" ||
+                param.type === "video-array" ? (
+                  (() => {
+                    const mediaUrls = parseMediaList(wiredValue);
+                    const isVideo = param.type === "video-array";
 
-              if (mediaUrls.length > 0) {
-                return (
-                  <div className="flex flex-col gap-2 mt-1">
-                    <div className={`grid gap-2 ${isVideo ? "grid-cols-2" : "flex flex-wrap"}`}>
-                      {mediaUrls.map((url, idx) => (
-                        <div
-                          key={idx}
-                          className={`relative overflow-hidden bg-white ${isVideo ? "rounded-lg" : "w-12 h-12 rounded"}`}
-                          style={{
-                            border: isVideo
-                              ? "2px solid rgba(34, 197, 94, 0.3)"
-                              : "2px solid rgba(59, 130, 246, 0.3)",
-                            aspectRatio: isVideo ? "4 / 3" : undefined,
-                          }}
-                        >
-                          {isVideo ? (
-                            <video src={url} className="w-full h-full object-cover" preload="metadata" playsInline />
-                          ) : (
-                            <img src={url} alt={`preview-${idx}`} className="w-full h-full object-cover" />
+                    if (mediaUrls.length > 0) {
+                      return (
+                        <div className="flex flex-col gap-2 mt-1">
+                          <div
+                            className={`grid gap-2 ${isVideo ? "grid-cols-2" : "flex flex-wrap"}`}
+                          >
+                            {mediaUrls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className={`relative overflow-hidden bg-white ${isVideo ? "rounded-lg" : "w-12 h-12 rounded"}`}
+                                style={{
+                                  border: isVideo
+                                    ? "2px solid rgba(34, 197, 94, 0.3)"
+                                    : "2px solid rgba(59, 130, 246, 0.3)",
+                                  aspectRatio: isVideo ? "4 / 3" : undefined,
+                                }}
+                              >
+                                {isVideo ? (
+                                  <video
+                                    src={url}
+                                    className="w-full h-full object-cover"
+                                    preload="metadata"
+                                    playsInline
+                                  />
+                                ) : (
+                                  <img
+                                    src={url}
+                                    alt={`preview-${idx}`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {!isVideo && (
+                            <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
+                              {mediaUrls.map((url, idx) => (
+                                <a
+                                  key={idx}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="truncate text-[10px] text-blue-500 hover:underline font-mono"
+                                >
+                                  {url}
+                                </a>
+                              ))}
+                            </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                    {!isVideo && (
-                      <div className="flex flex-col gap-1 max-h-20 overflow-y-auto">
-                        {mediaUrls.map((url, idx) => (
-                          <a
-                            key={idx}
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="truncate text-[10px] text-blue-500 hover:underline font-mono"
-                          >
-                            {url}
-                          </a>
-                        ))}
+                      );
+                    }
+                    return (
+                      <span className="italic text-xs text-gray-400">
+                        {isVideo
+                          ? "Waiting for videos..."
+                          : "Waiting for images..."}
+                      </span>
+                    );
+                  })()
+                ) : param.type === "file-upload" ||
+                  param.handle?.type === "image" ||
+                  param.handle?.type === "video" ||
+                  param.handle?.type === "audio" ||
+                  param.handle?.type === "file" ? (
+                  (() => {
+                    const mediaUrls = parseMediaList(wiredValue);
+                    const primaryUrl = mediaUrls[0];
+                    const wiredStr =
+                      typeof wiredValue === "string"
+                        ? wiredValue
+                        : (primaryUrl ?? "");
+
+                    if (!primaryUrl) {
+                      return (
+                        <span className="italic text-xs text-gray-400">
+                          Waiting for file URL...
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <div className="mt-2">
+                        {/* Audio handle type check FIRST — mp4 files in audio fields must render as <audio> */}
+                        {param.handle?.type === "audio" ||
+                        wiredStr.endsWith(".mp3") ||
+                        wiredStr.endsWith(".wav") ||
+                        wiredStr.endsWith(".ogg") ||
+                        wiredStr.endsWith(".m4a") ? (
+                          <div className="flex flex-col gap-2">
+                            {mediaUrls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className="relative inline-block w-full"
+                              >
+                                <audio
+                                  src={url}
+                                  controls
+                                  preload="metadata"
+                                  className="nodrag w-full"
+                                  style={{ minWidth: 160 }}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        ) : param.handle?.type === "video" ||
+                          mediaUrls.some((u) =>
+                            /\.(mp4|webm|mov)(\?|$)/i.test(u),
+                          ) ? (
+                          mediaUrls.length > 1 ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              {mediaUrls.map((url, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative w-full overflow-hidden rounded-md"
+                                  style={{
+                                    border: "2px solid rgba(34, 197, 94, 0.3)",
+                                  }}
+                                >
+                                  <video
+                                    src={url}
+                                    controls
+                                    preload="metadata"
+                                    className="nodrag w-full rounded-sm"
+                                    style={{ maxHeight: 120 }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div
+                              className="relative w-full max-w-[260px] overflow-hidden rounded-md"
+                              style={{
+                                border: "2px solid rgba(34, 197, 94, 0.3)",
+                              }}
+                            >
+                              <video
+                                src={primaryUrl}
+                                controls
+                                preload="metadata"
+                                className="nodrag w-full rounded-sm"
+                                style={{ maxHeight: 160 }}
+                              />
+                            </div>
+                          )
+                        ) : param.handle?.type === "image" ||
+                          primaryUrl.startsWith("data:image") ||
+                          /\.(jpeg|jpg|gif|png|webp)(\?|$)/i.test(
+                            primaryUrl,
+                          ) ? (
+                          mediaUrls.length > 1 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {mediaUrls.map((url, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative max-w-[100px] overflow-hidden rounded-md"
+                                  style={{
+                                    border: "2px solid rgba(59, 130, 246, 0.3)",
+                                  }}
+                                >
+                                  <img
+                                    src={url}
+                                    alt={`Inbound preview ${idx + 1}`}
+                                    className="nodrag w-full h-full object-cover"
+                                    style={{ maxHeight: 100 }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div
+                              className="relative max-w-[200px] overflow-hidden rounded-md"
+                              style={{
+                                border: "2px solid rgba(59, 130, 246, 0.3)",
+                              }}
+                            >
+                              <img
+                                src={primaryUrl}
+                                alt="Inbound preview"
+                                className="nodrag w-full h-full object-cover"
+                                style={{ maxHeight: 140 }}
+                              />
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {mediaUrls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]"
+                                style={{
+                                  border: "2px solid rgba(168, 85, 247, 0.3)",
+                                }}
+                              >
+                                <LucideIcons.FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                <span className="truncate text-xs text-gray-600 font-mono">
+                                  {url.split("/").pop() || "Document"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    );
+                  })()
+                ) : (
+                  <div className="max-h-[120px] overflow-y-auto nowheel whitespace-pre-wrap break-words text-xs leading-normal text-gray-500">
+                    {wiredValue !== null && wiredValue !== undefined
+                      ? String(wiredValue)
+                      : "Waiting for upstream value..."}
                   </div>
-                );
-              }
-              return (
-                <span className="italic text-xs text-gray-400">
-                  {isVideo ? "Waiting for videos..." : "Waiting for images..."}
-                </span>
-              );
-            })() : param.type === "file-upload" || param.handle?.type === "image" || param.handle?.type === "video" || param.handle?.type === "audio" || param.handle?.type === "file" ? (
-              (() => {
-                const mediaUrls = parseMediaList(wiredValue);
-                const primaryUrl = mediaUrls[0];
-                const wiredStr = typeof wiredValue === "string" ? wiredValue : primaryUrl ?? "";
-
-                if (!primaryUrl) {
-                  return (
-                    <span className="italic text-xs text-gray-400">Waiting for file URL...</span>
-                  );
-                }
-
-                return (
-                <div className="mt-2">
-                  {/* Audio handle type check FIRST — mp4 files in audio fields must render as <audio> */}
-                  {param.handle?.type === "audio" || (wiredStr.endsWith(".mp3") || wiredStr.endsWith(".wav") || wiredStr.endsWith(".ogg") || wiredStr.endsWith(".m4a")) ? (
-                    <div className="flex flex-col gap-2">
-                      {mediaUrls.map((url, idx) => (
-                        <div key={idx} className="relative inline-block w-full">
-                          <audio src={url} controls preload="metadata" className="nodrag w-full" style={{ minWidth: 160 }} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : param.handle?.type === "video" || mediaUrls.some((u) => /\.(mp4|webm|mov)(\?|$)/i.test(u)) ? (
-                    mediaUrls.length > 1 ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        {mediaUrls.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative w-full overflow-hidden rounded-md"
-                            style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}
-                          >
-                            <video src={url} controls preload="metadata" className="nodrag w-full rounded-sm" style={{ maxHeight: 120 }} />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="relative w-full max-w-[260px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(34, 197, 94, 0.3)" }}>
-                        <video src={primaryUrl} controls preload="metadata" className="nodrag w-full rounded-sm" style={{ maxHeight: 160 }} />
-                      </div>
-                    )
-                  ) : param.handle?.type === "image" || primaryUrl.startsWith("data:image") || /\.(jpeg|jpg|gif|png|webp)(\?|$)/i.test(primaryUrl) ? (
-                    mediaUrls.length > 1 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {mediaUrls.map((url, idx) => (
-                          <div
-                            key={idx}
-                            className="relative max-w-[100px] overflow-hidden rounded-md"
-                            style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}
-                          >
-                            <img src={url} alt={`Inbound preview ${idx + 1}`} className="nodrag w-full h-full object-cover" style={{ maxHeight: 100 }} />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="relative max-w-[200px] overflow-hidden rounded-md" style={{ border: "2px solid rgba(59, 130, 246, 0.3)" }}>
-                        <img src={primaryUrl} alt="Inbound preview" className="nodrag w-full h-full object-cover" style={{ maxHeight: 140 }} />
-                      </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      {mediaUrls.map((url, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white max-w-[240px]"
-                          style={{ border: "2px solid rgba(168, 85, 247, 0.3)" }}
-                        >
-                          <LucideIcons.FileText className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                          <span className="truncate text-xs text-gray-600 font-mono">
-                            {url.split("/").pop() || "Document"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                );
-              })()
-            ) : (
-              <div className="max-h-[120px] overflow-y-auto nowheel whitespace-pre-wrap break-words text-xs leading-normal text-gray-500">
-                {wiredValue !== null && wiredValue !== undefined ? String(wiredValue) : "Waiting for upstream value..."}
+                )}
               </div>
-            )}
-          </div>
-          );
-        })() : (
+            );
+          })()
+        ) : (
           <div className="relative">
             {param.type === "textarea" && (
               <div className="space-y-1">
                 <div className="relative">
                   <textarea
                     rows={3}
-                    placeholder={param.placeholder || `Describe the ${param.label.toLowerCase()} you want to create...`}
+                    placeholder={
+                      param.placeholder ||
+                      `Describe the ${param.label.toLowerCase()} you want to create...`
+                    }
                     value={value}
                     onChange={(e) => updateInput(param.key, e.target.value)}
                     disabled={disabled}
@@ -952,7 +1197,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   </button>
                 </div>
                 <div className="mt-1 text-right text-[10px] tabular-nums text-gray-400">
-                  {value ? String(value).length : 0}/{definition.limits?.[param.key]?.maxLength ?? 4000}
+                  {value ? String(value).length : 0}/
+                  {definition.limits?.[param.key]?.maxLength ?? 4000}
                 </div>
               </div>
             )}
@@ -997,7 +1243,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     max={param.max ?? 100}
                     step={param.step ?? 1}
                     value={value !== "" ? value : (param.defaultValue ?? 0)}
-                    onChange={(e) => updateInput(param.key, Number(e.target.value))}
+                    onChange={(e) =>
+                      updateInput(param.key, Number(e.target.value))
+                    }
                     disabled={disabled || isWired}
                     className="nodrag nowheel h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 accent-[#7C3AED] disabled:opacity-50"
                   />
@@ -1006,11 +1254,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     min={param.min ?? 0}
                     max={param.max ?? 100}
                     step={param.step ?? 1}
-                    value={Number(value !== "" ? value : (param.defaultValue ?? 0)).toFixed(param.step && param.step < 1 ? 2 : 0)}
+                    value={Number(
+                      value !== "" ? value : (param.defaultValue ?? 0),
+                    ).toFixed(param.step && param.step < 1 ? 2 : 0)}
                     onChange={(e) => {
                       const n = parseFloat(e.target.value);
                       if (!Number.isFinite(n)) return;
-                      const clamped = Math.min(param.max ?? 100, Math.max(param.min ?? 0, n));
+                      const clamped = Math.min(
+                        param.max ?? 100,
+                        Math.max(param.min ?? 0, n),
+                      );
                       updateInput(param.key, clamped);
                     }}
                     disabled={disabled || isWired}
@@ -1019,11 +1272,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <button
                     type="button"
                     disabled={disabled}
-                    onClick={() => updateInput(param.key, param.defaultValue ?? 0)}
+                    onClick={() =>
+                      updateInput(param.key, param.defaultValue ?? 0)
+                    }
                     className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-400 hover:text-gray-600 disabled:opacity-50"
                     title={`Reset ${param.label} to default`}
                   >
-                    <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                    <LucideIcons.RotateCcw
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />
                   </button>
                   {showAddToRequestBtn && (
                     <button
@@ -1032,7 +1290,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       onClick={() => handlePromoteInput(param)}
                       className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
+                      <LucideIcons.Plus
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
                     </button>
                   )}
                 </div>
@@ -1053,7 +1314,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     className="flex min-w-0 shrink items-center gap-1 text-xs text-gray-500"
                   >
                     <span className="truncate">{param.label}</span>
-                    {param.tooltip ? <FieldInfoTooltip text={param.tooltip} /> : null}
+                    {param.tooltip ? (
+                      <FieldInfoTooltip text={param.tooltip} />
+                    ) : null}
                   </span>
                 )}
                 <div
@@ -1063,62 +1326,76 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       : ""
                   }`}
                 >
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => setActiveDropdown(activeDropdown === param.key ? null : param.key)}
-                  className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer nodrag"
-                >
-                  <span className="truncate">
-                    {param.options?.find((opt: any) => opt.value === value)?.label || value || "Select option..."}
-                  </span>
-                  <LucideIcons.ChevronDown className="h-4 w-4 text-gray-500 opacity-50 shrink-0" aria-hidden="true" />
-                </button>
-
-                {/* Dropdown Menu Popup */}
-                {activeDropdown === param.key && (
-                  <div className="absolute left-0 top-full mt-1.5 z-50 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl text-left">
-                    {param.key === "size" && (
-                      <div className="text-[10px] text-gray-400 font-semibold px-4 py-1.5 uppercase tracking-wider select-none">
-                        Custom
-                      </div>
-                    )}
-                    <div className="max-h-[260px] overflow-y-auto nowheel flex flex-col gap-0.5">
-                      {param.options?.map((opt: any) => {
-                        const isSelected = opt.value === value;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => {
-                              updateInput(param.key, opt.value);
-                              setActiveDropdown(null);
-                            }}
-                            className={`flex items-center gap-1.5 w-full px-3 py-2 text-[13px] font-medium transition-colors rounded-xl text-left ${
-                              isSelected
-                                ? "bg-gray-100/60 text-gray-900"
-                                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                            }`}
-                          >
-                            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                              {isSelected && <LucideIcons.Check className="w-3.5 h-3.5 text-gray-900 stroke-[2.5]" />}
-                            </span>
-                            <span className="truncate">{opt.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                </div>
-                {isCompactSelectParam(definition.type, param) && param.handle && showAddToRequestBtn && (
-                  <div className="ml-auto shrink-0">
-                    <AddToRequestToggle
-                      disabled={isLocked}
-                      onPromote={() => handlePromoteInput(param)}
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() =>
+                      setActiveDropdown(
+                        activeDropdown === param.key ? null : param.key,
+                      )
+                    }
+                    className="flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer nodrag"
+                  >
+                    <span className="truncate">
+                      {param.options?.find((opt: any) => opt.value === value)
+                        ?.label ||
+                        value ||
+                        "Select option..."}
+                    </span>
+                    <LucideIcons.ChevronDown
+                      className="h-4 w-4 text-gray-500 opacity-50 shrink-0"
+                      aria-hidden="true"
                     />
-                  </div>
-                )}
+                  </button>
+
+                  {/* Dropdown Menu Popup */}
+                  {activeDropdown === param.key && (
+                    <div className="absolute left-0 top-full mt-1.5 z-50 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl text-left">
+                      {param.key === "size" && (
+                        <div className="text-[10px] text-gray-400 font-semibold px-4 py-1.5 uppercase tracking-wider select-none">
+                          Custom
+                        </div>
+                      )}
+                      <div className="max-h-[260px] overflow-y-auto nowheel flex flex-col gap-0.5">
+                        {param.options?.map((opt: any) => {
+                          const isSelected = opt.value === value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                updateInput(param.key, opt.value);
+                                setActiveDropdown(null);
+                              }}
+                              className={`flex items-center gap-1.5 w-full px-3 py-2 text-[13px] font-medium transition-colors rounded-xl text-left ${
+                                isSelected
+                                  ? "bg-gray-100/60 text-gray-900"
+                                  : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                              }`}
+                            >
+                              <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                                {isSelected && (
+                                  <LucideIcons.Check className="w-3.5 h-3.5 text-gray-900 stroke-[2.5]" />
+                                )}
+                              </span>
+                              <span className="truncate">{opt.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {isCompactSelectParam(definition.type, param) &&
+                  param.handle &&
+                  showAddToRequestBtn && (
+                    <div className="ml-auto shrink-0">
+                      <AddToRequestToggle
+                        disabled={isLocked}
+                        onPromote={() => handlePromoteInput(param)}
+                      />
+                    </div>
+                  )}
               </div>
             )}
 
@@ -1133,7 +1410,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <span className={`text-[10px] font-medium ${!value ? "text-gray-600" : "text-gray-400"}`}>False</span>
+                  <span
+                    className={`text-[10px] font-medium ${!value ? "text-gray-600" : "text-gray-400"}`}
+                  >
+                    False
+                  </span>
                   <button
                     type="button"
                     role="switch"
@@ -1150,7 +1431,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       className="pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0"
                     />
                   </button>
-                  <span className={`text-[10px] font-medium ${value ? "text-gray-600" : "text-gray-400"}`}>True</span>
+                  <span
+                    className={`text-[10px] font-medium ${value ? "text-gray-600" : "text-gray-400"}`}
+                  >
+                    True
+                  </span>
                 </div>
                 {showAddToRequestBtn && (
                   <button
@@ -1166,221 +1451,721 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               </div>
             )}
 
-            {param.type === "file-upload" && param.uiVariant === "crop-overlay-preview" && (
-              // Crop image: single-line layout — [label] [upload button flex-1] [+ add-to-request?]
-              // Add-to-request is only shown when not wired (same rule as other params).
-              <div className="flex items-center gap-2">
-                <span
-                  data-handle-anchor="label"
-                  className="shrink-0 text-xs text-gray-500"
-                >
-                  {param.label}
-                  {param.required && <span className="text-red-400">*</span>}
-                </span>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  disabled={isWired || disabled}
-                  onClick={() => {
-                    if (!isWired && !disabled) {
-                      document.getElementById(`file-input-crop-${id}-${param.key}`)?.click();
-                    }
-                  }}
-                  className="nodrag flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                  title={isWired ? "Image is supplied by an upstream connection" : value ? "Change image" : "Upload image"}
-                >
-                  {uploadingField === param.key ? (
-                    <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <LucideIcons.Upload className="w-3.5 h-3.5" />
-                  )}
-                  <span className="capitalize">
-                    {uploadingField === param.key ? "Uploading..." : value ? "Change image" : "Upload image"}
+            {param.type === "file-upload" &&
+              param.uiVariant === "crop-overlay-preview" && (
+                // Crop image: single-line layout — [label] [upload button flex-1] [+ add-to-request?]
+                // Add-to-request is only shown when not wired (same rule as other params).
+                <div className="flex items-center gap-2">
+                  <span
+                    data-handle-anchor="label"
+                    className="shrink-0 text-xs text-gray-500"
+                  >
+                    {param.label}
+                    {param.required && <span className="text-red-400">*</span>}
                   </span>
-                </button>
-                <input
-                  id={`file-input-crop-${id}-${param.key}`}
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  disabled={isWired || disabled}
-                  onChange={(e) => void handleFileUpload(param.key, e.target.files)}
-                />
-                {!isWired && showAddToRequestBtn && (
                   <button
                     type="button"
+                    tabIndex={-1}
+                    disabled={isWired || disabled}
+                    onClick={() => {
+                      if (!isWired && !disabled) {
+                        document
+                          .getElementById(`file-input-crop-${id}-${param.key}`)
+                          ?.click();
+                      }
+                    }}
+                    className="nodrag flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                    title={
+                      isWired
+                        ? "Image is supplied by an upstream connection"
+                        : value
+                          ? "Change image"
+                          : "Upload image"
+                    }
+                  >
+                    {uploadingField === param.key ? (
+                      <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <LucideIcons.Upload className="w-3.5 h-3.5" />
+                    )}
+                    <span className="capitalize">
+                      {uploadingField === param.key
+                        ? "Uploading..."
+                        : value
+                          ? "Change image"
+                          : "Upload image"}
+                    </span>
+                  </button>
+                  <input
+                    id={`file-input-crop-${id}-${param.key}`}
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    disabled={isWired || disabled}
+                    onChange={(e) =>
+                      void handleFileUpload(param.key, e.target.files)
+                    }
+                  />
+                  {!isWired && showAddToRequestBtn && (
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => handlePromoteInput(param)}
+                      className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                      title="Add to request inputs"
+                    >
+                      <LucideIcons.Plus
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  )}
+                </div>
+              )}
+
+            {/* Kling-style image upload: [label] [upload button flex-1] [+ add-to-request?] — side-label layout, no crop overlay */}
+            {param.type === "file-upload" &&
+              param.uiVariant === "kling-image-upload" && (
+                <div className="flex items-start gap-3">
+                  <span
+                    data-handle-anchor="label"
+                    className="shrink-0 pt-2 text-xs text-gray-500 dark:text-zinc-400"
+                  >
+                    {param.label}
+                    {param.required && <span className="text-red-400">*</span>}
+                  </span>
+                  <div className="flex-1">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        disabled={isWired || disabled}
+                        onClick={() => {
+                          if (!isWired && !disabled) {
+                            document
+                              .getElementById(`file-input-kling-${id}-${param.key}`)
+                              ?.click();
+                          }
+                        }}
+                        className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                        title={
+                          isWired
+                            ? "Image is supplied by an upstream connection"
+                            : value
+                              ? "Change image"
+                              : "Upload image"
+                        }
+                      >
+                        {uploadingField === param.key ? (
+                          <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <LucideIcons.Upload className="h-3.5 w-3.5" />
+                        )}
+                        <span className="capitalize">
+                          {uploadingField === param.key
+                            ? "Uploading..."
+                            : value
+                              ? "Change image"
+                              : "Upload image"}
+                        </span>
+                      </button>
+                      <input
+                        id={`file-input-kling-${id}-${param.key}`}
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        disabled={isWired || disabled}
+                        onChange={(e) =>
+                          void handleFileUpload(param.key, e.target.files)
+                        }
+                      />
+                    </div>
+                    {/* Show preview if a local image is set */}
+                    {value && !isWired && (
+                      <div className="mt-2 flex justify-end">
+                        <div className="flex flex-col items-end gap-1">
+                          <div
+                            className="relative overflow-hidden rounded-md"
+                            style={{ border: "2px solid rgba(59,130,246,0.3)" }}
+                          >
+                            <img
+                              alt=""
+                              src={String(value)}
+                              className="block rounded-sm"
+                              style={{ maxWidth: 200, maxHeight: 120 }}
+                            />
+                            <button
+                              type="button"
+                              className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                              onClick={() => updateInput(param.key, null)}
+                            >
+                              <LucideIcons.X className="h-2.5 w-2.5" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className="nodrag mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
                     disabled={isLocked}
                     onClick={() => handlePromoteInput(param)}
-                    className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
                     title="Add to request inputs"
                   >
                     <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
                   </button>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {param.type === "file-upload" && param.uiVariant !== "crop-overlay-preview" && (
-              <div className="space-y-2">
-                {value ? (
-                  <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] overflow-hidden p-2 flex items-center gap-3">
-                    {value.startsWith("data:image") || value.startsWith("http") && (value.includes(".jpg") || value.includes(".png") || value.includes(".jpeg") || value.includes(".webp") || value.match(/cropImage|gemini|openRouter|execute/i)) ? (
-                      <img src={value} alt="Upload preview" className="w-12 h-12 object-contain bg-white rounded border border-gray-200" />
-                    ) : (
-                      <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded text-gray-500">
-                        {param.key.includes("video") ? (
-                          <LucideIcons.Video className="w-5 h-5" />
-                        ) : param.key.includes("audio") ? (
-                          <LucideIcons.Music className="w-5 h-5" />
-                        ) : (
-                          <LucideIcons.File className="w-5 h-5" />
-                        )}
-                      </div>
-                    )}
-                    <span className="truncate flex-1 text-xs font-mono select-all pr-8">
-                      {value.startsWith("data:") ? "base64 file buffer" : value.split("/").pop()}
-                    </span>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        disabled={isLocked}
-                        onClick={() => removeFileValue(param.key)}
-                        className="nodrag absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 disabled:opacity-30"
-                        title="Clear file"
-                      >
-                        <LucideIcons.Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                    >
-                      {uploadingField === param.key ? (
-                        <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <LucideIcons.Upload className="w-3.5 h-3.5" />
-                      )}
-                      <span>{uploadingField === param.key ? "Uploading..." : `Upload ${param.label.toLowerCase()}`}</span>
-                    </button>
-                    <input
-                      id={`file-input-${param.key}`}
-                      type="file"
-                      disabled={disabled}
-                      accept={param.key.includes("image") ? "image/*" : param.key.includes("video") ? "video/*" : param.key.includes("audio") ? "audio/*" : "*"}
-                      className="hidden"
-                      onChange={(e) => void handleFileUpload(param.key, e.target.files)}
-                    />
-
-                    {/* Popover modal */}
-                    {activeUploadPopup === param.key && (
-                      <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
-                        <p className="text-xs text-gray-500 leading-normal font-normal">
-                          Add a file from your device or select one from your library
-                        </p>
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
-                          onClick={() => setActiveUploadPopup(null)}
-                        >
-                          <LucideIcons.ImagePlus className="h-4 w-4" />
-                          <span>Select Asset</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
-                          onClick={() => {
-                            setActiveUploadPopup(null);
-                            const input = document.getElementById(`file-input-${param.key}`);
-                            if (input) input.click();
-                          }}
-                        >
-                          <LucideIcons.Plus className="h-4 w-4" />
-                          <span>Upload</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Crop overlay preview — rendered after the inputImage file-upload when
-                uiVariant === "crop-overlay-preview" is set on the param definition. */}
-            {param.uiVariant === "crop-overlay-preview" && (() => {
-              // Resolve image: wired edge takes priority, fall back to locally stored value
-              const imgUrl: string | null =
-                (isWired
-                  ? (() => {
-                      const edge = (edges ?? []).find(
-                        (e) => e.target === id && e.targetHandle === handleId
-                      );
-                      if (!edge) return null;
-                      const v = resolvePropagatedEdgeValue(edge, nodes ?? [], edgeResolveOpts);
-                      return typeof v === "string" && v.length > 0 ? v : null;
-                    })()
-                  : (nodeData.inputs?.[param.key] as string | null)) ?? null;
-
-              if (!imgUrl) return null;
-
-              const clampPct = (n: number, min = 0, max = 100) =>
-                Math.min(max, Math.max(min, Number.isFinite(n) ? Math.round(n) : min));
-
-              const xv = clampPct(Number(nodeData.inputs?.x ?? 0));
-              const yv = clampPct(Number(nodeData.inputs?.y ?? 0));
-              const wv = clampPct(Number(nodeData.inputs?.w ?? 100), 1, 100);
-              const hv = clampPct(Number(nodeData.inputs?.h ?? 100), 1, 100);
-              const rightPct = Math.min(100, xv + wv);
-              const bottomPct = Math.min(100, yv + hv);
-
-              return (
-                <div className="mt-2 flex justify-end">
-                  <div className="flex flex-col items-end gap-1">
-                    <div
-                      className="relative overflow-hidden rounded-md"
-                      style={{ border: "2px solid rgba(59,130,246,0.3)" }}
-                    >
-                      <img
-                        alt=""
-                        src={imgUrl}
-                        className="block rounded-sm"
-                        style={{ maxWidth: 240, maxHeight: 160 }}
-                      />
-                      {/* Dimmed overlay regions */}
-                      <div className="pointer-events-none absolute inset-0">
-                        <div className="absolute left-0 right-0 top-0 bg-black/35" style={{ height: `${yv}%` }} />
-                        <div className="absolute left-0 right-0 bg-black/35" style={{ top: `${bottomPct}%`, bottom: 0 }} />
-                        <div className="absolute left-0 bg-black/35" style={{ top: `${yv}%`, width: `${xv}%`, height: `${bottomPct - yv}%` }} />
-                        <div className="absolute bg-black/35" style={{ top: `${yv}%`, left: `${rightPct}%`, right: 0, height: `${bottomPct - yv}%` }} />
-                        {/* Crop frame */}
-                        <div
-                          className="absolute border-2"
-                          style={{
-                            left: `${xv}%`,
-                            top: `${yv}%`,
-                            width: `${wv}%`,
-                            height: `${hv}%`,
-                            borderColor: "rgba(167,139,250,0.9)",
-                          }}
+            {param.type === "file-upload" &&
+              param.uiVariant !== "crop-overlay-preview" &&
+              param.uiVariant !== "kling-image-upload" && (
+                <div className="space-y-2">
+                  {value ? (
+                    <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] overflow-hidden p-2 flex items-center gap-3">
+                      {value.startsWith("data:image") ||
+                      (value.startsWith("http") &&
+                        (value.includes(".jpg") ||
+                          value.includes(".png") ||
+                          value.includes(".jpeg") ||
+                          value.includes(".webp") ||
+                          value.match(
+                            /cropImage|gemini|openRouter|execute/i,
+                          ))) ? (
+                        <img
+                          src={value}
+                          alt="Upload preview"
+                          className="w-12 h-12 object-contain bg-white rounded border border-gray-200"
                         />
-                      </div>
-                      {/* Remove button — only when image is local (not wired) */}
-                      {!isWired && !isLocked && !readOnly && (
+                      ) : (
+                        <div className="w-12 h-12 flex items-center justify-center bg-gray-100 rounded text-gray-500">
+                          {param.key.includes("video") ? (
+                            <LucideIcons.Video className="w-5 h-5" />
+                          ) : param.key.includes("audio") ? (
+                            <LucideIcons.Music className="w-5 h-5" />
+                          ) : (
+                            <LucideIcons.File className="w-5 h-5" />
+                          )}
+                        </div>
+                      )}
+                      <span className="truncate flex-1 text-xs font-mono select-all pr-8">
+                        {value.startsWith("data:")
+                          ? "base64 file buffer"
+                          : value.split("/").pop()}
+                      </span>
+                      {!readOnly && (
                         <button
                           type="button"
+                          disabled={isLocked}
                           onClick={() => removeFileValue(param.key)}
-                          className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
-                          title="Remove image"
+                          className="nodrag absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-gray-400 hover:text-red-500 hover:bg-gray-100 disabled:opacity-30"
+                          title="Clear file"
                         >
-                          <LucideIcons.X className="h-2.5 w-2.5" aria-hidden="true" />
+                          <LucideIcons.Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
+                  ) : (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() =>
+                          setActiveUploadPopup(
+                            activeUploadPopup === param.key ? null : param.key,
+                          )
+                        }
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                      >
+                        {uploadingField === param.key ? (
+                          <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <LucideIcons.Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {uploadingField === param.key
+                            ? "Uploading..."
+                            : `Upload ${param.label.toLowerCase()}`}
+                        </span>
+                      </button>
+                      <input
+                        id={`file-input-${param.key}`}
+                        type="file"
+                        disabled={disabled}
+                        accept={
+                          param.key.includes("image")
+                            ? "image/*"
+                            : param.key.includes("video")
+                              ? "video/*"
+                              : param.key.includes("audio")
+                                ? "audio/*"
+                                : "*"
+                        }
+                        className="hidden"
+                        onChange={(e) =>
+                          void handleFileUpload(param.key, e.target.files)
+                        }
+                      />
+
+                      {/* Popover modal */}
+                      {activeUploadPopup === param.key && (
+                        <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
+                          <p className="text-xs text-gray-500 leading-normal font-normal">
+                            Add a file from your device or select one from your
+                            library
+                          </p>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
+                            onClick={() => setActiveUploadPopup(null)}
+                          >
+                            <LucideIcons.ImagePlus className="h-4 w-4" />
+                            <span>Select Asset</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
+                            onClick={() => {
+                              setActiveUploadPopup(null);
+                              const input = document.getElementById(
+                                `file-input-${param.key}`,
+                              );
+                              if (input) input.click();
+                            }}
+                          >
+                            <LucideIcons.Plus className="h-4 w-4" />
+                            <span>Upload</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+            {/* Crop overlay preview — rendered after the inputImage file-upload when
+                uiVariant === "crop-overlay-preview" is set on the param definition. */}
+            {param.uiVariant === "crop-overlay-preview" &&
+              (() => {
+                // Resolve image: wired edge takes priority, fall back to locally stored value
+                const imgUrl: string | null =
+                  (isWired
+                    ? (() => {
+                        const edge = (edges ?? []).find(
+                          (e) => e.target === id && e.targetHandle === handleId,
+                        );
+                        if (!edge) return null;
+                        const v = resolvePropagatedEdgeValue(
+                          edge,
+                          nodes ?? [],
+                          edgeResolveOpts,
+                        );
+                        return typeof v === "string" && v.length > 0 ? v : null;
+                      })()
+                    : (nodeData.inputs?.[param.key] as string | null)) ?? null;
+
+                if (!imgUrl) return null;
+
+                const clampPct = (n: number, min = 0, max = 100) =>
+                  Math.min(
+                    max,
+                    Math.max(min, Number.isFinite(n) ? Math.round(n) : min),
+                  );
+
+                const xv = clampPct(Number(nodeData.inputs?.x ?? 0));
+                const yv = clampPct(Number(nodeData.inputs?.y ?? 0));
+                const wv = clampPct(Number(nodeData.inputs?.w ?? 100), 1, 100);
+                const hv = clampPct(Number(nodeData.inputs?.h ?? 100), 1, 100);
+                const rightPct = Math.min(100, xv + wv);
+                const bottomPct = Math.min(100, yv + hv);
+
+                return (
+                  <div className="mt-2 flex justify-end">
+                    <div className="flex flex-col items-end gap-1">
+                      <div
+                        className="relative overflow-hidden rounded-md"
+                        style={{ border: "2px solid rgba(59,130,246,0.3)" }}
+                      >
+                        <img
+                          alt=""
+                          src={imgUrl}
+                          className="block rounded-sm"
+                          style={{ maxWidth: 240, maxHeight: 160 }}
+                        />
+                        {/* Dimmed overlay regions */}
+                        <div className="pointer-events-none absolute inset-0">
+                          <div
+                            className="absolute left-0 right-0 top-0 bg-black/35"
+                            style={{ height: `${yv}%` }}
+                          />
+                          <div
+                            className="absolute left-0 right-0 bg-black/35"
+                            style={{ top: `${bottomPct}%`, bottom: 0 }}
+                          />
+                          <div
+                            className="absolute left-0 bg-black/35"
+                            style={{
+                              top: `${yv}%`,
+                              width: `${xv}%`,
+                              height: `${bottomPct - yv}%`,
+                            }}
+                          />
+                          <div
+                            className="absolute bg-black/35"
+                            style={{
+                              top: `${yv}%`,
+                              left: `${rightPct}%`,
+                              right: 0,
+                              height: `${bottomPct - yv}%`,
+                            }}
+                          />
+                          {/* Crop frame */}
+                          <div
+                            className="absolute border-2"
+                            style={{
+                              left: `${xv}%`,
+                              top: `${yv}%`,
+                              width: `${wv}%`,
+                              height: `${hv}%`,
+                              borderColor: "rgba(167,139,250,0.9)",
+                            }}
+                          />
+                        </div>
+                        {/* Remove button — only when image is local (not wired) */}
+                        {!isWired && !isLocked && !readOnly && (
+                          <button
+                            type="button"
+                            onClick={() => removeFileValue(param.key)}
+                            className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                            title="Remove image"
+                          >
+                            <LucideIcons.X
+                              className="h-2.5 w-2.5"
+                              aria-hidden="true"
+                            />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                );
+              })()}
+
+            {/* element-array: Kling v3 Elements repeatable section — no overall handle, each item has its own sub-handles */}
+            {param.type === "element-array" && (() => {
+              const items = elementItems;
+              const itemKeys = Object.keys(items).sort((a, b) => Number(a) - Number(b));
+              const handleElementFileUpload = async (itemIdx: string, fieldKey: string, files: FileList | null, isMulti = false, maxCount = 10) => {
+                if (!files?.length || isLocked || readOnly) return;
+                const uploadKey = `${itemIdx}-${fieldKey}`;
+                setUploadingElementField(uploadKey);
+                try {
+                  const { urls: validUrls, firstError } = await uploadFilesViaApi(Array.from(files));
+                  if (firstError) window.alert(firstError);
+                  if (validUrls.length > 0) {
+                    setElementItems(prev => {
+                      const item = { ...(prev[itemIdx] || {}) };
+                      if (isMulti) {
+                        const existing = (item[fieldKey] as string[]) || [];
+                        item[fieldKey] = [...existing, ...validUrls].slice(0, maxCount);
+                      } else {
+                        item[fieldKey] = validUrls[0];
+                      }
+                      const next = { ...prev, [itemIdx]: item };
+                      // Sync to node data
+                      const arr = Object.keys(next).sort((a, b) => Number(a) - Number(b)).map(k => next[k]);
+                      updateInput(param.key, arr);
+                      return next;
+                    });
+                  }
+                } catch (err) {
+                  console.error("[GenericNode] Element upload failed:", err);
+                } finally {
+                  setUploadingElementField(null);
+                }
+              };
+              const addItem = () => {
+                const newIdx = String(itemKeys.length > 0 ? Math.max(...itemKeys.map(Number)) + 1 : 0);
+                setElementItems(prev => {
+                  const next = { ...prev, [newIdx]: {} };
+                  const arr = Object.keys(next).sort((a, b) => Number(a) - Number(b)).map(k => next[k]);
+                  updateInput(param.key, arr);
+                  return next;
+                });
+              };
+              const removeItem = (itemIdx: string) => {
+                setElementItems(prev => {
+                  const next = { ...prev };
+                  delete next[itemIdx];
+                  // Re-index to keep array compact
+                  const reindexed: typeof next = {};
+                  Object.keys(next).sort((a, b) => Number(a) - Number(b)).forEach((k, i) => {
+                    reindexed[String(i)] = next[k];
+                  });
+                  const arr = Object.values(reindexed);
+                  updateInput(param.key, arr);
+                  return reindexed;
+                });
+              };
+              const removeElementImage = (itemIdx: string, fieldKey: string, imgIdx?: number) => {
+                setElementItems(prev => {
+                  const item = { ...(prev[itemIdx] || {}) };
+                  if (imgIdx !== undefined) {
+                    const arr = [...((item[fieldKey] as string[]) || [])];
+                    arr.splice(imgIdx, 1);
+                    item[fieldKey] = arr;
+                  } else {
+                    item[fieldKey] = "";
+                  }
+                  const next = { ...prev, [itemIdx]: item };
+                  const arr2 = Object.keys(next).sort((a, b) => Number(a) - Number(b)).map(k => next[k]);
+                  updateInput(param.key, arr2);
+                  return next;
+                });
+              };
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-gray-600 dark:text-zinc-300">{param.label}</span>
+                    {param.tooltip && (
+                      <span className="cursor-help" title={param.tooltip}>
+                        <LucideIcons.Info className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                      </span>
+                    )}
+                  </div>
+
+                  {itemKeys.map((itemIdx) => {
+                    const item = items[itemIdx];
+                    return (
+                      <div
+                        key={itemIdx}
+                        className="relative space-y-2.5 rounded-lg border border-gray-200 bg-[#F5F5F5]/50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40"
+                      >
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          className="nodrag absolute -right-2 -top-2 rounded-full bg-gray-200 p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-500 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                          title="Remove item"
+                          onClick={() => removeItem(itemIdx)}
+                        >
+                          <LucideIcons.Trash2 className="h-3 w-3" aria-hidden="true" />
+                        </button>
+
+                        {(param.elementFields || []).map((field: any) => {
+                          const fieldUploadKey = `${itemIdx}-${field.key}`;
+                          const fieldValue = item[field.key];
+                          const handleId_sub = `in:elements.${itemIdx}.${field.key}`;
+                          const isFieldWired = connectedTargets.has(handleId_sub);
+                          const imgList = Array.isArray(fieldValue) ? fieldValue as string[] : [];
+                          const singleVal = typeof fieldValue === "string" ? fieldValue : "";
+                          const atMax = field.type === "file-upload-multi" && imgList.length >= (field.maxCount || 10);
+
+                          return (
+                            <div key={field.key} className="relative" style={{ overflow: "visible" }}>
+                              {/* Sub-handle, positioned further left inside the card */}
+                              {field.handle && (
+                                <div
+                                  className="absolute flex items-center"
+                                  style={{ left: "-35px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+                                >
+                                  <Handle
+                                    type="target"
+                                    position={Position.Left}
+                                    id={handleId_sub}
+                                    className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                                    style={{
+                                      width: 12,
+                                      height: 12,
+                                      borderRadius: "50%",
+                                      background: field.handle.color,
+                                      border: `2px solid ${field.handle.color}80`,
+                                      boxShadow: `${field.handle.color}50 0px 0px 8px`,
+                                      cursor: "crosshair",
+                                    }}
+                                  />
+                                </div>
+                              )}
+
+                              {field.type === "file-upload-single" && (
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-3">
+                                    <span className="shrink-0 text-xs text-gray-500 dark:text-zinc-400">
+                                      {field.label}
+                                      {field.required && <span className="text-red-400">*</span>}
+                                    </span>
+                                    <div className="flex-1">
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          tabIndex={-1}
+                                          disabled={isFieldWired || disabled}
+                                          onClick={() => !isFieldWired && !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                          title={singleVal ? `Change ${field.accept.includes("video") ? "video" : "image"}` : `Upload ${field.accept.includes("video") ? "video" : "image"}`}
+                                        >
+                                          {uploadingElementField === fieldUploadKey ? (
+                                            <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                          ) : (
+                                            <LucideIcons.Upload className="h-3.5 w-3.5" />
+                                          )}
+                                          <span className="capitalize">
+                                            {uploadingElementField === fieldUploadKey
+                                              ? "Uploading..."
+                                              : singleVal
+                                                ? `Change ${field.accept.includes("video") ? "video" : "image"}`
+                                                : `Upload ${field.accept.includes("video") ? "video" : "image"}`}
+                                          </span>
+                                        </button>
+                                        <input
+                                          id={`el-file-${id}-${itemIdx}-${field.key}`}
+                                          type="file"
+                                          hidden
+                                          accept={field.accept}
+                                          disabled={isFieldWired || disabled}
+                                          onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {field.uploadRequirements && (
+                                    <div className="flex items-center gap-1">
+                                      <LucideIcons.Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" aria-hidden="true" />
+                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">{field.uploadRequirements}</span>
+                                    </div>
+                                  )}
+                                  {/* Preview for single upload */}
+                                  {singleVal && !isFieldWired && (
+                                    <div className="flex justify-end">
+                                      <div className="flex flex-col items-end gap-1">
+                                        <div
+                                          className="relative overflow-hidden rounded-md"
+                                          style={{ border: "2px solid rgba(59,130,246,0.3)" }}
+                                        >
+                                          <img
+                                            alt=""
+                                            className="block rounded-sm"
+                                            src={singleVal}
+                                            style={{ maxWidth: 200, maxHeight: 120 }}
+                                          />
+                                          <button
+                                            className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                                            onClick={() => removeElementImage(itemIdx, field.key)}
+                                          >
+                                            <LucideIcons.X className="h-2.5 w-2.5" aria-hidden="true" />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {field.type === "file-upload-multi" && (
+                                <div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                                      {field.label}
+                                      {field.required && <span className="text-red-400">*</span>}
+                                    </span>
+                                  </div>
+                                  <div className="relative mt-1">
+                                    <button
+                                      type="button"
+                                      tabIndex={-1}
+                                      disabled={isFieldWired || disabled || atMax}
+                                      onClick={() => !isFieldWired && !disabled && !atMax && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                      title="Upload image"
+                                    >
+                                      {uploadingElementField === fieldUploadKey ? (
+                                        <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <LucideIcons.Upload className="h-3.5 w-3.5" />
+                                      )}
+                                      <span className="capitalize">
+                                        {uploadingElementField === fieldUploadKey ? "Uploading..." : "Upload image"}
+                                      </span>
+                                    </button>
+                                    <input
+                                      id={`el-file-${id}-${itemIdx}-${field.key}`}
+                                      type="file"
+                                      hidden
+                                      accept={field.accept}
+                                      multiple
+                                      disabled={isFieldWired || disabled}
+                                      onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files, true, field.maxCount || 10)}
+                                    />
+                                  </div>
+                                  {field.uploadRequirements && (
+                                    <div className="mt-1 flex items-center gap-1">
+                                      <LucideIcons.Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" aria-hidden="true" />
+                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">{field.uploadRequirements}</span>
+                                    </div>
+                                  )}
+                                  {/* Grid of uploaded images */}
+                                  {imgList.length > 0 && (
+                                    <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+                                      {imgList.map((imgUrl, imgIdx) => (
+                                        <div
+                                          key={imgIdx}
+                                          className="nodrag nopan relative overflow-hidden rounded-lg border border-gray-200 bg-black dark:border-zinc-700"
+                                          title={`Image ${imgIdx + 1}`}
+                                          style={{ aspectRatio: "1 / 1" }}
+                                        >
+                                          <div className="absolute left-1 top-1 z-10 rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+                                            {imgIdx + 1}
+                                          </div>
+                                          <img
+                                            alt=""
+                                            className="h-full w-full object-cover"
+                                            draggable={false}
+                                            src={imgUrl}
+                                          />
+                                          <button
+                                            type="button"
+                                            className="absolute right-1 top-1 rounded bg-black/60 p-1 text-white hover:bg-red-500 disabled:opacity-50"
+                                            title="Remove"
+                                            onClick={() => removeElementImage(itemIdx, field.key, imgIdx)}
+                                          >
+                                            <LucideIcons.X className="h-3 w-3" aria-hidden="true" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                      {!atMax && (
+                                        <div className="relative">
+                                          <div
+                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/60 cursor-pointer hover:border-workflow-accent-400"
+                                            title="Add image"
+                                            style={{ aspectRatio: "1 / 1" }}
+                                            onClick={() => !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                          >
+                                            <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-400 dark:text-zinc-500">
+                                              Add Image
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    className="nodrag flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:border-[#7C3AED]/40 hover:text-[#7C3AED] dark:border-zinc-600 dark:text-zinc-400"
+                    onClick={addItem}
+                  >
+                    <LucideIcons.Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                    Add item
+                  </button>
                 </div>
               );
             })()}
@@ -1389,18 +2174,29 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               <div className="space-y-3">
                 {/* Custom upload row matching reference layout */}
                 <div className="flex items-start gap-3">
-                  <span data-handle-anchor="label" className="shrink-0 pt-2 text-xs text-gray-500 min-w-[70px]">
+                  <span
+                    data-handle-anchor="label"
+                    className="shrink-0 pt-2 text-xs text-gray-500 min-w-[70px]"
+                  >
                     {param.label}
-                    {param.required && <span className="text-red-400 ml-0.5">*</span>}
+                    {param.required && (
+                      <span className="text-red-400 ml-0.5">*</span>
+                    )}
                   </span>
-                  
+
                   <div className="flex-1">
                     {!readOnly ? (
                       <div className="relative">
                         <button
                           type="button"
                           disabled={disabled || value.length >= 10}
-                          onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
+                          onClick={() =>
+                            setActiveUploadPopup(
+                              activeUploadPopup === param.key
+                                ? null
+                                : param.key,
+                            )
+                          }
                           className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 nodrag border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                           title="Upload image"
                         >
@@ -1410,7 +2206,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             <LucideIcons.Upload className="h-3.5 w-3.5" />
                           )}
                           <span className="capitalize">
-                            {uploadingField === param.key ? "Uploading..." : "Upload image"}
+                            {uploadingField === param.key
+                              ? "Uploading..."
+                              : "Upload image"}
                           </span>
                         </button>
                         <input
@@ -1420,14 +2218,21 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           multiple
                           className="hidden"
                           disabled={disabled || value.length >= 10}
-                          onChange={(e) => void handleFileUpload(param.key, e.target.files, true)}
+                          onChange={(e) =>
+                            void handleFileUpload(
+                              param.key,
+                              e.target.files,
+                              true,
+                            )
+                          }
                         />
 
                         {/* Popover modal */}
                         {activeUploadPopup === param.key && (
                           <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
                             <p className="text-xs text-gray-500 leading-normal font-normal">
-                              Add a file from your device or select one from your library
+                              Add a file from your device or select one from
+                              your library
                             </p>
                             <button
                               type="button"
@@ -1442,7 +2247,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                               className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
                               onClick={() => {
                                 setActiveUploadPopup(null);
-                                const input = document.getElementById(`file-input-${param.key}`);
+                                const input = document.getElementById(
+                                  `file-input-${param.key}`,
+                                );
                                 if (input) input.click();
                               }}
                             >
@@ -1454,10 +2261,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       </div>
                     ) : (
                       value.length === 0 && (
-                        <div className="text-xs text-gray-400 italic">No images uploaded</div>
+                        <div className="text-xs text-gray-400 italic">
+                          No images uploaded
+                        </div>
                       )
                     )}
-                    
+
                     {/* Tooltip trigger */}
                     {!readOnly && (
                       <div className="relative mt-1 flex items-center gap-1 group/tooltip w-fit">
@@ -1490,8 +2299,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 {value.length > 0 && (
                   <div className="grid grid-cols-5 gap-2 pt-1">
                     {value.map((url: string, idx: number) => (
-                      <div key={idx} className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm">
-                        <img src={url} alt="" className="w-full h-full object-cover" />
+                      <div
+                        key={idx}
+                        className="group relative aspect-square rounded-lg border border-gray-200 bg-white overflow-hidden shadow-sm"
+                      >
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                         {!readOnly && (
                           <button
                             type="button"
@@ -1512,9 +2328,14 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {param.type === "video-array" && (
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
-                  <span data-handle-anchor="label" className="shrink-0 pt-2 text-xs text-gray-500">
+                  <span
+                    data-handle-anchor="label"
+                    className="shrink-0 pt-2 text-xs text-gray-500"
+                  >
                     {param.label}
-                    {param.required && <span className="text-red-400 ml-0.5">*</span>}
+                    {param.required && (
+                      <span className="text-red-400 ml-0.5">*</span>
+                    )}
                   </span>
 
                   <div className="flex-1">
@@ -1523,7 +2344,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         <button
                           type="button"
                           disabled={disabled || value.length >= 10}
-                          onClick={() => document.getElementById(`file-input-${param.key}`)?.click()}
+                          onClick={() =>
+                            document
+                              .getElementById(`file-input-${param.key}`)
+                              ?.click()
+                          }
                           className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                           title="Upload video"
                         >
@@ -1533,7 +2358,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             <LucideIcons.Upload className="h-3.5 w-3.5" />
                           )}
                           <span className="capitalize">
-                            {uploadingField === param.key ? "Uploading..." : "Upload video"}
+                            {uploadingField === param.key
+                              ? "Uploading..."
+                              : "Upload video"}
                           </span>
                         </button>
                         <input
@@ -1544,7 +2371,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           className="hidden"
                           disabled={disabled || value.length >= 10}
                           onChange={(e) => {
-                            void handleFileUpload(param.key, e.target.files, true).finally(() => {
+                            void handleFileUpload(
+                              param.key,
+                              e.target.files,
+                              true,
+                            ).finally(() => {
                               e.target.value = "";
                             });
                           }}
@@ -1587,7 +2418,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           <button
                             type="button"
                             disabled={disabled}
-                            onClick={() => document.getElementById(`file-input-${param.key}`)?.click()}
+                            onClick={() =>
+                              document
+                                .getElementById(`file-input-${param.key}`)
+                                ?.click()
+                            }
                             className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] hover:border-workflow-accent-400 dark:bg-zinc-800/60"
                             style={{ aspectRatio: "4 / 3" }}
                             title="Add video"
@@ -1609,7 +2444,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   };
 
   const primaryParams = definition.inputs.filter((p) => p.group === "primary");
-  const advancedParams = definition.inputs.filter((p) => p.group === "advanced");
+  const advancedParams = definition.inputs.filter(
+    (p) => p.group === "advanced",
+  );
+  // image-mode params shown only on Image to Video tab (Kling v3 and similar)
+  const imageModeParams = definition.inputs.filter((p) => (p as any).group === "image-mode");
+  // settings params shown in collapsible Settings section (both tabs)
+  const settingsParams = definition.inputs.filter((p) => (p as any).group === "settings");
 
   return (
     <div
@@ -1621,7 +2462,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           isExecuting,
           hasError: !!nodeError,
           isRunPending,
-        }
+        },
       )} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ overflow: "visible", width: "380px" }}
     >
@@ -1635,8 +2476,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         {!readOnly && (
           <NodeHeaderActions
             nodeId={id}
-            description={definition.description ?? `Execute a ${definition.name} operation inside the workflow.`}
-            runState={getNodeRunButtonState(isExecuting, isRunPending, isRunCompleted, isRunFailed)}
+            description={
+              definition.description ??
+              `Execute a ${definition.name} operation inside the workflow.`
+            }
+            runState={getNodeRunButtonState(
+              isExecuting,
+              isRunPending,
+              isRunCompleted,
+              isRunFailed,
+            )}
             isLocked={isLocked}
             onRun={handleSingleRun}
             onReset={handleReset}
@@ -1688,9 +2537,23 @@ export default function GenericNode({ id, data, type }: NodeProps) {
       {/* Primary Parameters */}
       <div className="px-4 py-4" style={{ overflow: "visible" }}>
         <div className="space-y-4">
-          {primaryParams.map(renderParameterInput)}
+          {/* Text-to-video / standard primary params — hidden when in image tab for nodes that have image-mode params */}
+          {modeTab === "text" || imageModeParams.length === 0
+            ? primaryParams.map(renderParameterInput)
+            : null}
 
-          {/* Collapsible Advanced Parameters */}
+          {/* Image-to-Video params — shown only in image tab */}
+          {imageModeParams.length > 0 && modeTab === "image" && (
+            <>
+              {imageModeParams.map(renderParameterInput)}
+              {/* Duration and Negative Prompt are shared — always show in image tab too */}
+              {primaryParams
+                .filter((p) => p.key === "duration" || p.key === "negative_prompt")
+                .map(renderParameterInput)}
+            </>
+          )}
+
+          {/* Collapsible Advanced Parameters (generic nodes) */}
           {advancedParams.length > 0 && (
             <>
               <div className="relative" style={{ overflow: "visible" }}>
@@ -1718,6 +2581,38 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               )}
             </>
           )}
+
+          {/* Collapsible Settings section (Kling v3 style — group: "settings") */}
+          {settingsParams.length > 0 && (
+            <>
+              <div className="relative" style={{ overflow: "visible" }}>
+                <button
+                  type="button"
+                  className="nodrag group mt-5 flex cursor-pointer items-center gap-2 bg-transparent border-0 p-0 outline-none"
+                  onClick={() => setShowSettings(!showSettings)}
+                >
+                  <LucideIcons.ChevronDown
+                    className={`h-4 w-4 text-gray-400 transition-transform ${
+                      showSettings ? "" : "-rotate-90"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span
+                    data-handle-anchor="label"
+                    className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-zinc-300"
+                  >
+                    Settings
+                  </span>
+                </button>
+              </div>
+
+              {showSettings && (
+                <div className="mt-4 space-y-4">
+                  {settingsParams.map(renderParameterInput)}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -1729,20 +2624,27 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           // run don't show stale values). Live mode: prefer the live store output (nodeOutputs)
           // and fall back to the value persisted on the node so media results stay visible
           // after the run completes and execution state is cleared.
-          const currentOutput = isPreviewMode ? output : (output ?? nodeData.output);
-          const displayValue = currentOutput !== null && typeof currentOutput === "object" && out.key in currentOutput 
-            ? currentOutput[out.key] 
-            : currentOutput;
+          const currentOutput = isPreviewMode
+            ? output
+            : (output ?? nodeData.output);
+          const displayValue =
+            currentOutput !== null &&
+            typeof currentOutput === "object" &&
+            out.key in currentOutput
+              ? currentOutput[out.key]
+              : currentOutput;
 
           return (
-            <div
-              key={out.key}
-              className="pt-4 border-t border-gray-100"
-            >
+            <div key={out.key} className="pt-4 border-t border-gray-100">
               <div className="relative" style={{ overflow: "visible" }}>
                 <div
                   className="absolute flex items-center"
-                  style={{ right: "-22px", top: "10px", transform: "translateY(-50%)", zIndex: 50 }}
+                  style={{
+                    right: "-22px",
+                    top: "10px",
+                    transform: "translateY(-50%)",
+                    zIndex: 50,
+                  }}
                 >
                   <Handle
                     type="source"
@@ -1779,12 +2681,18 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             className="mx-auto block w-full max-h-[160px] object-contain rounded"
                             onError={(e) => {
                               e.currentTarget.style.display = "none";
-                              const link = e.currentTarget.nextElementSibling as HTMLElement;
+                              const link = e.currentTarget
+                                .nextElementSibling as HTMLElement;
                               if (link) link.style.display = "block";
                             }}
                           />
                           <div style={{ display: "none" }}>
-                            <a href={String(displayValue)} target="_blank" rel="noreferrer" className="text-[12px] text-blue-500 hover:underline break-all">
+                            <a
+                              href={String(displayValue)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[12px] text-blue-500 hover:underline break-all"
+                            >
                               {String(displayValue)}
                             </a>
                           </div>
@@ -1841,25 +2749,32 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
       {/* Credit Estimate label */}
       <div className="px-4 pb-3 flex items-center justify-end gap-1 text-[10px] text-gray-400">
-        <LucideIcons.Coins className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+        <LucideIcons.Coins
+          className="h-3 w-3 shrink-0"
+          strokeWidth={2}
+          aria-hidden
+        />
         <span>~{(definition.credits.base / 1000000).toFixed(2)}M</span>
       </div>
 
-      {activeExpandParamKey && (() => {
-        const param = definition.inputs.find((p) => p.key === activeExpandParamKey);
-        if (!param) return null;
-        const paramValue = nodeData.inputs?.[activeExpandParamKey] ?? "";
+      {activeExpandParamKey &&
+        (() => {
+          const param = definition.inputs.find(
+            (p) => p.key === activeExpandParamKey,
+          );
+          if (!param) return null;
+          const paramValue = nodeData.inputs?.[activeExpandParamKey] ?? "";
 
-        return (
-          <TextExpandModal
-            title={param.label}
-            value={String(paramValue)}
-            readOnly={isPreviewMode || readOnly || isLocked}
-            onChange={(val) => updateInput(activeExpandParamKey, val)}
-            onClose={() => setActiveExpandParamKey(null)}
-          />
-        );
-      })()}
+          return (
+            <TextExpandModal
+              title={param.label}
+              value={String(paramValue)}
+              readOnly={isPreviewMode || readOnly || isLocked}
+              onChange={(val) => updateInput(activeExpandParamKey, val)}
+              onClose={() => setActiveExpandParamKey(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
