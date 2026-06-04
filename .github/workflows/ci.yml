@@ -23,10 +23,11 @@ jobs:
           registry-url: "https://npm.pkg.github.com"
           scope: "@shashank519915"
 
-      # NODE_AUTH_TOKEN lets pnpm authenticate with GitHub Packages to download @shashank519915/shared.
+      # PACKAGES_TOKEN is a PAT with read:packages scope stored as a repo secret.
+      # secrets.GITHUB_TOKEN cannot download packages from other repos — use PAT instead.
       - run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
       - run: pnpm typecheck
       - run: pnpm lint
@@ -50,7 +51,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.PACKAGES_TOKEN }}
 
       - run: pnpm exec playwright install --with-deps chromium
 
