@@ -1170,6 +1170,68 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               </div>
             )}
 
+            {/* Crop overlay preview — rendered after the inputImage file-upload when
+                uiVariant === "crop-overlay-preview" is set on the param definition. */}
+            {param.uiVariant === "crop-overlay-preview" && (() => {
+              const imgUrl: string | null =
+                (isWired
+                  ? (() => {
+                      const edge = (edges ?? []).find(
+                        (e) => e.target === id && e.targetHandle === handleId
+                      );
+                      if (!edge) return null;
+                      const v = resolvePropagatedEdgeValue(edge, nodes ?? [], edgeResolveOpts);
+                      return typeof v === "string" && v.length > 0 ? v : null;
+                    })()
+                  : (nodeData.inputs?.[param.key] as string | null)) ?? null;
+
+              if (!imgUrl) return null;
+
+              const clampPct = (n: number, min = 0, max = 100) =>
+                Math.min(max, Math.max(min, Number.isFinite(n) ? Math.round(n) : min));
+
+              const xv = clampPct(Number(nodeData.inputs?.x ?? 0));
+              const yv = clampPct(Number(nodeData.inputs?.y ?? 0));
+              const wv = clampPct(Number(nodeData.inputs?.w ?? 100), 1, 100);
+              const hv = clampPct(Number(nodeData.inputs?.h ?? 100), 1, 100);
+              const rightPct = Math.min(100, xv + wv);
+              const bottomPct = Math.min(100, yv + hv);
+
+              return (
+                <div className="mt-2 flex justify-end">
+                  <div
+                    className="relative overflow-hidden rounded-md"
+                    style={{ border: "2px solid rgba(59,130,246,0.3)", display: "inline-block" }}
+                  >
+                    <img
+                      alt=""
+                      src={imgUrl}
+                      className="block rounded-sm"
+                      style={{ maxWidth: 240, maxHeight: 160 }}
+                    />
+                    {/* Dimmed overlay regions */}
+                    <div className="pointer-events-none absolute inset-0">
+                      <div className="absolute left-0 right-0 top-0 bg-black/35" style={{ height: `${yv}%` }} />
+                      <div className="absolute left-0 right-0 bg-black/35" style={{ top: `${bottomPct}%`, bottom: 0 }} />
+                      <div className="absolute left-0 bg-black/35" style={{ top: `${yv}%`, width: `${xv}%`, height: `${bottomPct - yv}%` }} />
+                      <div className="absolute bg-black/35" style={{ top: `${yv}%`, left: `${rightPct}%`, right: 0, height: `${bottomPct - yv}%` }} />
+                      {/* Crop frame */}
+                      <div
+                        className="absolute border-2"
+                        style={{
+                          left: `${xv}%`,
+                          top: `${yv}%`,
+                          width: `${wv}%`,
+                          height: `${hv}%`,
+                          borderColor: "rgba(167,139,250,0.9)",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {param.type === "image-array" && (
               <div className="space-y-3">
                 {/* Custom upload row matching reference layout */}
