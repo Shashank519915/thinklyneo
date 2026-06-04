@@ -393,7 +393,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     const handleId = `in:${param.key}`;
     const isWired = connectedTargets.has(handleId);
     const requestPromoted = isRequestPromoted(nodes ?? [], edges ?? [], id, handleId);
-    const showUpstreamPanel = isWired && !requestPromoted;
+    // crop-overlay-preview params stay in their own layout even when wired — no upstream panel
+    const showUpstreamPanel = isWired && !requestPromoted && param.uiVariant !== "crop-overlay-preview";
     const showAddToRequestBtn = shouldShowAddToRequest({
       hasHandle: !!param.handle,
       readOnly,
@@ -748,13 +749,16 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         {(param.type !== "image-array" && param.type !== "video-array" || isWired) &&
           !isCompactSelectParam(definition.type, param) &&
           param.uiVariant !== "magica-side-label" &&
-          param.uiVariant !== "magica-volume-row" && (
+          param.uiVariant !== "magica-volume-row" &&
+          param.uiVariant !== "crop-overlay-preview" &&
+          param.type !== "slider" && (
           <div
             data-handle-anchor="label"
             className="mb-1.5 flex items-center text-xs text-gray-500"
           >
             <span>{param.label}</span>
             {param.required && <span className="text-red-400 ml-0.5">*</span>}
+            {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
             {param.handle && (
               <span className="ml-auto">
                 {showAddToRequestBtn && (
@@ -972,29 +976,61 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             )}
 
             {param.type === "slider" && (
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={param.min ?? 0}
-                  max={param.max ?? 100}
-                  step={param.step ?? 1}
-                  value={value !== "" ? value : (param.defaultValue ?? 0)}
-                  onChange={(e) => updateInput(param.key, Number(e.target.value))}
-                  disabled={disabled}
-                  className="nodrag nowheel flex-1 h-1.5 cursor-pointer accent-[#7C3AED] disabled:opacity-50"
-                />
-                <span className="w-8 text-right text-[12px] font-semibold tabular-nums text-gray-700">
-                  {Number(value).toFixed(param.step && param.step < 1 ? 2 : 0)}
-                </span>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => updateInput(param.key, param.defaultValue ?? 0)}
-                  className="nodrag h-7 w-7 flex items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:opacity-30"
-                  title="Reset to default"
-                >
-                  <LucideIcons.RotateCcw className="w-3.5 h-3.5" />
-                </button>
+              <div className="space-y-1.5">
+                {/* One-line Magica layout: label + tooltip | slider | number input | reset | add-to-request */}
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    data-handle-anchor="label"
+                    className="flex min-w-0 shrink items-center gap-0 text-xs text-gray-500"
+                  >
+                    <span className="truncate">{param.label}</span>
+                    {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
+                  </span>
+                  <input
+                    type="range"
+                    min={param.min ?? 0}
+                    max={param.max ?? 100}
+                    step={param.step ?? 1}
+                    value={value !== "" ? value : (param.defaultValue ?? 0)}
+                    onChange={(e) => updateInput(param.key, Number(e.target.value))}
+                    disabled={disabled || isWired}
+                    className="nodrag nowheel h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 accent-[#7C3AED] disabled:opacity-50"
+                  />
+                  <input
+                    type="number"
+                    min={param.min ?? 0}
+                    max={param.max ?? 100}
+                    step={param.step ?? 1}
+                    value={Number(value !== "" ? value : (param.defaultValue ?? 0)).toFixed(param.step && param.step < 1 ? 2 : 0)}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value);
+                      if (!Number.isFinite(n)) return;
+                      const clamped = Math.min(param.max ?? 100, Math.max(param.min ?? 0, n));
+                      updateInput(param.key, clamped);
+                    }}
+                    disabled={disabled || isWired}
+                    className="nodrag nowheel w-12 shrink-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-1.5 py-1 text-center text-xs text-gray-900 outline-none disabled:opacity-50"
+                  />
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => updateInput(param.key, param.defaultValue ?? 0)}
+                    className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                    title={`Reset ${param.label} to default`}
+                  >
+                    <LucideIcons.RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                  </button>
+                  {showAddToRequestBtn && (
+                    <button
+                      type="button"
+                      disabled={isLocked}
+                      onClick={() => handlePromoteInput(param)}
+                      className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1081,7 +1117,54 @@ export default function GenericNode({ id, data, type }: NodeProps) {
               </div>
             )}
 
-            {param.type === "file-upload" && (
+            {param.type === "file-upload" && param.uiVariant === "crop-overlay-preview" && (
+              // Crop image: side-label layout. Button is always rendered — muted when wired.
+              // Preview with crop overlay is rendered by the crop-overlay-preview block below.
+              <div className="flex items-start gap-3">
+                <span
+                  data-handle-anchor="label"
+                  className="shrink-0 pt-2 text-xs text-gray-500"
+                >
+                  {param.label}
+                  {param.required && <span className="text-red-400">*</span>}
+                </span>
+                <div className="flex-1">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      disabled={isWired || disabled}
+                      onClick={() => {
+                        if (!isWired && !disabled) {
+                          document.getElementById(`file-input-crop-${id}-${param.key}`)?.click();
+                        }
+                      }}
+                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                      title={isWired ? "Image is supplied by an upstream connection" : value ? "Change image" : "Upload image"}
+                    >
+                      {uploadingField === param.key ? (
+                        <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <LucideIcons.Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span className="capitalize">
+                        {uploadingField === param.key ? "Uploading..." : value ? "Change image" : "Upload image"}
+                      </span>
+                    </button>
+                    <input
+                      id={`file-input-crop-${id}-${param.key}`}
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      disabled={isWired || disabled}
+                      onChange={(e) => void handleFileUpload(param.key, e.target.files)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {param.type === "file-upload" && param.uiVariant !== "crop-overlay-preview" && (
               <div className="space-y-2">
                 {value ? (
                   <div className="relative rounded-lg border border-gray-200 bg-[#F5F5F5] overflow-hidden p-2 flex items-center gap-3">
@@ -1173,6 +1256,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             {/* Crop overlay preview — rendered after the inputImage file-upload when
                 uiVariant === "crop-overlay-preview" is set on the param definition. */}
             {param.uiVariant === "crop-overlay-preview" && (() => {
+              // Resolve image: wired edge takes priority, fall back to locally stored value
               const imgUrl: string | null =
                 (isWired
                   ? (() => {
@@ -1199,33 +1283,46 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
               return (
                 <div className="mt-2 flex justify-end">
-                  <div
-                    className="relative overflow-hidden rounded-md"
-                    style={{ border: "2px solid rgba(59,130,246,0.3)", display: "inline-block" }}
-                  >
-                    <img
-                      alt=""
-                      src={imgUrl}
-                      className="block rounded-sm"
-                      style={{ maxWidth: 240, maxHeight: 160 }}
-                    />
-                    {/* Dimmed overlay regions */}
-                    <div className="pointer-events-none absolute inset-0">
-                      <div className="absolute left-0 right-0 top-0 bg-black/35" style={{ height: `${yv}%` }} />
-                      <div className="absolute left-0 right-0 bg-black/35" style={{ top: `${bottomPct}%`, bottom: 0 }} />
-                      <div className="absolute left-0 bg-black/35" style={{ top: `${yv}%`, width: `${xv}%`, height: `${bottomPct - yv}%` }} />
-                      <div className="absolute bg-black/35" style={{ top: `${yv}%`, left: `${rightPct}%`, right: 0, height: `${bottomPct - yv}%` }} />
-                      {/* Crop frame */}
-                      <div
-                        className="absolute border-2"
-                        style={{
-                          left: `${xv}%`,
-                          top: `${yv}%`,
-                          width: `${wv}%`,
-                          height: `${hv}%`,
-                          borderColor: "rgba(167,139,250,0.9)",
-                        }}
+                  <div className="flex flex-col items-end gap-1">
+                    <div
+                      className="relative overflow-hidden rounded-md"
+                      style={{ border: "2px solid rgba(59,130,246,0.3)" }}
+                    >
+                      <img
+                        alt=""
+                        src={imgUrl}
+                        className="block rounded-sm"
+                        style={{ maxWidth: 240, maxHeight: 160 }}
                       />
+                      {/* Dimmed overlay regions */}
+                      <div className="pointer-events-none absolute inset-0">
+                        <div className="absolute left-0 right-0 top-0 bg-black/35" style={{ height: `${yv}%` }} />
+                        <div className="absolute left-0 right-0 bg-black/35" style={{ top: `${bottomPct}%`, bottom: 0 }} />
+                        <div className="absolute left-0 bg-black/35" style={{ top: `${yv}%`, width: `${xv}%`, height: `${bottomPct - yv}%` }} />
+                        <div className="absolute bg-black/35" style={{ top: `${yv}%`, left: `${rightPct}%`, right: 0, height: `${bottomPct - yv}%` }} />
+                        {/* Crop frame */}
+                        <div
+                          className="absolute border-2"
+                          style={{
+                            left: `${xv}%`,
+                            top: `${yv}%`,
+                            width: `${wv}%`,
+                            height: `${hv}%`,
+                            borderColor: "rgba(167,139,250,0.9)",
+                          }}
+                        />
+                      </div>
+                      {/* Remove button — only when image is local (not wired) */}
+                      {!isWired && !isLocked && !readOnly && (
+                        <button
+                          type="button"
+                          onClick={() => removeFileValue(param.key)}
+                          className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500"
+                          title="Remove image"
+                        >
+                          <LucideIcons.X className="h-2.5 w-2.5" aria-hidden="true" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
