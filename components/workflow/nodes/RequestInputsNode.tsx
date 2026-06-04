@@ -78,15 +78,13 @@ export default function RequestInputsNode({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (
-        activeUploadPopup &&
-        !(e.target as HTMLElement).closest(".upload-popup-container")
-      ) {
+      const target = e.target as HTMLElement;
+      if (activeUploadPopup && !target.closest(".upload-popup-container")) {
         setActiveUploadPopup(null);
       }
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [activeUploadPopup]);
 
   const fields: WorkflowField[] = nodeData.fields ?? [];

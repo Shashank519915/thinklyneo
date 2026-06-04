@@ -218,6 +218,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
     if (!activeUploadPopup && !activeDropdown) return;
     const handleOutsideClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      // Use click (not mousedown) so the trigger button's onClick toggle runs first.
+      // This prevents the race where mousedown closes the popup and onClick reopens it.
       if (activeUploadPopup && !target.closest(".upload-popup-container")) {
         setActiveUploadPopup(null);
       }
@@ -225,8 +227,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
         setActiveDropdown(null);
       }
     };
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
   }, [activeUploadPopup, activeDropdown]);
 
   const hasModeTab = type === "gptImage2" || type === "klingV3";
@@ -1185,7 +1187,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     rows={3}
                     placeholder={
                       param.placeholder ||
-                      `Describe the ${param.label.toLowerCase()} you want to create...`
+                      (definition.type === "gptImage2" && modeTab === "image"
+                        ? "Describe how you want to edit the image..."
+                        : `Describe the ${param.label.toLowerCase()} you want to create...`)
                     }
                     value={value}
                     onChange={(e) => updateInput(param.key, e.target.value)}
@@ -2538,10 +2542,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             ? primaryParams.map(renderParameterInput)
             : null}
 
-          {/* Image-to-Video params — shown only in image tab, rendered in definition order */}
-          {imageModeParams.length > 0 && modeTab === "image" && (
-            <>{imageModeParams.map(renderParameterInput)}</>
-          )}
+          {/* Image tab — for nodes like gptImage2 that interleave primary+image-mode in definition order.
+              For klingV3-style nodes, image-mode params replace primary entirely. */}
+          {imageModeParams.length > 0 && modeTab === "image" && (() => {
+            // If the node has primary params alongside image-mode params (e.g. gptImage2),
+            // render all primary+image-mode in their definition order so fields interleave correctly.
+            // For nodes where primary params are hidden in image tab (klingV3), imageModeParams only.
+            const hasPrimaryInImageTab = definition.type === "gptImage2";
+            if (hasPrimaryInImageTab) {
+              return definition.inputs
+                .filter((p: any) => p.group === "primary" || p.group === "image-mode")
+                .map(renderParameterInput);
+            }
+            return imageModeParams.map(renderParameterInput);
+          })()}
 
           {/* Collapsible Advanced Parameters (generic nodes) */}
           {advancedParams.length > 0 && (
