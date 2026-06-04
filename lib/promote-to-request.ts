@@ -293,10 +293,38 @@ export function removeRequestFieldAndEdges(
   const req = nodes.find((n) => n.id === requestNodeId);
   if (!req) return { nodes, edges };
   const reqData = req.data as unknown as RequestInputsData;
+
+  // Find the field before removing it so we can clear linked target inputs
+  const removedField = (reqData.fields ?? []).find((f) => f.id === fieldId);
+
   const fields = (reqData.fields ?? []).filter((f) => f.id !== fieldId);
-  const nextNodes = nodes.map((n) =>
+  let nextNodes = nodes.map((n) =>
     n.id === requestNodeId ? { ...n, data: { ...reqData, fields } } : n
   );
+
+  // Clear the linked target's local input so stale values don't re-appear
+  if (removedField?.linkedTarget) {
+    const { nodeId, handle } = removedField.linkedTarget;
+    const paramKey = handle.replace(/^in:/, "");
+    const isMediaArray =
+      removedField.type === "image_field" ||
+      removedField.type === "video_field" ||
+      removedField.type === "audio_field";
+    const isBoolean = removedField.type === "boolean_field";
+    const clearValue = isMediaArray ? [] : isBoolean ? false : undefined;
+    nextNodes = nextNodes.map((n) => {
+      if (n.id !== nodeId) return n;
+      const data = n.data as { inputs?: Record<string, unknown> };
+      const inputs = { ...(data.inputs ?? {}) };
+      if (clearValue === undefined) {
+        delete inputs[paramKey];
+      } else {
+        inputs[paramKey] = clearValue;
+      }
+      return { ...n, data: { ...data, inputs } };
+    });
+  }
+
   const nextEdges = edges.filter((e) => e.sourceHandle !== fieldId);
   return { nodes: nextNodes, edges: nextEdges };
 }

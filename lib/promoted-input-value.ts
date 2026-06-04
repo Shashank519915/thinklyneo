@@ -123,7 +123,13 @@ export function resolveEffectiveParamValue(opts: {
   if (promoted === undefined || promoted === null || promoted === "") {
     // Wire removed — fall back to defaultValue only (don't preserve stale local uploads)
     if (isArrayType) return normalizeArrayParamValue(opts.defaultValue, opts.defaultValue);
+    if (opts.paramType === "boolean") return opts.defaultValue ?? false;
     return opts.defaultValue ?? "";
+  }
+
+  if (opts.paramType === "boolean") {
+    // promoted is a string "true"/"false" from the request field — coerce to actual boolean
+    return promoted === "true" || promoted === true;
   }
 
   if (opts.paramType === "number" || opts.paramType === "slider") {

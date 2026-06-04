@@ -215,9 +215,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   const isLocked = !!nodeData.locked;
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showSettings, setShowSettings] = useState(
-    definition.type === "openRouter" || definition.type === "gemini",
-  );
+  const [showSettings, setShowSettings] = useState(false);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   // Elements array state for Kling v3 Image-to-Video
   const [elementItems, setElementItems] = useState<Record<string, Record<string, string | string[]>>>(() => {
