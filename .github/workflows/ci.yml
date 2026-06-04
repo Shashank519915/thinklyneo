@@ -11,15 +11,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "pnpm"
+          # @galaxy/shared is pulled from GitHub Packages — must point here
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@galaxy"
+
+      # NODE_AUTH_TOKEN lets pnpm authenticate with GitHub Packages to download @galaxy/shared
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @galaxy/shared build
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
@@ -28,15 +37,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "pnpm"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@galaxy"
+
       - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: pnpm exec playwright install --with-deps chromium
+
       - name: Playwright smoke (deployed app, public routes)
         run: pnpm test:e2e
         env:

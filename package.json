@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "pnpm --filter @galaxy/shared build && next build",
+    "build": "next build",
     "start": "next start",
-    "sync-shared": "node scripts/sync-shared.js",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -16,7 +15,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.4",
-    "@galaxy/shared": "file:./shared",
+    "@galaxy/shared": "1.0.0",
     "@trigger.dev/react-hooks": "4.4.6",
     "@trigger.dev/sdk": "4.4.6",
     "@xyflow/react": "^12.10.2",
