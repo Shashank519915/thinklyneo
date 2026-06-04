@@ -593,8 +593,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   borderRadius: "50%",
                   background: param.handle.color,
                   border: `2px solid ${param.handle.color}80`,
-                  boxShadow: `${param.handle.color}50 0px 0px 8px`,
                   cursor: "crosshair",
+                  ["--handle-color" as any]: param.handle.color,
                 }}
               />
             </div>
@@ -717,8 +717,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   borderRadius: "50%",
                   background: param.handle.color,
                   border: `2px solid ${param.handle.color}80`,
-                  boxShadow: `${param.handle.color}50 0px 0px 8px`,
                   cursor: "crosshair",
+                  ["--handle-color" as any]: param.handle.color,
                 }}
               />
             </div>
@@ -891,8 +891,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 borderRadius: "50%",
                 background: param.handle.color,
                 border: `2px solid ${param.handle.color}80`,
-                boxShadow: `${param.handle.color}50 0px 0px 8px`,
                 cursor: "crosshair",
+                ["--handle-color" as any]: param.handle.color,
               }}
             />
           </div>
@@ -1529,7 +1529,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 <div className="flex items-start gap-3">
                   <span
                     data-handle-anchor="label"
-                    className="shrink-0 pt-2 text-xs text-gray-500 dark:text-zinc-400"
+                    className="shrink-0 pt-2 text-xs text-gray-500"
                   >
                     {param.label}
                     {param.required && <span className="text-red-400">*</span>}
@@ -1993,8 +1993,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       borderRadius: "50%",
                                       background: field.handle.color,
                                       border: `2px solid ${field.handle.color}80`,
-                                      boxShadow: `${field.handle.color}50 0px 0px 8px`,
                                       cursor: "crosshair",
+                                      ["--handle-color" as any]: field.handle.color,
                                     }}
                                   />
                                 </div>
@@ -2676,8 +2676,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       borderRadius: "50%",
                       background: out.handle.color,
                       border: `2px solid ${out.handle.color}80`,
-                      boxShadow: `${out.handle.color}50 0px 0px 8px`,
                       cursor: "crosshair",
+                      ["--handle-color" as any]: out.handle.color,
                     }}
                   />
                 </div>

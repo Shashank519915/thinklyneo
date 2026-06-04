@@ -135,19 +135,25 @@ export default function ResponseNode({ id, data }: NodeProps) {
                 key={result.id}
                 className="relative space-y-2 rounded-lg bg-[#F5F5F5] p-3"
               >
-                <Handle
-                  type="target"
-                  position={Position.Left}
-                  id={result.id}
-                  style={{
-                    background: "#6366F1",
-                    border: "2px solid #6366F1",
-                    width: 14,
-                    height: 14,
-                    left: -29,
-                    boxShadow: "0 0 8px rgba(99,102,241,0.314)",
-                  }}
-                />
+                <div
+                  className="absolute flex items-center"
+                  style={{ left: "-21px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+                >
+                  <Handle
+                    type="target"
+                    position={Position.Left}
+                    id={result.id}
+                    className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                    style={{
+                      background: "#6366F1",
+                      border: "2px solid #6366F180",
+                      width: 14,
+                      height: 14,
+                      cursor: "crosshair",
+                      ["--handle-color" as any]: "#6366F1",
+                    }}
+                  />
+                </div>
                 {/* Result header */}
                 <div className="flex items-center gap-1.5">
                   <span
@@ -252,19 +258,25 @@ export default function ResponseNode({ id, data }: NodeProps) {
           {/* Default drop zone for new connections */}
           {!readOnly && (
             <div className="relative overflow-visible mt-3">
-              <Handle
-                type="target"
-                position={Position.Left}
-                id="result"
-                style={{
-                  background: "#E5E7EB",
-                  border: "2px solid #9CA3AF",
-                  width: 14,
-                  height: 14,
-                  left: -21,
-                  top: 10,
-                }}
-              />
+              <div
+                className="absolute flex items-center"
+                style={{ left: "-21px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+              >
+                <Handle
+                  type="target"
+                  position={Position.Left}
+                  id="result"
+                  className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                  style={{
+                    background: "#E5E7EB",
+                    border: "2px solid #9CA3AF80",
+                    width: 14,
+                    height: 14,
+                    cursor: "crosshair",
+                    ["--handle-color" as any]: "#9CA3AF",
+                  }}
+                />
+              </div>
               <div className="text-[12px] text-gray-500 italic pl-2 py-1">Drop edge here to add field...</div>
             </div>
           )}

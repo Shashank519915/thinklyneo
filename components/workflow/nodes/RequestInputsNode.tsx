@@ -366,20 +366,26 @@ export default function RequestInputsNode({
 
           return (
             <div key={field.id} className={`relative overflow-visible transition-all ${isFieldNew(field.id) ? "opacity-40 grayscale pointer-events-none" : ""}`}>
-              {/* Output handle */}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={field.id}
-                style={{
-                  background: handleColorVal,
-                  border: `2px solid ${handleColorVal}80`,
-                  width: 14,
-                  height: 14,
-                  right: -21,
-                  boxShadow: `0 0 8px ${handleColorVal}30`,
-                }}
-              />
+              {/* Output handle — pinned to the label row top, slightly below */}
+              <div
+                className="absolute flex items-center"
+                style={{ right: "-21px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
+              >
+                <Handle
+                  type="source"
+                  position={Position.Right}
+                  id={field.id}
+                  className="!relative !transform-none source connectable connectablestart connectableend connectionindicator"
+                  style={{
+                    background: handleColorVal,
+                    border: `2px solid ${handleColorVal}80`,
+                    width: 14,
+                    height: 14,
+                    cursor: "crosshair",
+                    ["--handle-color" as any]: handleColorVal,
+                  }}
+                />
+              </div>
 
               <div className="w-full">
                 {/* Field label row */}

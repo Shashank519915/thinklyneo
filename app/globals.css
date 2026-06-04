@@ -112,6 +112,23 @@ body {
   height: 14px !important;
   border-radius: 50% !important;
   border-width: 2px !important;
+  transition: width 0.15s ease, height 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+/* When hovering the parent node: show a soft transparent halo ring around every handle */
+.react-flow__node:hover .react-flow__handle {
+  box-shadow:
+    0px 0px 6px var(--handle-color, #888),
+    0 0 0 6px color-mix(in srgb, var(--handle-color, #888) 18%, transparent) !important;
+}
+
+/* When hovering a specific handle: grow the dot (~14 + half of 6px halo = ~17px) + stronger halo */
+.react-flow__handle:hover {
+  width: 18px !important;
+  height: 18px !important;
+  box-shadow:
+    0px 0px 8px var(--handle-color, #888),
+    0 0 0 6px color-mix(in srgb, var(--handle-color, #888) 28%, transparent) !important;
 }
 
 /* Node add animation */
