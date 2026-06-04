@@ -74,6 +74,7 @@ export function resolveRequestFieldType(
 ): WorkflowField["type"] {
   if (paramType === "select") return "select_field";
   if (paramType === "number" || paramType === "slider") return "number_field";
+  if (paramType === "boolean") return "boolean_field";
   const ht = handleType as string | undefined;
   if (ht === "image") return "image_field";
   if (ht === "video") return "video_field";

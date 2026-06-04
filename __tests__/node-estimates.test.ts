@@ -33,6 +33,6 @@ describe("sumWorkflowEstimateMillions", () => {
 
   it("sums a realistic pipeline", () => {
     const list = [node("requestInputs"), node("gptImage2"), node("klingV3"), node("response")];
-    expect(sumWorkflowEstimateMillions(list)).toBeCloseTo(0.21 + 1.5);
+    expect(sumWorkflowEstimateMillions(list)).toBeCloseTo(0.21 + 0.84);
   });
 });

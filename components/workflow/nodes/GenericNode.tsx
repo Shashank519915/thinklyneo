@@ -755,7 +755,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           param.uiVariant !== "magica-side-label" &&
           param.uiVariant !== "magica-volume-row" &&
           param.uiVariant !== "crop-overlay-preview" &&
-          param.type !== "slider" && (
+          param.type !== "slider" &&
+          param.type !== "boolean" && (
           <div
             data-handle-anchor="label"
             className="mb-1.5 flex items-center text-xs text-gray-500"
