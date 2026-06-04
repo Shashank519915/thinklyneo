@@ -12,8 +12,8 @@ importers:
         specifier: ^7.3.4
         version: 7.4.3(next@16.2.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@shashank519915/shared':
-        specifier: 1.0.9
-        version: 1.0.9
+        specifier: 1.0.10
+        version: 1.0.10
       '@trigger.dev/react-hooks':
         specifier: 4.4.6
         version: 4.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1059,8 +1059,8 @@ packages:
   '@s2-dev/streamstore@0.22.5':
     resolution: {integrity: sha512-GqdOKIbIoIxT+40fnKzHbrsHB6gBqKdECmFe7D3Ojk4FoN1Hu0LhFzZv6ZmVMjoHHU+55debS1xSWjZwQmbIyQ==}
 
-  '@shashank519915/shared@1.0.9':
-    resolution: {integrity: sha512-XNXxpl4CfpylPy+m9Lj/CWYcelyIbkvklRALDk7mT6oktBIrVVA5uO9Y/qYqcOC3MlRqA3W4zbX5rdfumpk+DA==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.9/cc6932dea94f3e3cc1aedce52e55231287dfc238}
+  '@shashank519915/shared@1.0.10':
+    resolution: {integrity: sha512-+CB2QAFXOsnI93VUbmZ6KIK9Fj/KT7/uaSdfnS3ToasVdodqtgD3yJv9wVVMo5u2SjwPexavyUPkIdyfSME0rg==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.10/8c27acf9bf804cc68352d078c02312dae70c9416}
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
@@ -1874,8 +1874,8 @@ packages:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
 
-  electron-to-chromium@1.5.366:
-    resolution: {integrity: sha512-OlRuhb688YTCzzU3gXPLn6nGyd+F+53INE1qaKKlu6kETErE8FYsyDh0XqXEU+uBRn0MpCzz2vfNwORhkap8qg==}
+  electron-to-chromium@1.5.367:
+    resolution: {integrity: sha512-4Mk/mrynCNQ+atY40D3UpmhLWB6AHMbYMlIrPhHcMF6x0L7O0b052FCAsxw1LlaR++UFuNg3D/A6XCuGDa0guQ==}
 
   emoji-regex@9.2.2:
     resolution: {integrity: sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg==}
@@ -4234,7 +4234,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@shashank519915/shared@1.0.9':
+  '@shashank519915/shared@1.0.10':
     dependencies:
       zod: 3.25.76
 
@@ -4895,7 +4895,7 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.33
       caniuse-lite: 1.0.30001793
-      electron-to-chromium: 1.5.366
+      electron-to-chromium: 1.5.367
       node-releases: 2.0.47
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
 
@@ -5099,7 +5099,7 @@ snapshots:
       es-errors: 1.3.0
       gopd: 1.2.0
 
-  electron-to-chromium@1.5.366: {}
+  electron-to-chromium@1.5.367: {}
 
   emoji-regex@9.2.2: {}
 

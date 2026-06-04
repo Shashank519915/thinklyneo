@@ -83,8 +83,8 @@ export default function RequestInputsNode({
         setActiveUploadPopup(null);
       }
     };
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, [activeUploadPopup]);
 
   const fields: WorkflowField[] = nodeData.fields ?? [];
@@ -618,7 +618,7 @@ export default function RequestInputsNode({
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
-                            onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
+                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
                             className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                             title="Upload image"
                           >
@@ -706,7 +706,7 @@ export default function RequestInputsNode({
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
-                            onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
+                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
                             className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                             title="Upload video"
                           >
@@ -797,7 +797,7 @@ export default function RequestInputsNode({
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
-                            onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
+                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
                             className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                             title={`Upload ${field.type === "audio_field" ? "audio" : "media"}`}
                           >
@@ -877,7 +877,7 @@ export default function RequestInputsNode({
                           <button
                             type="button"
                             disabled={uploadingFields[field.id]}
-                            onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
+                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
                             className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                             title="Upload file"
                           >
