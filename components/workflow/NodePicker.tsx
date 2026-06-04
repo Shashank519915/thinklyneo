@@ -17,6 +17,10 @@ import {
   Layers,
   ChevronRight,
 } from "lucide-react";
+import {
+  EXECUTABLE_NODE_DEFINITIONS,
+  buildDefaultNodeInputs,
+} from "@shashank519915/shared";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { generateNodeId } from "@/lib/utils";
 import { type Node } from "@xyflow/react";
@@ -101,127 +105,19 @@ const CATEGORIES: Array<{
   { id: "others", label: "OTHERS", icon: <Layers className="h-3.5 w-3.5" /> },
 ];
 
-/** Creates default node data payloads before `viewportCenter`-based placement and `addNode`. */
+/** Creates default node data from shared `NodeDefinition` (single source of truth for inputs). */
 function createNode(nodeType: string): Node {
-  const id = generateNodeId();
-  const position = { x: 0, y: 0 };
-
-  if (nodeType === "cropImage") {
-    return {
-      id,
-      type: "cropImage",
-      position,
-      data: {
-        label: "Crop Image",
-        inputs: { inputImage: null, x: 0, y: 0, w: 100, h: 100 },
-        output: null,
-      },
-    };
+  const def = EXECUTABLE_NODE_DEFINITIONS[nodeType];
+  if (!def) {
+    throw new Error(`Unknown node type: ${nodeType}`);
   }
-
-  if (nodeType === "gptImage2") {
-    return {
-      id,
-      type: "gptImage2",
-      position,
-      data: {
-        label: "GPT-Image-2",
-        inputs: { prompt: "", negativePrompt: "", aspectRatio: "1:1" },
-        output: null,
-      },
-    };
-  }
-
-  if (nodeType === "klingV3") {
-    return {
-      id,
-      type: "klingV3",
-      position,
-      data: {
-        label: "Kling v3",
-        inputs: { prompt: "", inputImage: null, aspectRatio: "16:9", duration: "5s" },
-        output: null,
-      },
-    };
-  }
-
-  if (nodeType === "mergeVideo") {
-    return {
-      id,
-      type: "mergeVideo",
-      position,
-      data: {
-        label: "Merge Videos",
-        inputs: { video_urls: [], transition: "none" },
-        output: null,
-      },
-    };
-  }
-
-  if (nodeType === "mergeAV") {
-    return {
-      id,
-      type: "mergeAV",
-      position,
-      data: {
-        label: "Merge Audio & Video",
-        inputs: { video_url: null, audio_url: null, audio_volume: 0.5 },
-        output: null,
-      },
-    };
-  }
-
-  if (nodeType === "extractAudio") {
-    return {
-      id,
-      type: "extractAudio",
-      position,
-      data: {
-        label: "Extract Audio",
-        inputs: { videoUrl: "", format: "mp3" },
-        output: null,
-      },
-    };
-  }
-
-  if (nodeType === "openRouter") {
-    return {
-      id,
-      type: "openRouter",
-      position,
-      data: {
-        label: "OpenRouter LLM",
-        inputs: {
-          prompt: "",
-          systemPrompt: "",
-          image_urls: [],
-          video_urls: [],
-          audio_urls: [],
-          temperature: 0.5,
-          maxTokens: 1024,
-          topP: 1,
-        },
-        output: null,
-      },
-    };
-  }
-
   return {
-    id,
-    type: "gemini",
-    position,
+    id: generateNodeId(),
+    type: nodeType,
+    position: { x: 0, y: 0 },
     data: {
-      label: "Gemini",
-      inputs: {
-        prompt: "",
-        systemPrompt: "",
-        image_urls: [],
-        video_urls: [],
-        audio_urls: [],
-        temperature: 0.5,
-        maxTokens: 1024,
-        topP: 1,
-      },
+      label: def.name,
+      inputs: buildDefaultNodeInputs(def),
       output: null,
     },
   };

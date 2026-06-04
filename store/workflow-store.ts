@@ -323,22 +323,26 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
         });
 
       let nextNodes = applyNodeChanges(changes, state.nodes);
+      let nextEdges = state.edges;
 
-      // When a node is deleted, also drop any promoted request fields linked to it.
+      // When a node is deleted, drop its edges and any promoted request fields linked to it.
       if (removedIds.length > 0) {
         const removedSet = new Set(removedIds);
+        nextEdges = state.edges.filter(
+          (e) => !removedSet.has(e.source) && !removedSet.has(e.target),
+        );
         nextNodes = nextNodes.map((n) => {
           if (n.type !== "requestInputs") return n;
           const data = n.data as { fields?: WorkflowField[] };
           const fields = (data.fields ?? []).filter(
-            (f) => !f.linkedTarget || !removedSet.has(f.linkedTarget.nodeId)
+            (f) => !f.linkedTarget || !removedSet.has(f.linkedTarget.nodeId),
           );
           if (fields.length === (data.fields ?? []).length) return n;
           return { ...n, data: { ...data, fields } };
         });
       }
 
-      return { nodes: nextNodes };
+      return { nodes: nextNodes, edges: nextEdges };
     });
   },
 

@@ -32,6 +32,7 @@ import {
   extractAudioDefinition,
   estimateNodeDisplayMicrocredits,
   formatNodeEstimateMillions,
+  buildDefaultNodeInputs,
   type NodeDefinition,
 } from "@shashank519915/shared";
 
@@ -301,13 +302,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
   };
 
   const handleReset = () => {
-    const defaultInputs: Record<string, any> = {};
-    definition.inputs.forEach((param) => {
-      defaultInputs[param.key] =
-        param.defaultValue !== undefined ? param.defaultValue : null;
-    });
     updateNodeData(id, {
-      inputs: defaultInputs,
+      inputs: buildDefaultNodeInputs(definition),
       output: null,
     } as any);
   };
