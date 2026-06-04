@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.4",
-    "@shashank519915/shared": "1.0.10",
+    "@shashank519915/shared": "1.0.12",
     "@trigger.dev/react-hooks": "4.4.6",
     "@trigger.dev/sdk": "4.4.6",
     "@xyflow/react": "^12.10.2",

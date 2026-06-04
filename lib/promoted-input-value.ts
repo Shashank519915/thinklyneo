@@ -14,7 +14,13 @@ import {
 import type { WorkflowField } from "@/store/workflow-store";
 
 /** Node input keys that store comma-separated media as string arrays. */
-const ARRAY_MEDIA_INPUT_KEYS = new Set(["images", "uploadedImages", "video_urls"]);
+const ARRAY_MEDIA_INPUT_KEYS = new Set([
+  "images",
+  "uploadedImages",
+  "image_urls",
+  "video_urls",
+  "audio_urls",
+]);
 
 export function getPromotedFieldValue(
   nodes: Node[],
@@ -50,14 +56,18 @@ export function coerceSyncedInputValue(
   const parsed = parseWorkflowFieldValue(field);
   if (parsed === undefined) return undefined;
 
-  if (field.type === "image_field" || field.type === "video_field") {
+  if (
+    field.type === "image_field" ||
+    field.type === "video_field" ||
+    field.type === "audio_field"
+  ) {
     const urls = parseMediaList(parsed);
     if (ARRAY_MEDIA_INPUT_KEYS.has(paramKey)) return urls;
     if (field.mediaMaxCount === 1) return urls[0] ?? null;
     return urls.length <= 1 ? (urls[0] ?? null) : urls.join(",");
   }
 
-  if (field.type === "audio_field" || field.type === "file_field") {
+  if (field.type === "file_field") {
     const urls = parseMediaList(parsed);
     return urls[0] ?? (typeof parsed === "string" ? parsed : null);
   }
@@ -92,11 +102,14 @@ export function resolveEffectiveParamValue(opts: {
   paramType?: string;
   previewOpts?: ResolvePropagatedEdgeOptions;
 }): unknown {
+  const isArrayType =
+    opts.paramType === "image-array" ||
+    opts.paramType === "video-array" ||
+    opts.paramType === "audio-array";
+
   const fallback = opts.localValue ?? opts.defaultValue ?? "";
   if (!opts.requestPromoted) {
-    if (opts.paramType === "image-array" || opts.paramType === "video-array") {
-      return normalizeArrayParamValue(fallback, opts.defaultValue);
-    }
+    if (isArrayType) return normalizeArrayParamValue(fallback, opts.defaultValue);
     return fallback;
   }
 
@@ -108,10 +121,9 @@ export function resolveEffectiveParamValue(opts: {
     opts.previewOpts
   );
   if (promoted === undefined || promoted === null || promoted === "") {
-    if (opts.paramType === "image-array" || opts.paramType === "video-array") {
-      return normalizeArrayParamValue(fallback, opts.defaultValue);
-    }
-    return fallback;
+    // Wire removed — fall back to defaultValue only (don't preserve stale local uploads)
+    if (isArrayType) return normalizeArrayParamValue(opts.defaultValue, opts.defaultValue);
+    return opts.defaultValue ?? "";
   }
 
   if (opts.paramType === "number" || opts.paramType === "slider") {
@@ -119,9 +131,7 @@ export function resolveEffectiveParamValue(opts: {
     return Number.isFinite(n) ? n : fallback;
   }
 
-  if (opts.paramType === "image-array" || opts.paramType === "video-array") {
-    return normalizeArrayParamValue(promoted, opts.defaultValue);
-  }
+  if (isArrayType) return normalizeArrayParamValue(promoted, opts.defaultValue);
 
   return promoted;
 }

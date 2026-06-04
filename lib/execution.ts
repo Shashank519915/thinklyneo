@@ -138,10 +138,27 @@ function getHandleDataType(
     (handleId === "out:result" && nodeType === "gptImage2")
   )
     return "image";
-  if (handleId === "in:images") return "image"; // gemini vision multi-input
-  if (handleId === "in:video_urls") return "video"; // merge videos multi-input
+  if (handleId === "in:images" || handleId === "in:image_urls") return "image"; // vision multi-input
+  if (handleId === "in:video_urls") return "video"; // merge/openrouter video multi-input
+  if (handleId === "in:audio_urls") return "audio"; // openrouter audio multi-input
   if (handleId === "in:audio_volume") return "number";
   if (handleId === "in:format") return "text";
+  // Settings sliders / numbers / booleans — type carried by field_* on source side, accept generic
+  if (
+    handleId === "in:temperature" ||
+    handleId === "in:maxTokens" ||
+    handleId === "in:topP" ||
+    handleId === "in:topK" ||
+    handleId === "in:frequencyPenalty" ||
+    handleId === "in:presencePenalty" ||
+    handleId === "in:repetitionPenalty" ||
+    handleId === "in:minP" ||
+    handleId === "in:topA" ||
+    handleId === "in:seed" ||
+    handleId === "in:reasoning" ||
+    handleId === "in:response_format"
+  ) return "generic";
+  if (handleId === "in:stop") return "text";
   if (handleId.includes("Video") || handleId.includes("video")) return "video";
   if (handleId.includes("Audio") || handleId.includes("audio")) return "audio";
   if (handleId.includes("media") || handleId.includes("Media")) return "media";
@@ -179,11 +196,18 @@ export function isValidConnection(
   // Response handle is special
   if (targetType === "response") return true;
 
-  // Image fan-in for Gemini Vision
-  if (targetHandle === "in:images" && sourceType === "image") return true;
+  // Image fan-in for Gemini Vision / OpenRouter
+  if (
+    (targetHandle === "in:images" || targetHandle === "in:image_urls") &&
+    sourceType === "image"
+  )
+    return true;
 
-  // Video fan-in for Merge Videos
+  // Video fan-in for Merge Videos / OpenRouter
   if (targetHandle === "in:video_urls" && sourceType === "video") return true;
+
+  // Audio fan-in for OpenRouter
+  if (targetHandle === "in:audio_urls" && sourceType === "audio") return true;
 
   return sourceType === targetType;
 }
@@ -304,34 +328,46 @@ async function executeNode(
   }
 
   if (type === "gemini") {
-    const data = node.data as {
-      model?: string;
-      inputs?: {
-        systemPrompt?: string | null;
-        temperature?: number;
-        maxTokens?: number;
-        topP?: number;
-      };
-    };
+    const data = node.data as { model?: string; inputs?: Record<string, unknown> };
     const prompt = resolvedInputs["prompt"] ?? null;
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return { output: null, error: "No prompt connected or prompt is empty" };
     }
-    const images = (resolvedInputs["images"] as unknown[]) ?? [];
-    const validImages: string[] = [];
-    for (const img of images) {
-      if (typeof img === "string" && img.length > 0) {
-        const splitUrls = img.split(",").map((s) => s.trim()).filter(Boolean);
-        validImages.push(...splitUrls);
+    const collectGeminiUrls = (key: string, legacyKey?: string): string[] => {
+      const raw =
+        resolvedInputs[key] ??
+        (legacyKey ? resolvedInputs[legacyKey] : undefined) ??
+        data.inputs?.[key] ??
+        (legacyKey ? data.inputs?.[legacyKey] : undefined);
+      const out: string[] = [];
+      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      for (const item of items) {
+        if (typeof item === "string" && item.length > 0)
+          out.push(...item.split(",").map((s) => s.trim()).filter(Boolean));
       }
-    }
+      return out;
+    };
+    const gi = data.inputs ?? {};
     const body = {
       model: data.model ?? "gemini-2.5-flash",
       prompt,
-      systemPrompt: resolvedInputs["systemPrompt"] ?? data.inputs?.systemPrompt ?? null,
-      images: validImages,
-      temperature: data.inputs?.temperature ?? 1.0,
-      maxTokens: data.inputs?.maxTokens ?? 2048,
+      systemPrompt: resolvedInputs["systemPrompt"] ?? gi.systemPrompt ?? null,
+      image_urls: collectGeminiUrls("image_urls", "images"),
+      video_urls: collectGeminiUrls("video_urls", "video"),
+      audio_urls: collectGeminiUrls("audio_urls", "audio"),
+      temperature: gi.temperature ?? 1.0,
+      maxTokens: gi.maxTokens ?? 2048,
+      reasoning: gi.reasoning,
+      topP: gi.topP ?? 0.95,
+      topK: gi.topK,
+      frequencyPenalty: gi.frequencyPenalty,
+      presencePenalty: gi.presencePenalty,
+      repetitionPenalty: gi.repetitionPenalty,
+      minP: gi.minP,
+      topA: gi.topA,
+      seed: gi.seed,
+      stop: gi.stop,
+      response_format: gi.response_format,
       runId,
       nodeRunId: node.id,
     };
@@ -352,32 +388,45 @@ async function executeNode(
   }
 
   if (type === "openRouter") {
-    const data = node.data as {
-      inputs?: {
-        systemPrompt?: string | null;
-        temperature?: number;
-        maxTokens?: number;
-        topP?: number;
-      };
-    };
+    const data = node.data as { inputs?: Record<string, unknown> };
     const prompt = resolvedInputs["prompt"] ?? null;
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return { output: null, error: "No prompt connected or prompt is empty" };
     }
-    const images = (resolvedInputs["images"] as unknown[]) ?? [];
-    const validImages: string[] = [];
-    for (const img of images) {
-      if (typeof img === "string" && img.length > 0) {
-        const splitUrls = img.split(",").map((s) => s.trim()).filter(Boolean);
-        validImages.push(...splitUrls);
+    const collectUrls = (key: string, legacyKey?: string): string[] => {
+      const raw =
+        resolvedInputs[key] ??
+        (legacyKey ? resolvedInputs[legacyKey] : undefined) ??
+        data.inputs?.[key] ??
+        (legacyKey ? data.inputs?.[legacyKey] : undefined);
+      const out: string[] = [];
+      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      for (const item of items) {
+        if (typeof item === "string" && item.length > 0)
+          out.push(...item.split(",").map((s) => s.trim()).filter(Boolean));
       }
-    }
+      return out;
+    };
+    const oi = data.inputs ?? {};
     const body = {
       prompt,
-      systemPrompt: resolvedInputs["systemPrompt"] ?? data.inputs?.systemPrompt ?? null,
-      images: validImages,
-      temperature: data.inputs?.temperature ?? 1.0,
-      maxTokens: data.inputs?.maxTokens ?? 2048,
+      systemPrompt: resolvedInputs["systemPrompt"] ?? oi.systemPrompt ?? null,
+      images: collectUrls("image_urls", "images"),
+      video_urls: collectUrls("video_urls", "video"),
+      audio_urls: collectUrls("audio_urls", "audio"),
+      temperature: oi.temperature ?? 0.5,
+      maxTokens: oi.maxTokens ?? 1024,
+      reasoning: oi.reasoning,
+      topP: oi.topP ?? 1,
+      topK: oi.topK,
+      frequencyPenalty: oi.frequencyPenalty,
+      presencePenalty: oi.presencePenalty,
+      repetitionPenalty: oi.repetitionPenalty,
+      minP: oi.minP,
+      topA: oi.topA,
+      seed: oi.seed,
+      stop: oi.stop,
+      response_format: oi.response_format,
       runId,
       nodeRunId: node.id,
     };

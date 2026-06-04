@@ -216,7 +216,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSettings, setShowSettings] = useState(
-    definition.type === "openRouter",
+    definition.type === "openRouter" || definition.type === "gemini",
   );
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   // Elements array state for Kling v3 Image-to-Video
@@ -2291,12 +2291,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <div className="flex items-start gap-3">
                     <span
                       data-handle-anchor="label"
-                      className="shrink-0 pt-2 text-xs text-gray-500"
+                      className="shrink-0 pt-2 text-xs text-gray-500 flex items-center gap-0.5"
                     >
                       {param.label}
                       {param.required && (
                         <span className="text-red-400 ml-0.5">*</span>
                       )}
+                      {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
                     </span>
 
                     <div className="flex-1">
@@ -2458,12 +2459,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <div className="flex items-start gap-3">
                     <span
                       data-handle-anchor="label"
-                      className="shrink-0 pt-2 text-xs text-gray-500"
+                      className="shrink-0 pt-2 text-xs text-gray-500 flex items-center gap-0.5"
                     >
                       {param.label}
                       {param.required && (
                         <span className="text-red-400 ml-0.5">*</span>
                       )}
+                      {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
                     </span>
 
                     <div className="flex-1">
@@ -2606,12 +2608,13 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   <div className="flex items-start gap-3">
                     <span
                       data-handle-anchor="label"
-                      className="shrink-0 pt-2 text-xs text-gray-500"
+                      className="shrink-0 pt-2 text-xs text-gray-500 flex items-center gap-0.5"
                     >
                       {param.label}
                       {param.required && (
                         <span className="text-red-400 ml-0.5">*</span>
                       )}
+                      {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
                     </span>
 
                     <div className="flex-1">

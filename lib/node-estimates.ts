@@ -1,25 +1,34 @@
 /**
- * @fileoverview Static workflow cost estimates for canvas chrome — sourced from @shashank519915/shared definitions.
+ * @fileoverview Workflow cost estimates for canvas chrome — uses @shashank519915/shared
+ * registry + per-node dynamic rules (OpenRouter/Gemini inputs update the total live).
  */
 
 import type { Node } from "@xyflow/react";
-import { estimateWorkflowCostMillions } from "@shashank519915/shared";
+import {
+  estimateWorkflowCostMicrocredits,
+  formatMillionsValueFromMicrocredits,
+} from "@shashank519915/shared";
 
-/** @deprecated Use estimateWorkflowCostMillions from shared; kept for CropImageNode label compat */
-export const ESTIMATE_CROP_M = 0.21;
-/** @deprecated Use estimateWorkflowCostMillions from shared; kept for CropImageNode label compat */
-export const ESTIMATE_GEMINI_M = 0.45;
+function toEstimateNodes(nodeList: Node[]) {
+  return nodeList.map((n) => ({
+    type: n.type ?? "",
+    inputs: (n.data as { inputs?: Record<string, unknown> } | undefined)?.inputs,
+  }));
+}
 
-export const NODE_ESTIMATE_LABEL: Record<"cropImage" | "gemini", string> = {
-  cropImage: `~${ESTIMATE_CROP_M}M`,
-  gemini: `~${ESTIMATE_GEMINI_M}M`,
-};
+/** Total estimated cost in microcredits (matches per-node badges + billing holds use credits.base). */
+export function getWorkflowEstimateMicrocredits(nodeList: Node[]): number {
+  return estimateWorkflowCostMicrocredits(toEstimateNodes(nodeList));
+}
 
-/**
- * Sums credits.base for all executable nodes on the canvas (microcredits → millions).
- */
+/** Total estimated cost in millions (e.g. 1.54). */
 export function sumWorkflowEstimateMillions(nodeList: Node[]): number {
-  return estimateWorkflowCostMillions(
-    nodeList.map((n) => ({ type: n.type ?? "" }))
-  );
+  return getWorkflowEstimateMicrocredits(nodeList) / 1_000_000;
+}
+
+/** Formatted value for `Est ~{x}M` chrome — adapts precision for small OpenRouter totals. */
+export function formatWorkflowEstimateDisplay(nodeList: Node[]): string {
+  const micro = getWorkflowEstimateMicrocredits(nodeList);
+  if (micro === 0) return "0.00";
+  return formatMillionsValueFromMicrocredits(micro);
 }

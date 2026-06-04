@@ -33,7 +33,7 @@ import {
   type RequestFieldKind,
 } from "@/lib/request-inputs";
 import { uploadFilesViaApi } from "@/lib/upload";
-import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
+import { formatWorkflowEstimateDisplay } from "@/lib/node-estimates";
 import PlaygroundFieldRow from "@/components/playground/PlaygroundFieldRow";
 import {
   buildPlaygroundOutputSections,
@@ -130,7 +130,7 @@ export default function WorkflowWorkspacePage() {
 
   // Playground form state
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
-  const [estimatedCost, setEstimatedCost] = useState(0.1);
+  const [estimatedCostLabel, setEstimatedCostLabel] = useState("0.10");
   const [liveNodeStates, setLiveNodeStates] = useState<
     Record<string, { status: string; output?: unknown; error?: string }>
   >({});
@@ -288,8 +288,11 @@ export default function WorkflowWorkspacePage() {
         setWorkflowName(data.data.name);
         setNodes(data.data.nodes || []);
         setEdges(data.data.edges || []);
-        setEstimatedCost(
-          sumWorkflowEstimateMillions(data.data.nodes || []) || 0.1
+        const nodes = data.data.nodes || [];
+        setEstimatedCostLabel(
+          nodes.length > 0
+            ? formatWorkflowEstimateDisplay(nodes)
+            : "0.10",
         );
         return data.data as {
           nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }>;
@@ -748,7 +751,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                           </p>
                         </div>
                         <span className="rounded-md bg-muted px-2 py-1 text-[11px] text-muted-foreground">
-                          Est. ~{estimatedCost.toFixed(2)}M
+                          Est. ~{estimatedCostLabel}M
                         </span>
                       </div>
                       

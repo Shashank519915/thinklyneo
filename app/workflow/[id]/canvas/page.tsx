@@ -17,7 +17,7 @@ import { Download, Upload } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { workflowFilePayloadSchema } from "@/lib/validation";
 import { SpinningLogo } from "@/components/SpinningLogo";
-import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
+import { formatWorkflowEstimateDisplay } from "@/lib/node-estimates";
 import { resolveActiveRunNodeIds, validateWorkflowInputsSync } from "@shashank519915/shared";
 import WorkflowSaveToast, {
   type WorkflowSaveToastPhase,
@@ -519,11 +519,8 @@ export default function WorkflowCanvasPage() {
     return hasRequest && hasResponse;
   }, []);
 
-  const estimateWorkflowCostDisplay = (): string => {
-    const sum = sumWorkflowEstimateMillions(nodes);
-    if (sum === 0) return "0.00";
-    return sum.toFixed(2);
-  };
+  const estimateWorkflowCostDisplay = (): string =>
+    formatWorkflowEstimateDisplay(nodes);
 
   useEffect(() => { setEditNameValue(workflowName); }, [workflowName]);
   useEffect(() => { if (isEditingName) nameInputRef.current?.focus(); }, [isEditingName]);
