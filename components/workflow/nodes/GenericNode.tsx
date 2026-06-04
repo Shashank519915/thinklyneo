@@ -19,6 +19,7 @@ import {
 } from "@/lib/node-run-chrome";
 import NodeHeaderActions from "./NodeHeaderActions";
 import FieldInfoTooltip from "./FieldInfoTooltip";
+import { UploadPopup } from "./UploadPopup";
 import TextExpandModal from "../TextExpandModal";
 import {
   cropImageDefinition,
@@ -749,11 +750,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       multiVideoRejected
                     }
                     onClick={() => {
-                      if (canEditLocally) {
-                        document
-                          .getElementById(`file-input-${param.key}`)
-                          ?.click();
-                      }
+                      if (canEditLocally)
+                        setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key);
                     }}
                     className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 transition-colors hover:border-gray-400 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
                     title={
@@ -790,6 +788,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         },
                       );
                     }}
+                  />
+                  <UploadPopup
+                    open={activeUploadPopup === param.key}
+                    onClose={() => setActiveUploadPopup(null)}
+                    onUpload={() => document.getElementById(`file-input-${param.key}`)?.click()}
                   />
                 </div>
               )}
@@ -1463,49 +1466,53 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     {param.label}
                     {param.required && <span className="text-red-400">*</span>}
                   </span>
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    disabled={isWired || disabled}
-                    onClick={() => {
-                      if (!isWired && !disabled) {
-                        document
-                          .getElementById(`file-input-crop-${id}-${param.key}`)
-                          ?.click();
+                  <div className="relative min-w-0 flex-1">
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      disabled={isWired || disabled}
+                      onClick={() => {
+                        if (!isWired && !disabled)
+                          setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key);
+                      }}
+                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                      title={
+                        isWired
+                          ? "Image is supplied by an upstream connection"
+                          : value
+                            ? "Change image"
+                            : "Upload image"
                       }
-                    }}
-                    className="nodrag flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                    title={
-                      isWired
-                        ? "Image is supplied by an upstream connection"
-                        : value
-                          ? "Change image"
-                          : "Upload image"
-                    }
-                  >
-                    {uploadingField === param.key ? (
-                      <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <LucideIcons.Upload className="w-3.5 h-3.5" />
-                    )}
-                    <span className="capitalize">
-                      {uploadingField === param.key
-                        ? "Uploading..."
-                        : value
-                          ? "Change image"
-                          : "Upload image"}
-                    </span>
-                  </button>
-                  <input
-                    id={`file-input-crop-${id}-${param.key}`}
-                    type="file"
-                    hidden
-                    accept="image/*"
-                    disabled={isWired || disabled}
-                    onChange={(e) =>
-                      void handleFileUpload(param.key, e.target.files)
-                    }
-                  />
+                    >
+                      {uploadingField === param.key ? (
+                        <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <LucideIcons.Upload className="w-3.5 h-3.5" />
+                      )}
+                      <span className="capitalize">
+                        {uploadingField === param.key
+                          ? "Uploading..."
+                          : value
+                            ? "Change image"
+                            : "Upload image"}
+                      </span>
+                    </button>
+                    <input
+                      id={`file-input-crop-${id}-${param.key}`}
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      disabled={isWired || disabled}
+                      onChange={(e) =>
+                        void handleFileUpload(param.key, e.target.files)
+                      }
+                    />
+                    <UploadPopup
+                      open={activeUploadPopup === param.key}
+                      onClose={() => setActiveUploadPopup(null)}
+                      onUpload={() => document.getElementById(`file-input-crop-${id}-${param.key}`)?.click()}
+                    />
+                  </div>
                   {!isWired && showAddToRequestBtn && (
                     <button
                       type="button"
@@ -1541,11 +1548,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         tabIndex={-1}
                         disabled={isWired || disabled}
                         onClick={() => {
-                          if (!isWired && !disabled) {
-                            document
-                              .getElementById(`file-input-kling-${id}-${param.key}`)
-                              ?.click();
-                          }
+                          if (!isWired && !disabled)
+                            setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key);
                         }}
                         className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                         title={
@@ -1578,6 +1582,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         onChange={(e) =>
                           void handleFileUpload(param.key, e.target.files)
                         }
+                      />
+                      <UploadPopup
+                        open={activeUploadPopup === param.key}
+                        onClose={() => setActiveUploadPopup(null)}
+                        onUpload={() => document.getElementById(`file-input-kling-${id}-${param.key}`)?.click()}
                       />
                     </div>
                     {/* Show preview if a local image is set */}
@@ -1711,36 +1720,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       />
 
                       {/* Popover modal */}
-                      {activeUploadPopup === param.key && (
-                        <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
-                          <p className="text-xs text-gray-500 leading-normal font-normal">
-                            Add a file from your device or select one from your
-                            library
-                          </p>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
-                            onClick={() => setActiveUploadPopup(null)}
-                          >
-                            <LucideIcons.ImagePlus className="h-4 w-4" />
-                            <span>Select Asset</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
-                            onClick={() => {
-                              setActiveUploadPopup(null);
-                              const input = document.getElementById(
-                                `file-input-${param.key}`,
-                              );
-                              if (input) input.click();
-                            }}
-                          >
-                            <LucideIcons.Plus className="h-4 w-4" />
-                            <span>Upload</span>
-                          </button>
-                        </div>
-                      )}
+                      <UploadPopup
+                        open={activeUploadPopup === param.key}
+                        onClose={() => setActiveUploadPopup(null)}
+                        onUpload={() => { const input = document.getElementById(`file-input-${param.key}`); if (input) (input as HTMLInputElement).click(); }}
+                      />
                     </div>
                   )}
                 </div>
@@ -2008,12 +1992,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       {field.required && <span className="text-red-400">*</span>}
                                     </span>
                                     <div className="flex-1">
+                                      {(() => {
+                                        const elPopupKey = `el-popup-${itemIdx}-${field.key}`;
+                                        return (
                                       <div className="relative">
                                         <button
                                           type="button"
                                           tabIndex={-1}
                                           disabled={isFieldWired || disabled}
-                                          onClick={() => !isFieldWired && !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                          onClick={() => !isFieldWired && !disabled && setActiveUploadPopup(activeUploadPopup === elPopupKey ? null : elPopupKey)}
                                           className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                                           title={singleVal ? `Change ${isVideo ? "video" : "image"}` : `Upload ${isVideo ? "video" : "image"}`}
                                         >
@@ -2038,7 +2025,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                           disabled={isFieldWired || disabled}
                                           onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files)}
                                         />
+                                        <UploadPopup
+                                          open={activeUploadPopup === elPopupKey}
+                                          onClose={() => setActiveUploadPopup(null)}
+                                          onUpload={() => document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                        />
                                       </div>
+                                        );
+                                      })()}
+                                      
                                       {/* Upload requirements — aligned to left edge of button, inside flex-1 */}
                                       {field.uploadRequirementsTooltip && (
                                         <div className="mt-1 flex items-center gap-1">
@@ -2083,12 +2078,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       {field.required && <span className="text-red-400">*</span>}
                                     </span>
                                   </div>
+                                  {(() => {
+                                    const elPopupKeyMulti = `el-popup-${itemIdx}-${field.key}`;
+                                    return (
                                   <div className="relative">
                                     <button
                                       type="button"
                                       tabIndex={-1}
                                       disabled={isFieldWired || disabled || atMax || refImagesMuted}
-                                      onClick={() => !isFieldWired && !disabled && !atMax && !refImagesMuted && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                      onClick={() => !isFieldWired && !disabled && !atMax && !refImagesMuted && setActiveUploadPopup(activeUploadPopup === elPopupKeyMulti ? null : elPopupKeyMulti)}
                                       className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 disabled:opacity-50"
                                       title={refImagesMuted ? "Upload a Frontal Image first" : "Upload image"}
                                     >
@@ -2110,7 +2108,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       disabled={isFieldWired || disabled || refImagesMuted}
                                       onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files, true, field.maxCount || 10)}
                                     />
+                                    <UploadPopup
+                                      open={activeUploadPopup === elPopupKeyMulti}
+                                      onClose={() => setActiveUploadPopup(null)}
+                                      onUpload={() => document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                    />
                                   </div>
+                                    );
+                                  })()}
+                                  
                                   {/* Upload requirements info — tooltip on info icon */}
                                   {field.uploadRequirementsTooltip && (
                                     <div className="mt-1 flex items-center gap-1">
@@ -2147,20 +2153,23 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                           </button>
                                         </div>
                                       ))}
-                                      {!atMax && (
+                                      {!atMax && (() => {
+                                        const elPopupKeyAdd = `el-popup-${itemIdx}-${field.key}`;
+                                        return (
                                         <div className="relative">
                                           <div
-                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] cursor-pointer hover:border-[#7C3AED]/40"
+                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] cursor-pointer hover:border-gray-400"
                                             title="Add image"
                                             style={{ aspectRatio: "1 / 1" }}
-                                            onClick={() => !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                            onClick={() => !disabled && setActiveUploadPopup(activeUploadPopup === elPopupKeyAdd ? null : elPopupKeyAdd)}
                                           >
                                             <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-400">
                                               Add Image
                                             </div>
                                           </div>
                                         </div>
-                                      )}
+                                        );
+                                      })()}
                                     </div>
                                   )}
                                 </div>
@@ -2242,36 +2251,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         />
 
                         {/* Popover modal */}
-                        {activeUploadPopup === param.key && (
-                          <div className="upload-popup-container absolute left-0 top-full mt-3 z-50 flex w-[80vw] max-w-[246px] flex-col gap-3 rounded-3xl border border-gray-100 bg-white p-4 shadow-xl sm:w-[246px] text-left">
-                            <p className="text-xs text-gray-500 leading-normal font-normal">
-                              Add a file from your device or select one from
-                              your library
-                            </p>
-                            <button
-                              type="button"
-                              className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-[#3F3F46] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 nodrag"
-                              onClick={() => setActiveUploadPopup(null)}
-                            >
-                              <LucideIcons.ImagePlus className="h-4 w-4" />
-                              <span>Select Asset</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#6366F1] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 nodrag"
-                              onClick={() => {
-                                setActiveUploadPopup(null);
-                                const input = document.getElementById(
-                                  `file-input-${param.key}`,
-                                );
-                                if (input) input.click();
-                              }}
-                            >
-                              <LucideIcons.Plus className="h-4 w-4" />
-                              <span>Upload</span>
-                            </button>
-                          </div>
-                        )}
+                        <UploadPopup
+                          open={activeUploadPopup === param.key}
+                          onClose={() => setActiveUploadPopup(null)}
+                          onUpload={() => { const input = document.getElementById(`file-input-${param.key}`); if (input) (input as HTMLInputElement).click(); }}
+                        />
                       </div>
                     ) : (
                       value.length === 0 && (
@@ -2359,9 +2343,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           type="button"
                           disabled={disabled || value.length >= 10}
                           onClick={() =>
-                            document
-                              .getElementById(`file-input-${param.key}`)
-                              ?.click()
+                            setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)
                           }
                           className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
                           title="Upload video"
@@ -2393,6 +2375,11 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                               e.target.value = "";
                             });
                           }}
+                        />
+                        <UploadPopup
+                          open={activeUploadPopup === param.key}
+                          onClose={() => setActiveUploadPopup(null)}
+                          onUpload={() => document.getElementById(`file-input-${param.key}`)?.click()}
                         />
                       </div>
                     )}
@@ -2433,11 +2420,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                             type="button"
                             disabled={disabled}
                             onClick={() =>
-                              document
-                                .getElementById(`file-input-${param.key}`)
-                                ?.click()
+                              setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)
                             }
-                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] hover:border-workflow-accent-400 dark:bg-zinc-800/60"
+                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] hover:border-gray-400"
                             style={{ aspectRatio: "4 / 3" }}
                             title="Add video"
                           >
