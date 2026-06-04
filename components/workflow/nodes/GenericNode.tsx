@@ -1118,49 +1118,56 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             )}
 
             {param.type === "file-upload" && param.uiVariant === "crop-overlay-preview" && (
-              // Crop image: side-label layout. Button is always rendered — muted when wired.
-              // Preview with crop overlay is rendered by the crop-overlay-preview block below.
-              <div className="flex items-start gap-3">
+              // Crop image: single-line layout — [label] [upload button flex-1] [+ add-to-request?]
+              // Add-to-request is only shown when not wired (same rule as other params).
+              <div className="flex items-center gap-2">
                 <span
                   data-handle-anchor="label"
-                  className="shrink-0 pt-2 text-xs text-gray-500"
+                  className="shrink-0 text-xs text-gray-500"
                 >
                   {param.label}
                   {param.required && <span className="text-red-400">*</span>}
                 </span>
-                <div className="flex-1">
-                  <div className="relative">
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      disabled={isWired || disabled}
-                      onClick={() => {
-                        if (!isWired && !disabled) {
-                          document.getElementById(`file-input-crop-${id}-${param.key}`)?.click();
-                        }
-                      }}
-                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
-                      title={isWired ? "Image is supplied by an upstream connection" : value ? "Change image" : "Upload image"}
-                    >
-                      {uploadingField === param.key ? (
-                        <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <LucideIcons.Upload className="w-3.5 h-3.5" />
-                      )}
-                      <span className="capitalize">
-                        {uploadingField === param.key ? "Uploading..." : value ? "Change image" : "Upload image"}
-                      </span>
-                    </button>
-                    <input
-                      id={`file-input-crop-${id}-${param.key}`}
-                      type="file"
-                      hidden
-                      accept="image/*"
-                      disabled={isWired || disabled}
-                      onChange={(e) => void handleFileUpload(param.key, e.target.files)}
-                    />
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  disabled={isWired || disabled}
+                  onClick={() => {
+                    if (!isWired && !disabled) {
+                      document.getElementById(`file-input-crop-${id}-${param.key}`)?.click();
+                    }
+                  }}
+                  className="nodrag flex min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
+                  title={isWired ? "Image is supplied by an upstream connection" : value ? "Change image" : "Upload image"}
+                >
+                  {uploadingField === param.key ? (
+                    <LucideIcons.Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <LucideIcons.Upload className="w-3.5 h-3.5" />
+                  )}
+                  <span className="capitalize">
+                    {uploadingField === param.key ? "Uploading..." : value ? "Change image" : "Upload image"}
+                  </span>
+                </button>
+                <input
+                  id={`file-input-crop-${id}-${param.key}`}
+                  type="file"
+                  hidden
+                  accept="image/*"
+                  disabled={isWired || disabled}
+                  onChange={(e) => void handleFileUpload(param.key, e.target.files)}
+                />
+                {!isWired && showAddToRequestBtn && (
+                  <button
+                    type="button"
+                    disabled={isLocked}
+                    onClick={() => handlePromoteInput(param)}
+                    className="nodrag inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    title="Add to request inputs"
+                  >
+                    <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                )}
               </div>
             )}
 
