@@ -5,7 +5,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import * as LucideIcons from "lucide-react";
 import { useWorkflowStore, useNodePreview } from "@/store/workflow-store";
 import { parseMediaList } from "@/lib/media-list";
-import { isLikelyVideoUrl } from "@galaxy/shared";
+import { isLikelyVideoUrl } from "@shashank519915/shared";
 import { classifyMediaUrl, generateEdgeId, resolvePropagatedEdgeValue, sanitizeError } from "@/lib/utils";
 import { uploadFilesViaApi } from "@/lib/upload";
 import {
@@ -25,7 +25,7 @@ import {
   mergeAVDefinition,
   extractAudioDefinition,
   type NodeDefinition,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 // Map React Flow type strings to their shared configurations
 const DEFINITIONS: Record<string, NodeDefinition> = {

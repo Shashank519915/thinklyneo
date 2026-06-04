@@ -51,7 +51,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# @galaxy/shared is now a versioned GitHub Package — the local copy must never be committed.
+# @shashank519915/shared is now a versioned GitHub Package — the local copy must never be committed.
 # Delete the folder from git: git rm -r --cached shared/
 /shared/
 

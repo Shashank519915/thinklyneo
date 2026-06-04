@@ -3,7 +3,7 @@ import {
   resolveMergeAVAudioUrl,
   resolveMergeAVAudioVolume,
   resolveMergeAVVideoUrl,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 describe("merge AV resolvers", () => {
   it("resolves a single video_url", () => {

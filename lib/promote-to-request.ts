@@ -3,7 +3,7 @@
  */
 
 import type { Edge, Node } from "@xyflow/react";
-import type { NodeParameter } from "@galaxy/shared";
+import type { NodeParameter } from "@shashank519915/shared";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
 import { syncTargetFromRequestField } from "@/lib/promoted-input-value";
 import { generateEdgeId } from "@/lib/utils";

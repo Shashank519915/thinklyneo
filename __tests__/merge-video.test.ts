@@ -3,7 +3,7 @@ import {
   isLikelyVideoUrl,
   parseMergeVideoTransition,
   resolveMergeVideoUrls,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 describe("parseMergeVideoTransition", () => {
   it("parses wired text values", () => {

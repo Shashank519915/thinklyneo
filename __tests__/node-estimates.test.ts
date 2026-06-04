@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
-import { estimateWorkflowCostMillions } from "@galaxy/shared";
+import { estimateWorkflowCostMillions } from "@shashank519915/shared";
 import type { Node } from "@xyflow/react";
 
 function node(type: string): Node {

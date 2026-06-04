@@ -3,7 +3,7 @@ import {
   getRunnableNodeIds,
   getScopedRunNodeIds,
   resolveActiveRunNodeIds,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 const n = (id: string, type: string) => ({ id, type });
 const e = (source: string, target: string) => ({ source, target });

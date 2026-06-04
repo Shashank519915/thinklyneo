@@ -22,7 +22,7 @@ import {
   mergeAVDefinition,
   extractAudioDefinition,
   type NodeDefinition,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 import { SpinningLogo } from "@/components/SpinningLogo";
 
 interface NodeRunData {

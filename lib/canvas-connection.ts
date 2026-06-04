@@ -4,7 +4,7 @@
  */
 
 import type { Connection, Edge, Node } from "@xyflow/react";
-import { isLikelyVideoUrl, parseMediaList } from "@galaxy/shared";
+import { isLikelyVideoUrl, parseMediaList } from "@shashank519915/shared";
 import { isValidConnection, validateNewEdge } from "@/lib/execution";
 import { classifyMediaUrl, resolvePropagatedEdgeValue } from "@/lib/utils";
 

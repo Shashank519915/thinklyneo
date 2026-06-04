@@ -13,7 +13,7 @@ importers:
         version: 7.4.2(next@16.2.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@galaxy/shared':
         specifier: file:./shared
-        version: link:shared
+        version: file:shared
       '@trigger.dev/react-hooks':
         specifier: 4.4.6
         version: 4.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -105,16 +105,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.41)(jiti@2.7.0)(jsdom@27.4.0)(lightningcss@1.32.0)
-
-  shared:
-    dependencies:
-      zod:
-        specifier: ^3.25.76
-        version: 3.25.76
-    devDependencies:
-      typescript:
-        specifier: ^5.0.0
-        version: 5.9.3
 
 packages:
 
@@ -508,6 +498,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@galaxy/shared@file:shared':
+    resolution: {directory: shared, type: directory}
 
   '@google-cloud/precise-date@4.0.0':
     resolution: {integrity: sha512-1TUx3KdaU3cN7nfCdNf+UVqA/PSX29Cjcox3fZZBtINlRrXVTmUkQnCKv2MbBUbCopbK4olAT1IHl76uZyCiVA==}
@@ -3827,6 +3820,10 @@ snapshots:
       levn: 0.4.1
 
   '@exodus/bytes@1.15.1': {}
+
+  '@galaxy/shared@file:shared':
+    dependencies:
+      zod: 3.25.76
 
   '@google-cloud/precise-date@4.0.0': {}
 

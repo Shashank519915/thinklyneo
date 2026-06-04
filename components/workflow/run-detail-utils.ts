@@ -15,7 +15,7 @@ import {
   mergeAVDefinition,
   extractAudioDefinition,
   type NodeDefinition,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 export interface NodeRunData {
   id: string;

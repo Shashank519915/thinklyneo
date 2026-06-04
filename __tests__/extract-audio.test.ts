@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   extractAudioFfmpegConfig,
   parseExtractAudioFormat,
-} from "@galaxy/shared";
+} from "@shashank519915/shared";
 
 describe("parseExtractAudioFormat", () => {
   it("parses mp3, wav, and aac", () => {

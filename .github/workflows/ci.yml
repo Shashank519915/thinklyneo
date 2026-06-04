@@ -20,11 +20,10 @@ jobs:
         with:
           node-version: "22"
           cache: "pnpm"
-          # @galaxy/shared is pulled from GitHub Packages — must point here
           registry-url: "https://npm.pkg.github.com"
-          scope: "@galaxy"
+          scope: "@shashank519915"
 
-      # NODE_AUTH_TOKEN lets pnpm authenticate with GitHub Packages to download @galaxy/shared
+      # NODE_AUTH_TOKEN lets pnpm authenticate with GitHub Packages to download @shashank519915/shared.
       - run: pnpm install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,7 +46,7 @@ jobs:
           node-version: "22"
           cache: "pnpm"
           registry-url: "https://npm.pkg.github.com"
-          scope: "@galaxy"
+          scope: "@shashank519915"
 
       - run: pnpm install --frozen-lockfile
         env:

@@ -1,1 +1,1 @@
-export { parseMediaList } from "@galaxy/shared";
+export { parseMediaList } from "@shashank519915/shared";

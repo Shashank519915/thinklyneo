@@ -18,11 +18,12 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { workflowFilePayloadSchema } from "@/lib/validation";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import { sumWorkflowEstimateMillions } from "@/lib/node-estimates";
-import { resolveActiveRunNodeIds, validateWorkflowInputsSync } from "@galaxy/shared";
+import { resolveActiveRunNodeIds, validateWorkflowInputsSync } from "@shashank519915/shared";
 import WorkflowSaveToast, {
   type WorkflowSaveToastPhase,
 } from "@/components/workflow/WorkflowSaveToast";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
+import { useAttachLiveRunOnFocus } from "@/lib/use-attach-live-run-on-focus";
 
 export default function WorkflowCanvasPage() {
   const params = useParams();
@@ -104,6 +105,10 @@ export default function WorkflowCanvasPage() {
     orchestratorRunId: string;
     publicAccessToken: string;
   } | null>(null);
+  const orchestratorStateRef = useRef(orchestratorState);
+  useEffect(() => {
+    orchestratorStateRef.current = orchestratorState;
+  }, [orchestratorState]);
 
   const handleRun = useCallback(
     async (scope: "full" | "single" | "partial", targetIds?: string[]) => {
@@ -312,7 +317,7 @@ export default function WorkflowCanvasPage() {
     [workflowId, currentRunId, setIsRunning, setCurrentRunId, setCurrentRunScope, clearExecutionState]
   );
 
-  const restoreLiveRun = useCallback(async () => {
+  const restoreLiveRun = useCallback(async (options?: { force?: boolean }) => {
     try {
       const historyResp = await fetch(`/api/workflows/${workflowId}/history`);
       const historyData = await historyResp.json();
@@ -333,6 +338,14 @@ export default function WorkflowCanvasPage() {
 
       const runningRun = runsList.find((r) => r.status === "running");
       if (!runningRun) return;
+
+      if (
+        !options?.force &&
+        runningRun.orchestratorRunId &&
+        orchestratorStateRef.current?.orchestratorRunId === runningRun.orchestratorRunId
+      ) {
+        return;
+      }
 
       if (!runningRun.orchestratorRunId) {
         console.log(`[NextFlow] Run ${runningRun.id} has no orchestrator — finalizing.`);
@@ -449,18 +462,7 @@ export default function WorkflowCanvasPage() {
     }
   }, [loading, restoreLiveRun]);
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
-        if (isRunning) {
-          restoreLiveRun();
-        }
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, [isRunning, restoreLiveRun]);
+  useAttachLiveRunOnFocus(() => restoreLiveRun(), !!orchestratorState);
 
   useEffect(() => {
     if (savePhase !== "saved") return;
@@ -853,7 +855,7 @@ export default function WorkflowCanvasPage() {
                         <button
                           type="button"
                           title="Click to reconnect to live run stream"
-                          onClick={() => restoreLiveRun()}
+                          onClick={() => restoreLiveRun({ force: true })}
                           className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
                         >
                           <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />

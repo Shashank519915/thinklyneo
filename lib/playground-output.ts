@@ -2,7 +2,7 @@
  * Playground output panel: merge history nodeRuns with live orchestrator nodeStates.
  */
 
-import { getRunnableNodeIds, type GraphEdge, type GraphNode } from "@galaxy/shared";
+import { getRunnableNodeIds, type GraphEdge, type GraphNode } from "@shashank519915/shared";
 
 export interface PlaygroundNodeRunLike {
   nodeId: string;

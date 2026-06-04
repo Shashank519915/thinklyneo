@@ -20,6 +20,7 @@ import {
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { formatRelativeTime } from "@/lib/utils";
+import { useAttachLiveRunOnFocus } from "@/lib/use-attach-live-run-on-focus";
 import { SpinningLogo } from "@/components/SpinningLogo";
 import Canvas from "@/components/workflow/Canvas";
 import TextExpandModal from "@/components/workflow/TextExpandModal";
@@ -162,6 +163,10 @@ export default function WorkflowWorkspacePage() {
     orchestratorRunId: string;
     publicAccessToken: string;
   } | null>(null);
+  const orchestratorStateRef = useRef(orchestratorState);
+  useEffect(() => {
+    orchestratorStateRef.current = orchestratorState;
+  }, [orchestratorState]);
 
   const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({});
   const [activeExpandFieldId, setActiveExpandFieldId] = useState<string | null>(null);
@@ -314,14 +319,24 @@ export default function WorkflowWorkspacePage() {
   const restoreLiveRun = useCallback(
     async (
       runsList: WorkflowRunItem[],
-      wf: { nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }> } | null
+      wf: { nodes?: Array<{ type: string; data?: { fields?: WorkflowField[] } }> } | null,
+      options?: { attachOnly?: boolean; force?: boolean }
     ) => {
       const runningRun = runsList.find((r) => r.status === "running");
       if (!runningRun?.orchestratorRunId) {
-        setSelectedRun(null);
-        setLiveNodeStates({});
-        setLiveRunCreditsMicro(null);
-        if (wf) applyWorkflowFieldsToInputs(wf);
+        if (!options?.attachOnly) {
+          setSelectedRun(null);
+          setLiveNodeStates({});
+          setLiveRunCreditsMicro(null);
+          if (wf) applyWorkflowFieldsToInputs(wf);
+        }
+        return;
+      }
+
+      if (
+        !options?.force &&
+        orchestratorStateRef.current?.orchestratorRunId === runningRun.orchestratorRunId
+      ) {
         return;
       }
 
@@ -362,6 +377,16 @@ export default function WorkflowWorkspacePage() {
       cancelled = true;
     };
   }, [workflowId, fetchWorkflow, fetchHistory, restoreLiveRun]);
+
+  const tryAttachExternalRun = useCallback(async () => {
+    const runsList = await fetchHistory();
+    const runningRun = runsList.find((r) => r.status === "running");
+    if (!runningRun?.orchestratorRunId) return;
+    const wf = workflow ?? (await fetchWorkflow());
+    await restoreLiveRun(runsList, wf, { attachOnly: true });
+  }, [fetchHistory, fetchWorkflow, workflow, restoreLiveRun]);
+
+  useAttachLiveRunOnFocus(() => tryAttachExternalRun(), !!orchestratorState);
 
   // Check if response node is connected
   const hasResponseConnection = useCallback(() => {

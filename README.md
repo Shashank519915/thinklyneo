@@ -193,6 +193,8 @@ after backend definition changes. `requestInputs` / `response` remain bespoke ca
 
 **Mid-run credit-exhaustion abort.** Orchestrator aborts when the next layer estimate exceeds remaining hold (see backend `lib/credits.ts`).
 
+**External-run auto-attach.** On tab focus, if SSE is not mounted, `restoreLiveRun` attaches when history shows a `running` row (API/MCP/another tab); skips when `orchestratorState` is already set.
+
 **Unkey + local mock fallback.** Production Unkey when configured; SHA-256 key table for dev/tests.
 
 **Viewport in localStorage.** Per-device pan/zoom; graph JSON stays clean for API/MCP.
@@ -208,7 +210,6 @@ not probed pre-run.
 
 - **MSW / API integration tests** for `/api/v1` (auth, 409 concurrency, rate headers) with mocked Unkey/OpenRouter/Transloadit.
 - **Per-run graph snapshot** on `WorkflowRun` so history modals show deleted nodes.
-- **External-run auto-attach** on an open canvas without refocus.
 - **Video duration probing** at execute time (ffprobe); stricter policy for unreachable HEAD URLs.
 
 ---

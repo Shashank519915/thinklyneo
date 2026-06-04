@@ -1,9 +1,9 @@
 /**
- * @fileoverview Static workflow cost estimates for canvas chrome — sourced from @galaxy/shared definitions.
+ * @fileoverview Static workflow cost estimates for canvas chrome — sourced from @shashank519915/shared definitions.
  */
 
 import type { Node } from "@xyflow/react";
-import { estimateWorkflowCostMillions } from "@galaxy/shared";
+import { estimateWorkflowCostMillions } from "@shashank519915/shared";
 
 /** @deprecated Use estimateWorkflowCostMillions from shared; kept for CropImageNode label compat */
 export const ESTIMATE_CROP_M = 0.21;
