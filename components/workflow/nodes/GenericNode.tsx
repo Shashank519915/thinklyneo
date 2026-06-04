@@ -152,7 +152,7 @@ function isCompactSelectParam(
     (param.key === "transition" ||
       (nodeType === "extractAudio" && param.key === "format") ||
       (nodeType === "klingV3" &&
-        (param.key === "aspect_ratio" || param.key === "duration")))
+        (param.key === "aspect_ratio" || param.key === "duration" || param.key === "duration_text")))
   );
 }
 
@@ -1606,15 +1606,17 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    className="nodrag mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
-                    disabled={isLocked}
-                    onClick={() => handlePromoteInput(param)}
-                    title="Add to request inputs"
-                  >
-                    <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
-                  </button>
+                  {!isWired && showAddToRequestBtn && (
+                    <button
+                      type="button"
+                      className="nodrag mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                      disabled={isLocked}
+                      onClick={() => handlePromoteInput(param)}
+                      title="Add to request inputs"
+                    >
+                      <LucideIcons.Plus className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1927,17 +1929,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
               return (
                 <div className="space-y-2">
+                  {/* Section header: bold black label + info tooltip */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600 dark:text-zinc-300">{param.label}</span>
+                    <span className="text-xs font-medium text-gray-900 dark:text-white">{param.label}</span>
                     {param.tooltip && (
-                      <span className="cursor-help" title={param.tooltip}>
-                        <LucideIcons.Info className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
-                      </span>
+                      <FieldInfoTooltip text={param.tooltip} />
                     )}
                   </div>
 
                   {itemKeys.map((itemIdx) => {
                     const item = items[itemIdx];
+                    // frontal image drives conditional behaviour for other fields
+                    const frontalVal = typeof item["frontal_image_url"] === "string" ? item["frontal_image_url"] : "";
+                    const hasFrontal = frontalVal.length > 0;
+
                     return (
                       <div
                         key={itemIdx}
@@ -1961,11 +1966,18 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                           const imgList = Array.isArray(fieldValue) ? fieldValue as string[] : [];
                           const singleVal = typeof fieldValue === "string" ? fieldValue : "";
                           const atMax = field.type === "file-upload-multi" && imgList.length >= (field.maxCount || 10);
+                          const isVideo = field.accept?.includes("video");
+
+                          // Video element is hidden once a frontal image is uploaded
+                          if (field.key === "video_url" && hasFrontal) return null;
+
+                          // Reference Images upload button is muted until frontal image is provided
+                          const refImagesMuted = field.key === "reference_image_urls" && !hasFrontal && !isFieldWired;
 
                           return (
                             <div key={field.key} className="relative" style={{ overflow: "visible" }}>
                               {/* Sub-handle, positioned further left inside the card */}
-                              {field.handle && (
+                              {field.handle && !refImagesMuted && !(field.key === "video_url" && hasFrontal) && (
                                 <div
                                   className="absolute flex items-center"
                                   style={{ left: "-35px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
@@ -2002,8 +2014,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                           tabIndex={-1}
                                           disabled={isFieldWired || disabled}
                                           onClick={() => !isFieldWired && !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
-                                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
-                                          title={singleVal ? `Change ${field.accept.includes("video") ? "video" : "image"}` : `Upload ${field.accept.includes("video") ? "video" : "image"}`}
+                                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                          title={singleVal ? `Change ${isVideo ? "video" : "image"}` : `Upload ${isVideo ? "video" : "image"}`}
                                         >
                                           {uploadingElementField === fieldUploadKey ? (
                                             <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2014,8 +2026,8 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                             {uploadingElementField === fieldUploadKey
                                               ? "Uploading..."
                                               : singleVal
-                                                ? `Change ${field.accept.includes("video") ? "video" : "image"}`
-                                                : `Upload ${field.accept.includes("video") ? "video" : "image"}`}
+                                                ? `Change ${isVideo ? "video" : "image"}`
+                                                : `Upload ${isVideo ? "video" : "image"}`}
                                           </span>
                                         </button>
                                         <input
@@ -2029,14 +2041,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       </div>
                                     </div>
                                   </div>
-                                  {field.uploadRequirements && (
+                                  {/* Upload requirements — left-aligned under the button, with tooltip on info icon */}
+                                  {field.uploadRequirementsTooltip && (
                                     <div className="flex items-center gap-1">
-                                      <LucideIcons.Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" aria-hidden="true" />
-                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">{field.uploadRequirements}</span>
+                                      <FieldInfoTooltip text={field.uploadRequirementsTooltip} />
+                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">Upload requirements</span>
                                     </div>
                                   )}
-                                  {/* Preview for single upload */}
-                                  {singleVal && !isFieldWired && (
+                                  {/* Preview for single image upload */}
+                                  {singleVal && !isFieldWired && !isVideo && (
                                     <div className="flex justify-end">
                                       <div className="flex flex-col items-end gap-1">
                                         <div
@@ -2064,20 +2077,20 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
                               {field.type === "file-upload-multi" && (
                                 <div>
-                                  <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
                                     <span className="text-xs text-gray-500 dark:text-zinc-400">
                                       {field.label}
                                       {field.required && <span className="text-red-400">*</span>}
                                     </span>
                                   </div>
-                                  <div className="relative mt-1">
+                                  <div className="relative">
                                     <button
                                       type="button"
                                       tabIndex={-1}
-                                      disabled={isFieldWired || disabled || atMax}
-                                      onClick={() => !isFieldWired && !disabled && !atMax && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
-                                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
-                                      title="Upload image"
+                                      disabled={isFieldWired || disabled || atMax || refImagesMuted}
+                                      onClick={() => !isFieldWired && !disabled && !atMax && !refImagesMuted && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
+                                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                      title={refImagesMuted ? "Upload a Frontal Image first" : "Upload image"}
                                     >
                                       {uploadingElementField === fieldUploadKey ? (
                                         <LucideIcons.Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -2094,14 +2107,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       hidden
                                       accept={field.accept}
                                       multiple
-                                      disabled={isFieldWired || disabled}
+                                      disabled={isFieldWired || disabled || refImagesMuted}
                                       onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files, true, field.maxCount || 10)}
                                     />
                                   </div>
-                                  {field.uploadRequirements && (
+                                  {/* Upload requirements info — tooltip on info icon */}
+                                  {field.uploadRequirementsTooltip && (
                                     <div className="mt-1 flex items-center gap-1">
-                                      <LucideIcons.Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" aria-hidden="true" />
-                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">{field.uploadRequirements}</span>
+                                      <FieldInfoTooltip text={field.uploadRequirementsTooltip} />
+                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">Upload requirements</span>
                                     </div>
                                   )}
                                   {/* Grid of uploaded images */}
@@ -2136,7 +2150,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       {!atMax && (
                                         <div className="relative">
                                           <div
-                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] dark:border-zinc-700 dark:bg-zinc-800/60 cursor-pointer hover:border-workflow-accent-400"
+                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-800/60 cursor-pointer hover:border-[#7C3AED]/40"
                                             title="Add image"
                                             style={{ aspectRatio: "1 / 1" }}
                                             onClick={() => !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
@@ -2160,7 +2174,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
                   <button
                     type="button"
-                    className="nodrag flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:border-[#7C3AED]/40 hover:text-[#7C3AED] dark:border-zinc-600 dark:text-zinc-400"
+                    className="nodrag flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-900 transition-colors hover:border-[#7C3AED]/40 hover:text-[#7C3AED] dark:border-zinc-600 dark:text-zinc-300"
                     onClick={addItem}
                   >
                     <LucideIcons.Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -2542,15 +2556,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             ? primaryParams.map(renderParameterInput)
             : null}
 
-          {/* Image-to-Video params — shown only in image tab */}
+          {/* Image-to-Video params — shown only in image tab, rendered in definition order */}
           {imageModeParams.length > 0 && modeTab === "image" && (
-            <>
-              {imageModeParams.map(renderParameterInput)}
-              {/* Duration and Negative Prompt are shared — always show in image tab too */}
-              {primaryParams
-                .filter((p) => p.key === "duration" || p.key === "negative_prompt")
-                .map(renderParameterInput)}
-            </>
+            <>{imageModeParams.map(renderParameterInput)}</>
           )}
 
           {/* Collapsible Advanced Parameters (generic nodes) */}
@@ -2582,37 +2590,46 @@ export default function GenericNode({ id, data, type }: NodeProps) {
             </>
           )}
 
-          {/* Collapsible Settings section (Kling v3 style — group: "settings") */}
-          {settingsParams.length > 0 && (
-            <>
-              <div className="relative" style={{ overflow: "visible" }}>
-                <button
-                  type="button"
-                  className="nodrag group mt-5 flex cursor-pointer items-center gap-2 bg-transparent border-0 p-0 outline-none"
-                  onClick={() => setShowSettings(!showSettings)}
-                >
-                  <LucideIcons.ChevronDown
-                    className={`h-4 w-4 text-gray-400 transition-transform ${
-                      showSettings ? "" : "-rotate-90"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span
-                    data-handle-anchor="label"
-                    className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-zinc-300"
+          {/* Collapsible Settings section (Kling v3 style — group: "settings").
+              In image tab, also includes generate_audio from primary params. */}
+          {(settingsParams.length > 0 || (imageModeParams.length > 0 && modeTab === "image")) && (() => {
+            // In image tab, pull generate_audio from primaryParams into this section too
+            const extraInSettings = imageModeParams.length > 0 && modeTab === "image"
+              ? primaryParams.filter((p) => p.key === "generate_audio")
+              : [];
+            const allSettingsItems = [...settingsParams, ...extraInSettings];
+            if (allSettingsItems.length === 0) return null;
+            return (
+              <>
+                <div className="relative" style={{ overflow: "visible" }}>
+                  <button
+                    type="button"
+                    className="nodrag group mt-5 flex cursor-pointer items-center gap-2 bg-transparent border-0 p-0 outline-none"
+                    onClick={() => setShowSettings(!showSettings)}
                   >
-                    Settings
-                  </span>
-                </button>
-              </div>
-
-              {showSettings && (
-                <div className="mt-4 space-y-4">
-                  {settingsParams.map(renderParameterInput)}
+                    <LucideIcons.ChevronDown
+                      className={`h-4 w-4 text-gray-400 transition-transform ${
+                        showSettings ? "" : "-rotate-90"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span
+                      data-handle-anchor="label"
+                      className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-zinc-300"
+                    >
+                      Settings
+                    </span>
+                  </button>
                 </div>
-              )}
-            </>
-          )}
+
+                {showSettings && (
+                  <div className="mt-4 space-y-4">
+                    {allSettingsItems.map(renderParameterInput)}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 

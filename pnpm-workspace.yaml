@@ -13,3 +13,6 @@ minimumReleaseAgeExclude:
   - '@shashank519915/shared@1.0.2'
   - '@shashank519915/shared@1.0.3'
   - '@shashank519915/shared@1.0.4'
+  - '@shashank519915/shared@1.0.5'
+  - '@shashank519915/shared@1.0.6'
+  - '@shashank519915/shared@1.0.7'
