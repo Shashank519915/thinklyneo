@@ -7,3 +7,6 @@ allowBuilds:
   "protobufjs": true
   "sharp": true
   unrs-resolver: false
+
+minimumReleaseAgeExclude:
+  - '@shashank519915/shared@1.0.0'
