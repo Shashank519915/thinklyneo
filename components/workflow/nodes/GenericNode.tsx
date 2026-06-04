@@ -934,10 +934,9 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           </div>
         )}
 
-        {((param.type !== "image-array" &&
+        {param.type !== "image-array" &&
           param.type !== "video-array" &&
-          param.type !== "audio-array") ||
-          isWired) &&
+          param.type !== "audio-array" &&
           !isCompactSelectParam(definition.type, param) &&
           param.uiVariant !== "magica-side-label" &&
           param.uiVariant !== "magica-volume-row" &&
@@ -2376,7 +2375,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         </div>
                       )}
 
-                      {(value.length > 0 || (!readOnly && !isWired && !atMax)) && (
+                      {value.length > 0 && (
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           {value.map((url: string, idx: number) => (
                             <div
@@ -2524,8 +2523,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         </div>
                       )}
 
-                      {(value.length > 0 ||
-                        (!readOnly && !isWired && !atMax)) && (
+                      {value.length > 0 && (
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {value.map((url: string, idx: number) => (
                             <div
@@ -2673,8 +2671,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                         </div>
                       )}
 
-                      {(value.length > 0 ||
-                        (!readOnly && !isWired && !atMax)) && (
+                      {value.length > 0 && (
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           {value.map((url: string, idx: number) => (
                             <div

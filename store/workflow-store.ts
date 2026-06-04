@@ -377,17 +377,31 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
 
   deleteNode: (nodeId) => {
     if (UNDELETABLE_NODES.has(nodeId)) return;
-    // Check if it's a response or request-inputs type
     const node = get().nodes.find((n) => n.id === nodeId);
     if (node?.type === "requestInputs" || node?.type === "response") return;
 
     get().pushHistory();
-    set((state) => ({
-      nodes: state.nodes.filter((n) => n.id !== nodeId),
-      edges: state.edges.filter(
+    set((state) => {
+      // Remove edges touching this node
+      const nextEdges = state.edges.filter(
         (e) => e.source !== nodeId && e.target !== nodeId
-      ),
-    }));
+      );
+
+      // Remove any promoted request fields that are linked to the deleted node
+      const nextNodes = state.nodes
+        .filter((n) => n.id !== nodeId)
+        .map((n) => {
+          if (n.type !== "requestInputs") return n;
+          const data = n.data as { fields?: WorkflowField[] };
+          const fields = (data.fields ?? []).filter(
+            (f) => f.linkedTarget?.nodeId !== nodeId
+          );
+          if (fields.length === (data.fields ?? []).length) return n;
+          return { ...n, data: { ...data, fields } };
+        });
+
+      return { nodes: nextNodes, edges: nextEdges };
+    });
   },
 
   // Execution state
