@@ -153,7 +153,9 @@ function isCompactSelectParam(
     (param.key === "transition" ||
       (nodeType === "extractAudio" && param.key === "format") ||
       (nodeType === "klingV3" &&
-        (param.key === "aspect_ratio" || param.key === "duration" || param.key === "duration_text")))
+        (param.key === "aspect_ratio" || param.key === "duration" || param.key === "duration_text")) ||
+      (nodeType === "gptImage2" &&
+        (param.key === "quality" || param.key === "n" || param.key === "background" || param.key === "output_format")))
   );
 }
 
@@ -1354,11 +1356,6 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   {/* Dropdown Menu Popup */}
                   {activeDropdown === param.key && (
                     <div className="absolute left-0 top-full mt-1.5 z-50 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl text-left">
-                      {param.key === "size" && (
-                        <div className="text-[10px] text-gray-400 font-semibold px-4 py-1.5 uppercase tracking-wider select-none">
-                          Custom
-                        </div>
-                      )}
                       <div className="max-h-[260px] overflow-y-auto nowheel flex flex-col gap-0.5">
                         {param.options?.map((opt: any) => {
                           const isSelected = opt.value === value;
@@ -2602,7 +2599,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     />
                     <span
                       data-handle-anchor="label"
-                      className="text-xs text-gray-400 group-hover:text-gray-600 dark:group-hover:text-zinc-300"
+                      className="text-xs text-gray-400 group-hover:text-gray-600"
                     >
                       Settings
                     </span>
