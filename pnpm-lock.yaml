@@ -12,8 +12,8 @@ importers:
         specifier: ^7.3.4
         version: 7.4.3(next@16.2.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@shashank519915/shared':
-        specifier: 1.0.3
-        version: 1.0.3
+        specifier: 1.0.4
+        version: 1.0.4
       '@trigger.dev/react-hooks':
         specifier: 4.4.6
         version: 4.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1059,8 +1059,8 @@ packages:
   '@s2-dev/streamstore@0.22.5':
     resolution: {integrity: sha512-GqdOKIbIoIxT+40fnKzHbrsHB6gBqKdECmFe7D3Ojk4FoN1Hu0LhFzZv6ZmVMjoHHU+55debS1xSWjZwQmbIyQ==}
 
-  '@shashank519915/shared@1.0.3':
-    resolution: {integrity: sha512-hK3IVWbaYWwpeXMWG0wtzjIGhCUFcuHFKYROFRrtIr+ihp7ImRUevpb4rT8C0d8Jb8rU4PU8JmwV7+/m0uRAQQ==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.3/b07aae3df685cf984ebd14be0ad8291c5bc162b8}
+  '@shashank519915/shared@1.0.4':
+    resolution: {integrity: sha512-v67Hv97oTuifWuDcwSY4C2bbyk0FtcVW8kUSH0cG/p3IF7yY8qJ4skF8szgiSnRA+nz9zjSEvTuCYHxRp8S1YQ==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.4/fdabcd4ac7268750718254f4b18ed7dd20e0f824}
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
@@ -1891,8 +1891,8 @@ packages:
     resolution: {integrity: sha512-C5Pn8Wk+1vKBoHghJODM63yk8MvrO9EWZUfkAt5HAqIgPE4/8FF0PEGHXtEd40l223+cE5ABWuPzm38PHFXfMA==}
     engines: {node: '>=10.2.0'}
 
-  enhanced-resolve@5.22.1:
-    resolution: {integrity: sha512-6QEuw3zoX1SJQc7b87aBXke/no+mG2bTBgw29gWMQonLmpEkWoCAVkl+M49e48AZlWzxiDzDZzYdp6kobcyLww==}
+  enhanced-resolve@5.22.2:
+    resolution: {integrity: sha512-0rxICaFZ7NQho/sHely2bvOPRP0Eu2B0NZ9zM54YvRvWMn7jfz3DmnOZDR9LlXDdDcqntAVc6Hfy4gr/tdH/Ag==}
     engines: {node: '>=10.13.0'}
 
   entities@8.0.0:
@@ -4234,7 +4234,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@shashank519915/shared@1.0.3':
+  '@shashank519915/shared@1.0.4':
     dependencies:
       zod: 3.25.76
 
@@ -4249,7 +4249,7 @@ snapshots:
   '@tailwindcss/node@4.3.0':
     dependencies:
       '@jridgewell/remapping': 2.3.5
-      enhanced-resolve: 5.22.1
+      enhanced-resolve: 5.22.2
       jiti: 2.7.0
       lightningcss: 1.32.0
       magic-string: 0.30.21
@@ -5134,7 +5134,7 @@ snapshots:
       - supports-color
       - utf-8-validate
 
-  enhanced-resolve@5.22.1:
+  enhanced-resolve@5.22.2:
     dependencies:
       graceful-fs: 4.2.11
       tapable: 2.3.3
