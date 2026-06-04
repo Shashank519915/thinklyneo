@@ -1609,7 +1609,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                   {!isWired && showAddToRequestBtn && (
                     <button
                       type="button"
-                      className="nodrag mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                      className="nodrag mt-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100"
                       disabled={isLocked}
                       onClick={() => handlePromoteInput(param)}
                       title="Add to request inputs"
@@ -1931,7 +1931,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                 <div className="space-y-2">
                   {/* Section header: bold black label + info tooltip */}
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-900 dark:text-white">{param.label}</span>
+                    <span className="text-xs font-medium text-gray-900">{param.label}</span>
                     {param.tooltip && (
                       <FieldInfoTooltip text={param.tooltip} />
                     )}
@@ -1946,12 +1946,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                     return (
                       <div
                         key={itemIdx}
-                        className="relative space-y-2.5 rounded-lg border border-gray-200 bg-[#F5F5F5]/50 p-3 dark:border-zinc-700 dark:bg-zinc-800/40"
+                        className="relative space-y-2.5 rounded-lg border border-gray-200 bg-white p-3"
                       >
                         {/* Delete button */}
                         <button
                           type="button"
-                          className="nodrag absolute -right-2 -top-2 rounded-full bg-gray-200 p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-500 dark:bg-zinc-700 dark:text-zinc-400 dark:hover:bg-red-900/40 dark:hover:text-red-400"
+                          className="nodrag absolute -right-2 -top-2 rounded-full bg-gray-200 p-1 text-gray-500 transition-colors hover:bg-red-100 hover:text-red-500"
                           title="Remove item"
                           onClick={() => removeItem(itemIdx)}
                         >
@@ -2003,7 +2003,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                               {field.type === "file-upload-single" && (
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-3">
-                                    <span className="shrink-0 text-xs text-gray-500 dark:text-zinc-400">
+                                    <span className="shrink-0 text-xs text-gray-500">
                                       {field.label}
                                       {field.required && <span className="text-red-400">*</span>}
                                     </span>
@@ -2014,7 +2014,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                           tabIndex={-1}
                                           disabled={isFieldWired || disabled}
                                           onClick={() => !isFieldWired && !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
-                                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                          className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors disabled:opacity-50 border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700"
                                           title={singleVal ? `Change ${isVideo ? "video" : "image"}` : `Upload ${isVideo ? "video" : "image"}`}
                                         >
                                           {uploadingElementField === fieldUploadKey ? (
@@ -2039,15 +2039,15 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                           onChange={(e) => void handleElementFileUpload(itemIdx, field.key, e.target.files)}
                                         />
                                       </div>
+                                      {/* Upload requirements — aligned to left edge of button, inside flex-1 */}
+                                      {field.uploadRequirementsTooltip && (
+                                        <div className="mt-1 flex items-center gap-1">
+                                          <FieldInfoTooltip text={field.uploadRequirementsTooltip} />
+                                          <span className="text-[10px] text-gray-400">Upload requirements</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
-                                  {/* Upload requirements — left-aligned under the button, with tooltip on info icon */}
-                                  {field.uploadRequirementsTooltip && (
-                                    <div className="flex items-center gap-1">
-                                      <FieldInfoTooltip text={field.uploadRequirementsTooltip} />
-                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">Upload requirements</span>
-                                    </div>
-                                  )}
                                   {/* Preview for single image upload */}
                                   {singleVal && !isFieldWired && !isVideo && (
                                     <div className="flex justify-end">
@@ -2078,7 +2078,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                               {field.type === "file-upload-multi" && (
                                 <div>
                                   <div className="flex items-center justify-between gap-2 mb-1">
-                                    <span className="text-xs text-gray-500 dark:text-zinc-400">
+                                    <span className="text-xs text-gray-500">
                                       {field.label}
                                       {field.required && <span className="text-red-400">*</span>}
                                     </span>
@@ -2089,7 +2089,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       tabIndex={-1}
                                       disabled={isFieldWired || disabled || atMax || refImagesMuted}
                                       onClick={() => !isFieldWired && !disabled && !atMax && !refImagesMuted && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
-                                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors border-gray-300 bg-white px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-white"
+                                      className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed transition-colors border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 disabled:opacity-50"
                                       title={refImagesMuted ? "Upload a Frontal Image first" : "Upload image"}
                                     >
                                       {uploadingElementField === fieldUploadKey ? (
@@ -2115,7 +2115,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                   {field.uploadRequirementsTooltip && (
                                     <div className="mt-1 flex items-center gap-1">
                                       <FieldInfoTooltip text={field.uploadRequirementsTooltip} />
-                                      <span className="text-[10px] text-gray-400 dark:text-zinc-500">Upload requirements</span>
+                                      <span className="text-[10px] text-gray-400">Upload requirements</span>
                                     </div>
                                   )}
                                   {/* Grid of uploaded images */}
@@ -2124,7 +2124,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       {imgList.map((imgUrl, imgIdx) => (
                                         <div
                                           key={imgIdx}
-                                          className="nodrag nopan relative overflow-hidden rounded-lg border border-gray-200 bg-black dark:border-zinc-700"
+                                          className="nodrag nopan relative overflow-hidden rounded-lg border border-gray-200 bg-black"
                                           title={`Image ${imgIdx + 1}`}
                                           style={{ aspectRatio: "1 / 1" }}
                                         >
@@ -2150,12 +2150,12 @@ export default function GenericNode({ id, data, type }: NodeProps) {
                                       {!atMax && (
                                         <div className="relative">
                                           <div
-                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white dark:border-zinc-700 dark:bg-zinc-800/60 cursor-pointer hover:border-[#7C3AED]/40"
+                                            className="nodrag relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] cursor-pointer hover:border-[#7C3AED]/40"
                                             title="Add image"
                                             style={{ aspectRatio: "1 / 1" }}
                                             onClick={() => !disabled && document.getElementById(`el-file-${id}-${itemIdx}-${field.key}`)?.click()}
                                           >
-                                            <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-400 dark:text-zinc-500">
+                                            <div className="flex h-full w-full items-center justify-center text-[10px] font-medium text-gray-400">
                                               Add Image
                                             </div>
                                           </div>
@@ -2174,7 +2174,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
                   <button
                     type="button"
-                    className="nodrag flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-900 transition-colors hover:border-[#7C3AED]/40 hover:text-[#7C3AED] dark:border-zinc-600 dark:text-zinc-300"
+                    className="nodrag flex items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-3 py-1.5 text-xs text-gray-900 transition-colors hover:border-[#7C3AED]/40 hover:text-[#7C3AED]"
                     onClick={addItem}
                   >
                     <LucideIcons.Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -2591,8 +2591,10 @@ export default function GenericNode({ id, data, type }: NodeProps) {
           )}
 
           {/* Collapsible Settings section (Kling v3 style — group: "settings").
+              Only shown on image tab (for nodes with image-mode params).
+              For standard nodes with no image-mode, shown always.
               In image tab, also includes generate_audio from primary params. */}
-          {(settingsParams.length > 0 || (imageModeParams.length > 0 && modeTab === "image")) && (() => {
+          {settingsParams.length > 0 && (imageModeParams.length === 0 || modeTab === "image") && (() => {
             // In image tab, pull generate_audio from primaryParams into this section too
             const extraInSettings = imageModeParams.length > 0 && modeTab === "image"
               ? primaryParams.filter((p) => p.key === "generate_audio")

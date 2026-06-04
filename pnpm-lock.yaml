@@ -12,8 +12,8 @@ importers:
         specifier: ^7.3.4
         version: 7.4.3(next@16.2.6(@babel/core@7.29.7)(@opentelemetry/api@1.9.0)(@playwright/test@1.60.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@shashank519915/shared':
-        specifier: 1.0.4
-        version: 1.0.4
+        specifier: 1.0.7
+        version: 1.0.7
       '@trigger.dev/react-hooks':
         specifier: 4.4.6
         version: 4.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -1059,8 +1059,8 @@ packages:
   '@s2-dev/streamstore@0.22.5':
     resolution: {integrity: sha512-GqdOKIbIoIxT+40fnKzHbrsHB6gBqKdECmFe7D3Ojk4FoN1Hu0LhFzZv6ZmVMjoHHU+55debS1xSWjZwQmbIyQ==}
 
-  '@shashank519915/shared@1.0.4':
-    resolution: {integrity: sha512-v67Hv97oTuifWuDcwSY4C2bbyk0FtcVW8kUSH0cG/p3IF7yY8qJ4skF8szgiSnRA+nz9zjSEvTuCYHxRp8S1YQ==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.4/fdabcd4ac7268750718254f4b18ed7dd20e0f824}
+  '@shashank519915/shared@1.0.7':
+    resolution: {integrity: sha512-Ubrkjm7kQHcUL8ye/sYZ0TKD6HbZqD9c2DiOCk33WPXAag8g5EWRlzPucSGVYfr7pyRlj0ZCY9h5N3+lX3D2gQ==, tarball: https://npm.pkg.github.com/download/@shashank519915/shared/1.0.7/a5731a94628815115793bc56ab496b209be76fe9}
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
@@ -4234,7 +4234,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@shashank519915/shared@1.0.4':
+  '@shashank519915/shared@1.0.7':
     dependencies:
       zod: 3.25.76
 
