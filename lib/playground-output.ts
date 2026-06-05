@@ -13,6 +13,14 @@ export interface PlaygroundNodeRunLike {
   creditCost?: number | null;
 }
 
+/** Live orchestrator SSE nodeStates entry (subset used by playground merge/credits). */
+export interface LiveNodeStateLike {
+  status?: string;
+  output?: unknown;
+  error?: string;
+  creditCost?: number | null;
+}
+
 export interface PlaygroundOutputSection {
   nodeId: string;
   label: string;
@@ -24,6 +32,31 @@ export interface PlaygroundOutputSection {
 
 export function sumRunCreditsMicro(nodeRuns: PlaygroundNodeRunLike[]): number {
   return nodeRuns.reduce((sum, nr) => sum + (nr.creditCost ?? 0), 0);
+}
+
+/** Sum creditCost from live orchestrator metadata nodeStates. */
+export function sumLiveStatesCreditsMicro(
+  liveStates: Record<string, LiveNodeStateLike> | null | undefined
+): number {
+  if (!liveStates) return 0;
+  return Object.values(liveStates).reduce(
+    (sum, st) => sum + (typeof st.creditCost === "number" ? st.creditCost : 0),
+    0
+  );
+}
+
+/** History table credits: nodeRuns total, with live SSE overlay for the active run. */
+export function resolveHistoryRowCreditsMicro(opts: {
+  nodeRuns: PlaygroundNodeRunLike[];
+  isSelected: boolean;
+  isRunning: boolean;
+  liveCreditsMicro: number | null;
+}): number {
+  const fromRows = sumRunCreditsMicro(opts.nodeRuns);
+  if (opts.isSelected && opts.isRunning && opts.liveCreditsMicro != null) {
+    return Math.max(fromRows, opts.liveCreditsMicro);
+  }
+  return fromRows;
 }
 
 export function formatCreditsMillions(micro: number): string {
@@ -85,7 +118,7 @@ export function countCompletedFromStates(
 /** Merge DB nodeRuns with live SSE states (live wins when present). */
 export function mergeNodeRunsWithLive(
   nodeRuns: PlaygroundNodeRunLike[],
-  liveStates: Record<string, { status: string; output?: unknown; error?: string }> | null
+  liveStates: Record<string, LiveNodeStateLike & { status: string }> | null
 ): PlaygroundNodeRunLike[] {
   if (!liveStates || Object.keys(liveStates).length === 0) return nodeRuns;
   const byId = new Map(nodeRuns.map((nr) => [nr.nodeId, { ...nr }]));
@@ -105,7 +138,8 @@ export function mergeNodeRunsWithLive(
       status,
       output: st.output ?? prev?.output,
       error: st.error ?? prev?.error,
-      creditCost: prev?.creditCost,
+      creditCost:
+        typeof st.creditCost === "number" ? st.creditCost : prev?.creditCost,
     });
   }
   return Array.from(byId.values());

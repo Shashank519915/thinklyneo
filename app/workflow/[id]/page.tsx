@@ -43,7 +43,9 @@ import {
   countRunnableNodes,
   formatCreditsMillions,
   mergeNodeRunsWithLive,
+  resolveHistoryRowCreditsMicro,
   resolvePlaygroundRunStatus,
+  sumLiveStatesCreditsMicro,
   sumRunCreditsMicro,
 } from "@/lib/playground-output";
 
@@ -499,13 +501,14 @@ export default function WorkflowWorkspacePage() {
   );
 
   const handleOrchestratorUpdate = useCallback(
-    (nodeStates: Record<string, { status: string; output?: unknown; error?: string }>) => {
+    (
+      nodeStates: Record<
+        string,
+        { status: string; output?: unknown; error?: string; creditCost?: number | null }
+      >
+    ) => {
       setLiveNodeStates(nodeStates);
-      // Accumulate live credits from completed node states
-      const total = Object.values(nodeStates).reduce((sum, ns: any) => {
-        return sum + (typeof ns.creditCost === "number" ? ns.creditCost : 0);
-      }, 0);
-      if (total > 0) setLiveRunCreditsMicro(total);
+      setLiveRunCreditsMicro(sumLiveStatesCreditsMicro(nodeStates));
     },
     []
   );
@@ -680,17 +683,7 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
   };
 
   // Filter history runs list
-  // Build the live-credit-enriched optimistic row for the history table
-  const optimisticRowForTable: WorkflowRunItem | null = optimisticRun
-    ? {
-        ...optimisticRun,
-        // Reflect accumulated live credits directly in the optimistic row's nodeRuns credit total
-        nodeRuns:
-          liveRunCreditsMicro != null && liveRunCreditsMicro > 0
-            ? [{ id: "live", nodeId: "live", nodeName: "", status: "running", creditCost: liveRunCreditsMicro, output: null, error: null, inputs: null, providerUsed: null, durationMs: null, startedAt: optimisticRun.startedAt, finishedAt: null }]
-            : [],
-      }
-    : null;
+  const optimisticRowForTable: WorkflowRunItem | null = optimisticRun;
 
   const filteredRuns = [
     ...(optimisticRowForTable ? [optimisticRowForTable] : []),
@@ -1051,8 +1044,17 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
                               </tr>
                             ) : (
                               filteredRuns.map((r) => {
-                                const totalCost = r.nodeRuns.reduce((sum, nr) => sum + (nr.creditCost || 0), 0);
-                                const isSelected = selectedRun?.id === r.id;
+                                const isSelected =
+                                  selectedRun?.id === r.id ||
+                                  (isRunning &&
+                                    optimisticRun?.id === r.id &&
+                                    selectedRun?.id === optimisticRun.id);
+                                const totalCost = resolveHistoryRowCreditsMicro({
+                                  nodeRuns: r.nodeRuns,
+                                  isSelected,
+                                  isRunning,
+                                  liveCreditsMicro: liveRunCreditsMicro,
+                                });
                                 const isOptimistic = r.id.startsWith("optimistic-");
                                 const displayStatus =
                                   r.status === "success" ? "completed" : r.status;
@@ -1379,7 +1381,12 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 interface SubscriberProps {
   orchestratorRunId: string;
   publicAccessToken: string;
-  onNodeStatesUpdate: (nodeStates: Record<string, { status: string; output?: any; error?: string }>) => void;
+  onNodeStatesUpdate: (
+    nodeStates: Record<
+      string,
+      { status: string; output?: unknown; error?: string; creditCost?: number | null }
+    >
+  ) => void;
   onComplete: (finalStatus: string) => void;
 }
 
