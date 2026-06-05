@@ -94,7 +94,7 @@ describe("buildInputValuesFromFields", () => {
     const vals = buildInputValuesFromFields(fields);
     expect(vals.field_text_1).toBe("A retro synthwave city");
     expect(vals.field_image_1).toBe("");
-    expect(vals.field_num_1).toBe(42);
+    expect(vals.field_num_1).toBe("42");
   });
 
   it("returns empty object for empty fields array", () => {
@@ -108,8 +108,9 @@ describe("isMultiAssetField", () => {
     expect(isMultiAssetField("video")).toBe(true);
   });
 
-  it("audio is not multi-asset", () => {
-    expect(isMultiAssetField("audio")).toBe(false);
+  it("audio supports multiple assets when mediaMaxCount allows", () => {
+    expect(isMultiAssetField("audio")).toBe(true);
+    expect(isMultiAssetField("audio", 1)).toBe(false);
   });
 
   it("text is not multi-asset", () => {

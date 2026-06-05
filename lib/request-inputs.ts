@@ -59,12 +59,16 @@ export function isMultiAssetField(
   mediaMaxCount?: number
 ): boolean {
   if (mediaMaxCount === 1) return false;
-  return kind === "image" || kind === "video";
+  if (kind === "image" || kind === "video") return true;
+  if (kind === "audio" && (mediaMaxCount == null || mediaMaxCount > 1)) return true;
+  return false;
 }
 
 export function maxAssetsForField(field: Pick<WorkflowField, "type" | "mediaMaxCount">): number {
   if (field.mediaMaxCount != null) return field.mediaMaxCount;
-  if (field.type === "video_field" || field.type === "image_field") return 10;
+  if (field.type === "image_field") return 10;
+  if (field.type === "video_field") return 7;
+  if (field.type === "audio_field") return 5;
   return 10;
 }
 
@@ -85,14 +89,17 @@ export function buildInputValuesFromFields(
   const next: Record<string, string> = {};
   for (const f of fields) {
     const prior = existing?.[f.id];
+    const kind = getRequestFieldKind(f);
     if (prior !== undefined && prior !== "") {
       next[f.id] = prior;
     } else if (f.value != null && f.value !== "") {
-      next[f.id] = f.value;
-    } else if (f.type === "boolean_field") {
+      next[f.id] = String(f.value);
+    } else if (kind === "boolean") {
       next[f.id] = "false";
-    } else if (f.type === "select_field") {
+    } else if (kind === "select") {
       next[f.id] = defaultSelectFieldValue(f);
+    } else if (kind === "number" && f.numberMin !== undefined) {
+      next[f.id] = String(f.numberMin);
     } else {
       next[f.id] = "";
     }
@@ -129,7 +136,7 @@ export function normalizeInputValuesForRun(
 ): Record<string, string> {
   const next = { ...values };
   for (const f of fields) {
-    if (f.type !== "select_field") continue;
+    if (getRequestFieldKind(f) !== "select") continue;
     const v = (next[f.id] ?? "").trim();
     if (!v) next[f.id] = defaultSelectFieldValue(f);
   }

@@ -29,9 +29,11 @@ import { type Node, type Edge } from "@xyflow/react";
 import {
   buildInputValuesFromFields,
   hydrateInputValuesFromRun,
+  maxAssetsForField,
   normalizeInputValuesForRun,
   type RequestFieldKind,
 } from "@/lib/request-inputs";
+import { validateWorkflowInputsSync } from "@shashank519915/shared";
 import { uploadFilesViaApi } from "@/lib/upload";
 import { formatWorkflowEstimateDisplay } from "@/lib/node-estimates";
 import PlaygroundFieldRow from "@/components/playground/PlaygroundFieldRow";
@@ -179,13 +181,20 @@ export default function WorkflowWorkspacePage() {
     if (!files || files.length === 0) return;
 
     const filesArray = Array.from(files);
-    
-    // Check limit
+
+    const requestNode = (workflow?.nodes || []).find(
+      (n: { type: string }) => n.type === "requestInputs"
+    );
+    const field = ((requestNode?.data?.fields || []) as WorkflowField[]).find(
+      (f) => f.id === fieldId
+    );
+    const maxAssets = maxAssetsForField(field ?? { type: "file_field" });
+
     const currentVal = inputValues[fieldId] || "";
     const currentUrls = currentVal ? currentVal.split(",").filter(Boolean) : [];
-    
-    if (currentUrls.length + filesArray.length > 10) {
-      alert("You can upload a maximum of 10 files.");
+
+    if (currentUrls.length + filesArray.length > maxAssets) {
+      alert(`You can upload a maximum of ${maxAssets} file(s).`);
       return;
     }
 
@@ -207,7 +216,7 @@ export default function WorkflowWorkspacePage() {
             setInputValues((prev) => {
               const prevVal = prev[fieldId] || "";
               const prevUrls = prevVal ? prevVal.split(",").filter(Boolean) : [];
-              return { ...prev, [fieldId]: [...prevUrls, ...localPreviews].slice(0, 10).join(",") };
+              return { ...prev, [fieldId]: [...prevUrls, ...localPreviews].slice(0, maxAssets).join(",") };
             });
           }
         };
@@ -233,7 +242,7 @@ export default function WorkflowWorkspacePage() {
           const cleanPrevUrls = prevUrls.filter(url => !url.startsWith("data:"));
           return {
             ...prev,
-            [fieldId]: [...cleanPrevUrls, ...validUrls].slice(0, 10).join(",")
+            [fieldId]: [...cleanPrevUrls, ...validUrls].slice(0, maxAssets).join(",")
           };
         });
       }
@@ -408,6 +417,21 @@ export default function WorkflowWorkspacePage() {
     if (isRunning) return;
     const fields = getRequestFields();
     const payload = normalizeInputValuesForRun(fields, inputValues);
+
+    const limitErr = validateWorkflowInputsSync({
+      nodes: (workflow?.nodes || []).map((n: { id: string; type: string; data?: unknown }) => ({
+        id: n.id,
+        type: n.type,
+        data: (n.data ?? {}) as Record<string, unknown>,
+      })),
+      inputValues: payload,
+      scope: "full",
+    });
+    if (limitErr) {
+      window.alert(limitErr.message);
+      return;
+    }
+
     setInputValues(payload);
     setIsRunning(true);
     setLiveNodeStates({});
