@@ -1,6 +1,7 @@
 /**
- * @fileoverview Workflow cost estimates for canvas chrome — uses @shashank519915/shared
- * registry + per-node dynamic rules (OpenRouter/Gemini inputs update the total live).
+ * @fileoverview Workflow cost estimates for canvas Run chrome — sums `credits.base` via
+ * shared `estimateWorkflowCostMicrocredits` (matches billing holds). Per-node badges use
+ * dynamic OpenRouter/Gemini display estimates separately in GenericNode.
  */
 
 import type { Node } from "@xyflow/react";
@@ -26,7 +27,7 @@ export function sumWorkflowEstimateMillions(nodeList: Node[]): number {
   return getWorkflowEstimateMicrocredits(nodeList) / 1_000_000;
 }
 
-/** Formatted value for `Est ~{x}M` chrome — adapts precision for small OpenRouter totals. */
+/** Formatted value for `Est ~{x}M` chrome. */
 export function formatWorkflowEstimateDisplay(nodeList: Node[]): string {
   const micro = getWorkflowEstimateMicrocredits(nodeList);
   if (micro === 0) return "0.00";

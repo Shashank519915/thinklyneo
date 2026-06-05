@@ -57,14 +57,14 @@ describe("sumWorkflowEstimateMillions", () => {
     expect(sumWorkflowEstimateMillions(list)).toBeCloseTo(0.21 + 0.84);
   });
 
-  it("uses dynamic OpenRouter estimate when inputs are present", () => {
+  it("uses billing base for OpenRouter in workflow total (not per-node display estimate)", () => {
     const list = [
       node("openRouter", {
         prompt: "x".repeat(200),
         image_urls: ["https://a.jpg"],
       }),
     ];
-    expect(getWorkflowEstimateMicrocredits(list)).toBe(100 + 100 + 300);
-    expect(formatWorkflowEstimateDisplay(list)).toBe("0.0005");
+    expect(getWorkflowEstimateMicrocredits(list)).toBe(450_000);
+    expect(formatWorkflowEstimateDisplay(list)).toBe("0.45");
   });
 });
