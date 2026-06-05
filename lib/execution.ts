@@ -96,6 +96,13 @@ function getHandleDataType(
   if (handleId === "in:audio_urls") return "audio";
   if (handleId === "in:audio_volume") return "number";
   if (handleId === "in:format") return "text";
+  // klingV3 image inputs
+  if (handleId === "in:start_image_url" || handleId === "in:end_image_url") return "image";
+  // extractAudio / mergeAV specific handles
+  if (handleId === "in:videoUrl" || handleId === "in:video_url") return "video";
+  if (handleId === "in:audio_url") return "audio";
+  if (handleId === "out:outputAudio") return "audio";
+  if (handleId === "out:video_url") return "video";
   if (
     handleId === "in:temperature" ||
     handleId === "in:maxTokens" ||
@@ -118,7 +125,8 @@ function getHandleDataType(
   if (handleId.includes("file") || handleId.includes("File") || handleId === "in:file") return "file";
   if (handleId.includes("prompt") || handleId === "in:prompt" || handleId === "in:systemPrompt") return "text";
   if (handleId === "out:response") return "text";
-  if (handleId.includes("x") || handleId.includes("y") || handleId.includes(":w") || handleId.includes(":h")) return "number";
+  if (handleId === "in:x" || handleId === "in:y" || handleId === "in:w" || handleId === "in:h")
+    return "number";
 
   if (nodeType === "cropImage") return "image";
   if (nodeType === "gemini") return "text";
@@ -136,6 +144,9 @@ export function isValidConnection(
   sourceNodeType: string | undefined,
   targetNodeType: string | undefined
 ): boolean {
+  // Response node accepts any output type — slots are user-named and type-agnostic.
+  if (targetNodeType === "response") return true;
+
   const sourceType = getHandleDataType(sourceHandle, sourceNodeType);
   const targetType = getHandleDataType(targetHandle, targetNodeType);
 

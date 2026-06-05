@@ -20,7 +20,7 @@ public REST API (`/api/v1`), OpenAPI 3.1 docs, and an MCP server for AI assistan
 - Public REST API with Unkey or local API keys
 - OpenAPI 3.1 docs and interactive playground (`/docs`)
 - Outbound Svix-style webhooks
-- MCP server (hosted HTTP + local StdIO)
+- MCP server (hosted Streamable HTTP)
 
 ## Repositories
 
@@ -144,7 +144,7 @@ Microcredit ledger (1,000,000 micro = 1.00 credit). Flow: estimate in-scope `cre
 |---------|-----------|--------|
 | Dashboard / canvas | Clerk session + `userId` ownership | `/api/workflows/*`, `/api/execute/*`, `/api/keys`, `/api/credits` |
 | Public API | Unkey or SHA-256 `ApiKey` table | `/api/v1/*` |
-| MCP | Bearer API key | `/api/mcp` (hosted), `scripts/mcp-server.ts` (StdIO) |
+| MCP | Bearer API key | `/api/mcp` (hosted Streamable HTTP — single supported transport) |
 
 ### Outbound webhooks
 

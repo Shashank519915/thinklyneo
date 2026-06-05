@@ -41,7 +41,7 @@ import GenericNode from "./nodes/GenericNode";
 import ResponseNode from "./nodes/ResponseNode";
 import AnimatedEdge from "./edges/AnimatedEdge";
 import BottomToolbar from "./BottomToolbar";
-import ControlsBar from "./ControlsBar";
+import ControlsBar from "./controls/ControlsBar";
 import { Map, Minimize2, Play, X } from "lucide-react";
 
 const nodeTypes = {

@@ -9,48 +9,22 @@
 
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Check } from "lucide-react";
-import type { Node as FlowNode } from "@xyflow/react";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { classifyMediaUrl, formatDuration, sanitizeError } from "@/lib/utils";
-import {
-  cropImageDefinition,
-  openrouterLlmDefinition,
-  geminiDefinition,
-  gptImage2Definition,
-  klingV3Definition,
-  mergeVideoDefinition,
-  mergeAVDefinition,
-  extractAudioDefinition,
-  type NodeDefinition,
-} from "@shashank519915/shared";
 import { SpinningLogo } from "@/components/SpinningLogo";
-
-interface NodeRunData {
-  id: string;
-  nodeId: string;
-  nodeName: string;
-  status: string;
-  startedAt: string;
-  finishedAt?: string;
-  durationMs?: number;
-  inputs?: Record<string, unknown>;
-  output?: unknown;
-  error?: string;
-  providerUsed?: string | null;
-  providerAttempts?: Array<{ providerId: string; status: "success" | "failed"; error?: string; durationMs: number }> | null;
-  logs?: string | null;
-  creditCost?: number | null;
-}
-
-interface RunHistoryItem {
-  id: string;
-  scope: string;
-  status: string;
-  startedAt: string;
-  finishedAt?: string;
-  durationMs?: number;
-  nodeRuns: NodeRunData[];
-}
+import {
+  type NodeRunData,
+  type RunHistoryItem,
+  STATUS_META as statusDot,
+  resolveInputLabel,
+  getRequestFieldLabel,
+  getResponseSlotLabel,
+  truncateMiddle,
+  looksLikeOpaquePayload,
+  parseOutputAsRecord,
+  isRequestInputsNodeRun as isRequestInputsNodeRunBase,
+  isResponseNodeRun,
+} from "@/components/workflow/run-detail-utils";
 
 interface RightHistoryPanelProps {
   workflowId: string;
@@ -81,15 +55,18 @@ const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
   { value: "canceled", label: "Canceled"  },
 ];
 
-const statusDot: Record<string, { color: string; label: string; pulse?: boolean }> = {
-  success:  { color: "#10B981", label: "Completed" },
-  failed:   { color: "#EF4444", label: "Failed"    },
-  partial:  { color: "#F59E0B", label: "Partial"   },
-  running:  { color: "#3B82F6", label: "Running", pulse: true },
-  queued:   { color: "#8B5CF6", label: "Queued"    },
-  waiting:  { color: "#F59E0B", label: "Waiting"   },
-  canceled: { color: "#9CA3AF", label: "Canceled"  },
-};
+/**
+ * Panel2-specific override: falls back to checking whether all output keys start with "field_"
+ * when the nodeId/nodeName heuristic alone is insufficient.
+ */
+function isRequestInputsNodeRun(nr: NodeRunData): boolean {
+  if (isRequestInputsNodeRunBase(nr)) return true;
+  const out = parseOutputAsRecord(nr.output);
+  if (!out) return false;
+  const keys = Object.keys(out);
+  if (keys.length === 0) return false;
+  return keys.every((k) => k.startsWith("field_"));
+}
 
 function getNodeTypeColor(nodeName: string): string {
   const lower = nodeName.toLowerCase();
@@ -112,52 +89,9 @@ function formatScopeLabel(scope: string): string {
   return scope;
 }
 
-const DEFINITIONS_BY_NAME: Record<string, NodeDefinition> = {
-  [cropImageDefinition.name]: cropImageDefinition,
-  [geminiDefinition.name]: geminiDefinition,
-  [openrouterLlmDefinition.name]: openrouterLlmDefinition,
-  [gptImage2Definition.name]: gptImage2Definition,
-  [klingV3Definition.name]: klingV3Definition,
-  [mergeVideoDefinition.name]: mergeVideoDefinition,
-  [mergeAVDefinition.name]: mergeAVDefinition,
-  [extractAudioDefinition.name]: extractAudioDefinition,
-};
-
-function resolveInputLabel(nodeName: string, key: string): string {
-  const def = DEFINITIONS_BY_NAME[nodeName];
-  const param = def?.inputs?.find((i) => i.key === key);
-  if (param?.label) return param.label;
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/_/g, " ")
-    .replace(/^\w/, (c) => c.toUpperCase());
-}
-
-function getRequestFieldLabel(fieldId: string, nodes: FlowNode[]): string {
-  const reqNode = nodes.find((n) => n.type === "requestInputs" || n.id === "request-inputs");
-  if (!reqNode) return fieldId.replace(/^field_/, "").replace(/_/g, " ");
-  const fields = ((reqNode.data as { fields?: Array<{ id: string; label?: string }> }).fields) ?? [];
-  const field = fields.find((f) => f.id === fieldId);
-  return field?.label?.trim() || fieldId.replace(/^field_/, "").replace(/_/g, " ");
-}
-
-function getResponseSlotLabel(slotId: string, nodes: FlowNode[]): string {
-  const respNode = nodes.find((n) => n.type === "response" || n.id === "response");
-  if (!respNode) return slotId;
-  const results = ((respNode.data as { results?: Array<{ id: string; label?: string }> }).results) ?? [];
-  const slot = results.find((r) => r.id === slotId);
-  return slot?.label?.trim() || slotId;
-}
-
 function isImageMediaUrl(s: string): boolean {
   const m = classifyMediaUrl(s.trim());
   return m?.kind === "image";
-}
-
-function truncateMiddle(s: string, maxLen: number): string {
-  if (s.length <= maxLen) return s;
-  const half = Math.floor((maxLen - 1) / 2);
-  return s.slice(0, half) + "…" + s.slice(s.length - half);
 }
 
 /** Summarize multi-key output objects for collapsed history rows. */
@@ -301,41 +235,6 @@ function ValuePreview({
       {JSON.stringify(value, null, 2)}
     </div>
   );
-}
-
-function looksLikeOpaquePayload(s: string): boolean {
-  if (s.length < 240) return false;
-  const sample = s.slice(0, 120).replace(/\s/g, "");
-  if (/^data:image\//i.test(s)) return false;
-  if (/^https?:\/\//i.test(s.trim())) return false;
-  return /^[A-Za-z0-9+/=]+$/.test(sample);
-}
-
-function parseOutputAsRecord(output: unknown): Record<string, unknown> | null {
-  if (output == null) return null;
-  if (typeof output === "object" && !Array.isArray(output)) return output as Record<string, unknown>;
-  if (typeof output === "string") {
-    try {
-      const j = JSON.parse(output) as unknown;
-      if (j && typeof j === "object" && !Array.isArray(j)) return j as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function isRequestInputsNodeRun(nr: NodeRunData): boolean {
-  if (nr.nodeId === "request-inputs" || nr.nodeName === "Request-Inputs") return true;
-  const out = parseOutputAsRecord(nr.output);
-  if (!out) return false;
-  const keys = Object.keys(out);
-  if (keys.length === 0) return false;
-  return keys.every((k) => k.startsWith("field_"));
-}
-
-function isResponseNodeRun(nr: NodeRunData): boolean {
-  return nr.nodeId === "response" || nr.nodeName === "Output" || nr.nodeName === "Response";
 }
 
 /** data:/https image URLs, or raw base64 when the field key suggests an image upload. */

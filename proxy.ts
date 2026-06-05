@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
+/** using proxy.ts file instead of middleware, because Next.js supports it and warns to use it for better support. */
+
 /** Routes that bypass auth (login pages, public API, hosted MCP) */
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",

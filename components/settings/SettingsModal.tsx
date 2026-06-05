@@ -1,5 +1,7 @@
 "use client";
 
+/** Some nav sections are stub, as their pages are not iplemented yet and are not a requirement as for now, they are just ui matching. hence kept them. */
+
 import { useCallback, useEffect, useState } from "react";
 import {
   BookOpen,

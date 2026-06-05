@@ -3,6 +3,7 @@
 /**
  * @fileoverview App navigation sidebar: expanded (260px) or collapsed icon rail (48px).
  * Settings modal contains API keys + webhook configuration (moved from /dashboard?tab=api).
+ * the nav buttons all use href= "#" and onClick=(e) => e.preventDefault() to prevent navigation. basically to keep stub because they are just UI match and nota requiremrent rightnow to be built.
  */
 
 import { useState, useEffect, useCallback } from "react";

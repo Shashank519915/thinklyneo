@@ -87,7 +87,7 @@ export function formatScopeMode(scope: string): string {
   return scope.charAt(0).toUpperCase() + scope.slice(1);
 }
 
-const DEFINITIONS_BY_NAME: Record<string, NodeDefinition> = {
+export const DEFINITIONS_BY_NAME: Record<string, NodeDefinition> = {
   [cropImageDefinition.name]: cropImageDefinition,
   [geminiDefinition.name]: geminiDefinition,
   [openrouterLlmDefinition.name]: openrouterLlmDefinition,

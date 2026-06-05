@@ -4,7 +4,8 @@
  * @fileoverview `/workflow/[id]/canvas2` client page: legacy snapshot of the canvas editor that keeps the
  * original inline run-preview + node drill-down behavior (via RightHistoryPanel2). Reachable only by
  * navigating to `/canvas2` manually; the primary `/canvas` route hosts the modal-based run history UI.
- */
+  * not a DRY Violation, it is just as an alternative to show the rightside panel and show history preview on the main canvas only.This is just for show. Not a violation.. 
+*/
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
