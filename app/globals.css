@@ -1,20 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #FFFFFF;
-  --foreground: #09090b;
-  --sidebar-bg: #F9F9F9;
-  --border-color: #E5E7EB;
-  --node-bg: #FFFFFF;
-  --brand-purple: #7C3AED;
-  --brand-purple-hover: #6D28D9;
+  --background: #050505;
+  --foreground: #F4F4F5;
+  --sidebar-bg: #0C0C0E;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --node-bg: #121215;
+  --brand-purple: #8B5CF6;
+  --brand-purple-hover: #7C3AED;
   --handle-orange: #F97316;
   --handle-blue: #3B82F6;
   --handle-green: #10B981;
   --handle-pink: #EC4899;
   --handle-amber: #F59E0B;
   --handle-indigo: #6366F1;
+  
+  /* Custom Snappy Easing Curves */
+  --ease-out-snappy: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @theme inline {
@@ -22,22 +26,62 @@
   --color-foreground: var(--foreground);
   --color-border: var(--border-color);
   --color-card: var(--node-bg);
-  --color-muted: #F4F4F5;
-  --color-muted-foreground: #71717A;
+  --color-muted: #18181B;
+  --color-muted-foreground: #A1A1AA;
   --color-primary: var(--brand-purple);
   --color-primary-foreground: #FFFFFF;
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  /* Thinkly color overrides */
+  --color-thinkly-neutral-800: #18181B;
+  --color-thinkly-indigo-500: #6366F1;
 }
 
 * {
   box-sizing: border-box;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -20%;
+  left: 30%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -10%;
+  right: 10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.05) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Node executing glow animation */
@@ -339,3 +383,146 @@ body {
     transform: none;
   }
 }
+
+/* Thinkly Custom Premium Design Tokens & Utilities */
+.dotted-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.bezel-container {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 4px 24px -2px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  background: rgba(12, 12, 14, 0.5);
+  backdrop-filter: blur(20px);
+}
+
+.bezel-container-inner {
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: rgba(8, 8, 10, 0.4);
+}
+
+.shimmer-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-hover::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.02) 20%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  content: '';
+  pointer-events: none;
+}
+
+.shimmer-hover:hover::after {
+  animation: shimmer-effect 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes shimmer-effect {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.active-scale {
+  transition: transform 120ms var(--ease-out-snappy), border-color 150ms ease, background-color 150ms ease;
+}
+
+.active-scale:active {
+  transform: scale(0.97) !important;
+}
+
+/* Pulsing status dot animation */
+@keyframes statusPulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+  }
+}
+
+.status-pulse-dot {
+  animation: statusPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Dynamic Island Organic Entry Animation */
+@keyframes islandContentEnter {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.97);
+  }
+  25% {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+.island-content-enter {
+  animation: islandContentEnter 650ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+/* Premium Dashboard Fade Slide Up Animation */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Noise overlay utility */
+.glass-noise {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 0);
+  background-size: 4px 4px;
+  opacity: 0.02;
+}
+
+/* Staggered Delay classes */
+.stagger-1 {
+  animation-delay: 60ms;
+}
+
+.stagger-2 {
+  animation-delay: 140ms;
+}
+
+.stagger-3 {
+  animation-delay: 220ms;
+}
+
+
+

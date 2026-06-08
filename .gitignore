@@ -56,3 +56,7 @@ next-env.d.ts
 /shared/
 
 /app/generated/prisma
+
+# agents & local skills config
+.agents/
+skills-lock.json
