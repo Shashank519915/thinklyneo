@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL ?? "https://galaxy-temp-frontend.vercel.app";
+  process.env.PLAYWRIGHT_BASE_URL ?? "https://thinkly-frontend.vercel.app";
 
 /**
  * Smoke e2e against a running app (deployed URL in CI, localhost when developing).

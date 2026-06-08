@@ -7,11 +7,11 @@
   "rewrites": [
     {
       "source": "/docs",
-      "destination": "https://nextflow-6b82c0dd.mintlify.dev/docs"
+      "destination": "https://thinkly-6b82c0dd.mintlify.dev/docs"
     },
     {
       "source": "/docs/:match*",
-      "destination": "https://nextflow-6b82c0dd.mintlify.dev/docs/:match*"
+      "destination": "https://thinkly-6b82c0dd.mintlify.dev/docs/:match*"
     }
   ]
 }

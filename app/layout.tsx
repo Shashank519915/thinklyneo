@@ -17,7 +17,7 @@ const inter = Inter({
 
 /** Default SEO + SVG favicons consumed by `<head>` across all routes. */
 export const metadata: Metadata = {
-  title: "NextFlow - AI Workflow Builder",
+  title: "Thinkly - AI Workflow Builder",
   description: "Build powerful AI workflows with a visual canvas",
   icons: {
     icon: "/logo.svg",

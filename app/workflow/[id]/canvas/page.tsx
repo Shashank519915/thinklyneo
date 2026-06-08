@@ -97,8 +97,8 @@ export default function WorkflowCanvasPage() {
     const handleRefresh = () => {
       fetchBalance();
     };
-    window.addEventListener("nextflow:refresh-history", handleRefresh);
-    return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
+    window.addEventListener("thinkly:refresh-history", handleRefresh);
+    return () => window.removeEventListener("thinkly:refresh-history", handleRefresh);
   }, [fetchBalance]);
 
   const [orchestratorState, setOrchestratorState] = useState<{
@@ -183,7 +183,7 @@ export default function WorkflowCanvasPage() {
 
         if (!resp.ok) {
           const errData = await resp.json().catch(() => ({ error: "Execute failed" }));
-          console.error("[NextFlow] Execute API error:", errData.error);
+          console.error("[Thinkly] Execute API error:", errData.error);
           window.alert(errData.error || "Execute failed");
           isRunningRef.current = false;
           setIsRunning(false);
@@ -195,7 +195,7 @@ export default function WorkflowCanvasPage() {
         const { runId, orchestratorRunId, publicAccessToken } = data.data ?? {};
 
         if (!runId || !orchestratorRunId || !publicAccessToken) {
-          console.error("[NextFlow] Missing execute response data:", data);
+          console.error("[Thinkly] Missing execute response data:", data);
           isRunningRef.current = false;
           setIsRunning(false);
           setCurrentRunScope(null);
@@ -206,9 +206,9 @@ export default function WorkflowCanvasPage() {
         setOrchestratorState({ orchestratorRunId, publicAccessToken });
         fetchBalance();
 
-        console.log(`[NextFlow] Run ${runId} started. Orchestrator: ${orchestratorRunId}`);
+        console.log(`[Thinkly] Run ${runId} started. Orchestrator: ${orchestratorRunId}`);
       } catch (err) {
-        console.error("[NextFlow] Execute failed:", err);
+        console.error("[Thinkly] Execute failed:", err);
         isRunningRef.current = false;
         setIsRunning(false);
         setCurrentRunScope(null);
@@ -224,16 +224,16 @@ export default function WorkflowCanvasPage() {
         method: "POST",
       });
       if (resp.ok) {
-        console.log("[NextFlow] Run cancelled successfully.");
+        console.log("[Thinkly] Run cancelled successfully.");
         isRunningRef.current = false;
         setIsRunning(false);
         setCurrentRunId(null);
         setCurrentRunScope(null);
         setOrchestratorState(null);
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
       }
     } catch (err) {
-      console.error("[NextFlow] Cancel failed:", err);
+      console.error("[Thinkly] Cancel failed:", err);
     }
   }, [isRunning, workflowId, setIsRunning, setCurrentRunId, setCurrentRunScope]);
 
@@ -304,14 +304,14 @@ export default function WorkflowCanvasPage() {
           body: JSON.stringify({ finalStatus: "failed" }),
         })
           .then(() => {
-            window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+            window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
           })
-          .catch((err) => console.error("[NextFlow] Reconcile failed:", err));
+          .catch((err) => console.error("[Thinkly] Reconcile failed:", err));
       }
 
       requestAnimationFrame(() => {
-        window.dispatchEvent(new CustomEvent("nextflow:auto-arrange"));
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        window.dispatchEvent(new CustomEvent("thinkly:auto-arrange"));
+        window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
       });
     },
     [workflowId, currentRunId, setIsRunning, setCurrentRunId, setCurrentRunScope, clearExecutionState]
@@ -348,7 +348,7 @@ export default function WorkflowCanvasPage() {
       }
 
       if (!runningRun.orchestratorRunId) {
-        console.log(`[NextFlow] Run ${runningRun.id} has no orchestrator — finalizing.`);
+        console.log(`[Thinkly] Run ${runningRun.id} has no orchestrator — finalizing.`);
         try {
           await fetch(`/api/workflows/${workflowId}/node-runs`, {
             method: "POST",
@@ -360,12 +360,12 @@ export default function WorkflowCanvasPage() {
             }),
           });
         } catch {}
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
         return;
       }
 
       console.log(
-        `[NextFlow] Active run found: ${runningRun.id}. Restoring SSE to orchestrator ${runningRun.orchestratorRunId}...`
+        `[Thinkly] Active run found: ${runningRun.id}. Restoring SSE to orchestrator ${runningRun.orchestratorRunId}...`
       );
 
       for (const nr of runningRun.nodeRuns) {
@@ -399,8 +399,8 @@ export default function WorkflowCanvasPage() {
       });
 
       if (!tokenResp.ok) {
-        console.warn("[NextFlow] Failed to mint orchestrator token — run may have ended.");
-        window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+        console.warn("[Thinkly] Failed to mint orchestrator token — run may have ended.");
+        window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
         return;
       }
 
@@ -408,7 +408,7 @@ export default function WorkflowCanvasPage() {
       const { publicAccessToken } = tokenData.data ?? {};
 
       if (!publicAccessToken) {
-        console.warn("[NextFlow] No token returned for orchestrator.");
+        console.warn("[Thinkly] No token returned for orchestrator.");
         return;
       }
 
@@ -439,9 +439,9 @@ export default function WorkflowCanvasPage() {
         publicAccessToken,
       });
 
-      console.log(`[NextFlow] SSE restored to orchestrator ${runningRun.orchestratorRunId}`);
+      console.log(`[Thinkly] SSE restored to orchestrator ${runningRun.orchestratorRunId}`);
     } catch (err) {
-      console.error("[NextFlow] SSE restore failed:", err);
+      console.error("[Thinkly] SSE restore failed:", err);
     }
   }, [
     workflowId,
@@ -656,8 +656,8 @@ export default function WorkflowCanvasPage() {
         runWorkflow("single", [nodeId]);
       }
     };
-    window.addEventListener("nextflow:run-node", handler);
-    return () => window.removeEventListener("nextflow:run-node", handler);
+    window.addEventListener("thinkly:run-node", handler);
+    return () => window.removeEventListener("thinkly:run-node", handler);
   }, [runWorkflow]);
 
   useEffect(() => {
@@ -670,8 +670,8 @@ export default function WorkflowCanvasPage() {
         runWorkflow("partial", nodeIds);
       }
     };
-    window.addEventListener("nextflow:run-selected", handler);
-    return () => window.removeEventListener("nextflow:run-selected", handler);
+    window.addEventListener("thinkly:run-selected", handler);
+    return () => window.removeEventListener("thinkly:run-selected", handler);
   }, [runWorkflow]);
 
   const handleExportWorkflow = useCallback(async () => {
@@ -885,7 +885,7 @@ export default function WorkflowCanvasPage() {
                   )}
                   <span className="hidden sm:inline-flex">
                     <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
                       <span className="text-gray-500">Est</span>
                       <span className="tabular-nums">~{estimateWorkflowCostDisplay()}</span>
                       <span className="text-gray-500">M</span>
@@ -894,7 +894,7 @@ export default function WorkflowCanvasPage() {
 
                   <span className="hidden sm:inline-flex">
                     <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                       <span className="text-gray-500">Bal</span>
                       <span className="tabular-nums">{balance !== null ? (balance / 1000000).toFixed(2) : "0.00"}</span>
                       <span className="text-gray-500">M</span>
@@ -918,7 +918,7 @@ export default function WorkflowCanvasPage() {
                         {isRunning ? (
                           <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" stroke-linecap="round" stroke-linejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
                         )}
                       </button>
                       <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
@@ -933,7 +933,7 @@ export default function WorkflowCanvasPage() {
                           onClick={handleCancelRun}
                           className="flex h-8 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-4 w-4"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
                         </button>
                         <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
                           Cancel Run
@@ -952,7 +952,7 @@ export default function WorkflowCanvasPage() {
                         onClick={() => setIsHistoryPanelOpen(true)}
                         className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm transition-all hover:bg-gray-100"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       </button>
                       <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
                         Execution History

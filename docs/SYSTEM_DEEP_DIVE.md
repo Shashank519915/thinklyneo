@@ -1,6 +1,6 @@
 # System Deep Dive
 
-Architecture reference for the Galaxy platform. Execution and API logic live in **galaxy-temp-backend**; this repo owns the canvas UI and realtime subscription.
+Architecture reference for the Thinkly platform. Execution and API logic live in **thinkly-backend**; this repo owns the canvas UI and realtime subscription.
 
 ---
 
@@ -20,7 +20,7 @@ Architecture reference for the Galaxy platform. Execution and API logic live in 
 | API proxy | `next.config.ts` rewrites to `BACKEND_URL` |
 | Shared (synced) | `shared/` via `pnpm sync-shared` |
 
-### Backend (companion repo: galaxy-temp-backend)
+### Backend (companion repo: thinkly-backend)
 
 | Area | Path |
 |------|------|
@@ -34,9 +34,9 @@ Architecture reference for the Galaxy platform. Execution and API logic live in 
 
 ## Provider fallback (summary)
 
-Providers are defined per node in `@galaxy/shared` (synced from backend) and executed via `runProviderChain` on Trigger workers. The orchestrator only dispatches by `node.type`.
+Providers are defined per node in `@thinkly/shared` (synced from backend) and executed via `runProviderChain` on Trigger workers. The orchestrator only dispatches by `node.type`.
 
-Full provider table and executor kinds: see **galaxy-temp-backend** `docs/SYSTEM_DEEP_DIVE.md` or the Provider fallback section in this repo's README.
+Full provider table and executor kinds: see **thinkly-backend** `docs/SYSTEM_DEEP_DIVE.md` or the Provider fallback section in this repo's README.
 
 Executor kinds: `openrouter`, `webhook-sim`, `ffmpeg` (task-local), `stub`.
 
@@ -59,7 +59,7 @@ Canvas shows estimate from `lib/node-estimates.ts` (uses synced `registry.ts`). 
 ## Input limits
 
 - **Upload:** browser → `/api/upload` (backend sharp + size).
-- **Run click:** `validateWorkflowInputsSync` from `@galaxy/shared`.
+- **Run click:** `validateWorkflowInputsSync` from `@thinkly/shared`.
 - **Server:** backend `validate-input-limits.ts` before hold.
 
 Video duration declared but not probed pre-run.

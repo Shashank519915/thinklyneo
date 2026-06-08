@@ -99,8 +99,8 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
 
   useEffect(() => {
     const handleRefresh = () => fetchBalance();
-    window.addEventListener("nextflow:refresh-history", handleRefresh);
-    return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
+    window.addEventListener("thinkly:refresh-history", handleRefresh);
+    return () => window.removeEventListener("thinkly:refresh-history", handleRefresh);
   }, [fetchBalance]);
 
   const displayName =
@@ -131,7 +131,7 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
           >
             <img
               src="/logo.svg"
-              alt="NextFlow"
+              alt="Thinkly"
               className="h-5 w-5 transition-opacity duration-200 group-hover/sidebar:opacity-0"
             />
             <PanelLeftOpen
@@ -195,9 +195,9 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
         >
           <div className="mx-1.5 mb-2 mt-2 flex h-14 items-center justify-between px-3 py-1">
             <div className="flex min-w-0 items-center gap-0 pl-0">
-              <img src="/logo.svg" alt="NextFlow logo" className="h-10 w-10 flex-shrink-0" />
+              <img src="/logo.svg" alt="Thinkly logo" className="h-10 w-10 flex-shrink-0" />
               <span className="ml-1 select-none text-[20px] font-bold leading-none tracking-tight text-gray-900">
-                NextFlow
+                Thinkly
               </span>
             </div>
             <button

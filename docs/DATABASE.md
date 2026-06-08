@@ -1,8 +1,8 @@
 # Database
 
-Galaxy persists data in **PostgreSQL** via Prisma in the **galaxy-temp-backend** repo. The frontend does not connect to the database directly; it calls `/api/*` (proxied to the backend). This document describes the schema evaluators need when reading API responses and history UI.
+Thinkly persists data in **PostgreSQL** via Prisma in the **thinkly-backend** repo. The frontend does not connect to the database directly; it calls `/api/*` (proxied to the backend). This document describes the schema evaluators need when reading API responses and history UI.
 
-**Authoritative schema:** `galaxy-temp-backend/prisma/schema.prisma`  
+**Authoritative schema:** `thinkly-backend/prisma/schema.prisma`  
 **Full reference:** same file in the backend repo at `docs/DATABASE.md`
 
 ---
@@ -38,7 +38,7 @@ erDiagram
 | Run / history | `GET /api/workflows/[id]/history` — `WorkflowRun` + `NodeRun[]` |
 | Live run | Trigger `useRealtimeRun(orchestratorRunId)` metadata; restore via active run + node-runs |
 | Credit badge | `GET /api/credits/balance` |
-| Cost estimate | Computed client-side from synced `@galaxy/shared` `credits.base` |
+| Cost estimate | Computed client-side from synced `@thinkly/shared` `credits.base` |
 
 **Not in DB:** canvas viewport ( `localStorage` ). **Not per run yet:** graph snapshot at execution time.
 
@@ -68,7 +68,7 @@ Hold/reconcile logic runs only on the backend (`lib/credits.ts`).
 
 ## Local setup
 
-Database commands run in **galaxy-temp-backend**:
+Database commands run in **thinkly-backend**:
 
 ```bash
 pnpm db:push

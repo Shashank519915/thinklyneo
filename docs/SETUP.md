@@ -1,6 +1,6 @@
 # Setup Guide (Frontend)
 
-Local development for **galaxy-temp-frontend**. Requires **galaxy-temp-backend** for `/api/*` and Trigger execution. Env vars: [ENVIRONMENT.md](./ENVIRONMENT.md).
+Local development for **thinkly-frontend**. Requires **thinkly-backend** for `/api/*` and Trigger execution. Env vars: [ENVIRONMENT.md](./ENVIRONMENT.md).
 
 ---
 
@@ -8,7 +8,7 @@ Local development for **galaxy-temp-frontend**. Requires **galaxy-temp-backend**
 
 - Node.js 22
 - pnpm
-- **galaxy-temp-backend** cloned and configured (Postgres, Clerk, Trigger, OpenRouter, Transloadit)
+- **thinkly-backend** cloned and configured (Postgres, Clerk, Trigger, OpenRouter, Transloadit)
 
 ---
 
@@ -30,17 +30,17 @@ App: `http://localhost:3001` (proxies `/api/*` to `BACKEND_URL`).
 
 ```bash
 # Backend (sibling repo)
-cd ../galaxy-temp-backend
+cd ../thinkly-backend
 pnpm install
 pnpm db:push
 pnpm dev
 
 # Trigger worker
-cd ../galaxy-temp-backend
+cd ../thinkly-backend
 npx trigger.dev@latest dev
 
 # Frontend (this repo)
-cd ../galaxy-temp-frontend
+cd ../thinkly-frontend
 pnpm install
 pnpm sync-shared
 pnpm dev
@@ -60,7 +60,7 @@ Clerk keys must match the backend.
 
 ## `pnpm sync-shared`
 
-Copies `@galaxy/shared` from the backend into `shared/` before build. Re-run after changing node definitions in **galaxy-temp-backend**.
+Copies `@thinkly/shared` from the backend into `shared/` before build. Re-run after changing node definitions in **thinkly-backend**.
 
 Vercel build: `pnpm sync-shared && pnpm build`
 

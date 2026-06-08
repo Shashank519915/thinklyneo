@@ -52,7 +52,7 @@ interface RightHistoryPanelProps {
 function scheduleAutoArrangeAfterHistoryPreviewToggle(): void {
   requestAnimationFrame(() => {
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent("nextflow:auto-arrange"));
+      window.dispatchEvent(new CustomEvent("thinkly:auto-arrange"));
     }, 160);
   });
 }
@@ -246,8 +246,8 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
     const handleRefresh = () => {
       fetchHistory();
     };
-    window.addEventListener("nextflow:refresh-history", handleRefresh);
-    return () => window.removeEventListener("nextflow:refresh-history", handleRefresh);
+    window.addEventListener("thinkly:refresh-history", handleRefresh);
+    return () => window.removeEventListener("thinkly:refresh-history", handleRefresh);
   }, [workflowId]);
 
   // Build the synthetic "running" entry to show at the top while executing

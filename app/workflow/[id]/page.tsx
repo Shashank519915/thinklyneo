@@ -151,7 +151,7 @@ export default function WorkflowWorkspacePage() {
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [inDetails, setInDetails] = useState(true);
-  const [apiOrigin, setApiOrigin] = useState("https://api.galaxy.ai");
+  const [apiOrigin, setApiOrigin] = useState("https://api.thinkly.ai");
 
   useEffect(() => {
     if (typeof window !== "undefined") {

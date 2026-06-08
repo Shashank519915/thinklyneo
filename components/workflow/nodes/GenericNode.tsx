@@ -310,7 +310,7 @@ export default function GenericNode({ id, data, type }: NodeProps) {
 
   const handleSingleRun = () => {
     window.dispatchEvent(
-      new CustomEvent("nextflow:run-node", { detail: { nodeId: id } }),
+      new CustomEvent("thinkly:run-node", { detail: { nodeId: id } }),
     );
   };
 

@@ -101,7 +101,7 @@ function DashboardContent() {
   useEffect(() => {
     fetchWorkflows();
     console.log(
-      "[NextFlow] Candidate LinkedIn: " +
+      "[Thinkly] Candidate LinkedIn: " +
         (process.env.NEXT_PUBLIC_LINKEDIN_URL ||
           "https://www.linkedin.com/in/shashank-anand")
     );
@@ -274,7 +274,7 @@ function DashboardContent() {
                       className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground/80 transition-colors hover:bg-muted disabled:opacity-40 sm:gap-2 sm:px-3 cursor-pointer"
                       title="Import workflow JSON"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-upload" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-upload" aria-hidden="true">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="17 8 12 3 7 8"></polyline>
                         <line x1="12" x2="12" y1="3" y2="15"></line>
@@ -288,7 +288,7 @@ function DashboardContent() {
                       className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40 sm:gap-2 sm:px-3 cursor-pointer border-0"
                       title="Create a new workflow"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-plus" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus" aria-hidden="true">
                         <path d="M5 12h14"></path>
                         <path d="M12 5v14"></path>
                       </svg>
@@ -345,7 +345,7 @@ function DashboardContent() {
                       <div className="mt-1 text-sm text-muted-foreground">Open one to edit, run, and review history.</div>
                     </div>
                     <div className="relative">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="lucide lucide-search pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-search pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.3-4.3"></path>
                       </svg>
@@ -416,14 +416,14 @@ function DashboardContent() {
                                     <p className="text-xs text-muted-foreground">Add a file from your device or select one from your library</p>
                                     <button
                                       type="button"
-                                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-galaxy-neutral-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 cursor-pointer border-0"
+                                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-thinkly-neutral-800 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90 cursor-pointer border-0"
                                     >
                                       <ImagePlus className="h-4 w-4" />
                                       Select Asset
                                     </button>
                                     <button
                                       type="button"
-                                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-galaxy-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-0"
+                                      className="flex w-full items-center justify-center gap-2 rounded-lg bg-thinkly-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 cursor-pointer border-0"
                                     >
                                       <Plus className="h-4 w-4" />
                                       Upload

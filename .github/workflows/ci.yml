@@ -58,4 +58,4 @@ jobs:
       - name: Playwright smoke (deployed app, public routes)
         run: pnpm test:e2e
         env:
-          PLAYWRIGHT_BASE_URL: https://galaxy-temp-frontend.vercel.app
+          PLAYWRIGHT_BASE_URL: https://thinkly-frontend.vercel.app

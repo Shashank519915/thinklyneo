@@ -2,7 +2,7 @@
 
 /**
  * @fileoverview React Flow shell: validates connections, keyboard UX, marquee selection (“Run N nodes” pill), minimap,
- * preview/history coordination via workflow store (`nextflow:auto-arrange`, `nextflow:run-selected`).
+ * preview/history coordination via workflow store (`thinkly:auto-arrange`, `thinkly:run-selected`).
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -163,7 +163,7 @@ function RunPill({
 
   const handleRun = () => {
     window.dispatchEvent(
-      new CustomEvent("nextflow:run-selected", { detail: { nodeIds: selectedNodeIds } })
+      new CustomEvent("thinkly:run-selected", { detail: { nodeIds: selectedNodeIds } })
     );
   };
 
@@ -227,7 +227,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
   // Keep viewportCenter in sync so NodePicker can place nodes at current view center,
   // and persist the full viewport (pan + zoom) per workflow so reloads restore the view.
   const canvasRef = useRef<HTMLDivElement>(null);
-  const viewportStorageKey = workflowIdStore ? `galaxy:viewport:${workflowIdStore}` : null;
+  const viewportStorageKey = workflowIdStore ? `thinkly:viewport:${workflowIdStore}` : null;
 
   const updateViewportCenter = useCallback(() => {
     const el = canvasRef.current;
@@ -472,7 +472,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
       // Shift+A → auto-arrange
       if (e.shiftKey && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
-        window.dispatchEvent(new CustomEvent("nextflow:auto-arrange"));
+        window.dispatchEvent(new CustomEvent("thinkly:auto-arrange"));
         return;
       }
     };

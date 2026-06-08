@@ -1,18 +1,18 @@
-# Galaxy — Visual AI Workflow Builder (Frontend)
+# Thinkly — Visual AI Workflow Builder (Frontend)
 
-Galaxy is a DAG-based visual builder for AI media workflows. Users drag nodes onto a React Flow
+Thinkly is a DAG-based visual builder for AI media workflows. Users drag nodes onto a React Flow
 canvas, wire them together, and run the graph. Each node is an isolated Trigger.dev task with
 Zod input/output schemas. Runs execute in parallel where the graph allows, stream live status
 to the canvas, and are metered against a real credit ledger. The platform is also exposed as a
 public REST API (`/api/v1`), OpenAPI 3.1 docs, and an MCP server for AI assistants.
 
 **This repository:** Canvas UI, dashboard, workflow pages, Zustand store. Companion API:
-**galaxy-temp-backend**.
+**thinkly-backend**.
 
 ## Features
 
 - Visual DAG workflow builder (React Flow)
-- Schema-driven nodes (Zod, single `@galaxy/shared` source)
+- Schema-driven nodes (Zod, single `@thinkly/shared` source)
 - Trigger.dev orchestration with coordinator-waitpoint pattern
 - Config-driven provider fallback chains
 - Live execution history and run-detail modals
@@ -26,11 +26,11 @@ public REST API (`/api/v1`), OpenAPI 3.1 docs, and an MCP server for AI assistan
 
 | Path | Role | Stack |
 |------|------|-------|
-| `galaxy-temp-frontend` | Canvas UI, dashboard, history | Next.js 16, React 19, React Flow, Zustand |
-| `galaxy-temp-backend` | API routes, Trigger.dev tasks, Prisma | Next.js 16 API, Prisma 7, Trigger.dev v4 |
-| `galaxy-docs` | Public docs + OpenAPI | Mintlify |
+| `thinkly-frontend` | Canvas UI, dashboard, history | Next.js 16, React 19, React Flow, Zustand |
+| `thinkly-backend` | API routes, Trigger.dev tasks, Prisma | Next.js 16 API, Prisma 7, Trigger.dev v4 |
+| `thinkly-docs` | Public docs + OpenAPI | Mintlify |
 
-Frontend and backend are separate deployments with their own `.git` and env. `@galaxy/shared`
+Frontend and backend are separate deployments with their own `.git` and env. `@thinkly/shared`
 is owned by the backend repo and synced into **this repo** (`shared/`) at build time via
 `pnpm sync-shared`.
 
@@ -125,7 +125,7 @@ The orchestrator never reads `providers[]` — only `node.type`, dependency reso
 
 ### Provider fallback
 
-Config-driven provider fallback: providers are defined per node in `@galaxy/shared` and executed
+Config-driven provider fallback: providers are defined per node in `@thinkly/shared` and executed
 through a generic `runProviderChain()` in the backend (`trigger/provider-chain.ts`). Primary
 failure logs an attempt and advances to the next provider. Executor kinds: `openrouter`,
 `webhook-sim`, `ffmpeg` (task-local), `stub`.
@@ -161,7 +161,7 @@ pnpm sync-shared
 pnpm dev
 ```
 
-Requires **galaxy-temp-backend** running (`BACKEND_URL`, default `http://localhost:3000`) and
+Requires **thinkly-backend** running (`BACKEND_URL`, default `http://localhost:3000`) and
 Trigger worker (`npx trigger.dev dev` in backend repo). Full stack: [docs/SETUP.md](docs/SETUP.md)
 
 ## Environment variables
@@ -172,7 +172,7 @@ cloud, GitHub Actions (`TRIGGER_ACCESS_TOKEN`), and MCP client variables.
 ## Deployment
 
 - **Vercel frontend project** — build: `pnpm sync-shared && pnpm build`; set `BACKEND_URL` to backend deployment.
-- **Backend + Trigger** — **galaxy-temp-backend** repo and Trigger.dev dashboard.
+- **Backend + Trigger** — **thinkly-backend** repo and Trigger.dev dashboard.
 - **Docs** — Mintlify at `/docs` via `vercel.json` rewrites.
 
 ## Design decisions and trade-offs
@@ -185,10 +185,10 @@ correct. State in Postgres enables `restoreLiveRun`.
 **`medium-2x` for `merge-video`.** Default `small-1x` (512MB) OOMs on xfade + `libx264`. Task uses
 `machine: "medium-2x"` with OOM retry to `large-1x`. Higher cost for that node only.
 
-**Config-driven providers in `@galaxy/shared`.** One `runProviderChain`, unit-tested once; orchestrator
+**Config-driven providers in `@thinkly/shared`.** One `runProviderChain`, unit-tested once; orchestrator
 unchanged. FFmpeg stays task-local; webhook-sim timeout falls back to stub, not a third live provider.
 
-**`@galaxy/shared` synced, not published.** Build-time single source of truth; run `pnpm sync-shared`
+**`@thinkly/shared` synced, not published.** Build-time single source of truth; run `pnpm sync-shared`
 after backend definition changes. `requestInputs` / `response` remain bespoke canvas nodes.
 
 **Mid-run credit-exhaustion abort.** Orchestrator aborts when the next layer estimate exceeds remaining hold (see backend `lib/credits.ts`).

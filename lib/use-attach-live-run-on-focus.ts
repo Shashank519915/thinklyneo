@@ -17,7 +17,7 @@ export function useAttachLiveRunOnFocus(
   useEffect(() => {
     const handleVisible = () => {
       if (document.visibilityState !== "visible") return;
-      window.dispatchEvent(new CustomEvent("nextflow:refresh-history"));
+      window.dispatchEvent(new CustomEvent("thinkly:refresh-history"));
       if (!hasLiveSubscriber) {
         void attachRef.current();
       }

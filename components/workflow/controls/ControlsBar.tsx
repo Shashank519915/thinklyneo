@@ -79,7 +79,7 @@ function Tip({
 
 // ─── ControlsBar ─────────────────────────────────────────────────────────────
 
-/** Canvas HUD reacting to Zoom/Fit/`nextflow:auto-arrange` broadcasts. */
+/** Canvas HUD reacting to Zoom/Fit/`thinkly:auto-arrange` broadcasts. */
 export default function ControlsBar() {
   const [expanded, setExpanded] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -99,8 +99,8 @@ export default function ControlsBar() {
   // Shift+A global shortcut
   useEffect(() => {
     const handler = () => autoArrange();
-    window.addEventListener("nextflow:auto-arrange", handler);
-    return () => window.removeEventListener("nextflow:auto-arrange", handler);
+    window.addEventListener("thinkly:auto-arrange", handler);
+    return () => window.removeEventListener("thinkly:auto-arrange", handler);
   }, [autoArrange]);
 
   const zoomPct = Math.round(zoom * 100);

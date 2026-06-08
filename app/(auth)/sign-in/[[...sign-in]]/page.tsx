@@ -12,7 +12,7 @@ import { AuthSignInUpChrome } from "@/components/auth/AuthSignInUpChrome";
 export default function SignInPage() {
   useEffect(() => {
     console.log(
-      "[NextFlow] Candidate LinkedIn: " +
+      "[Thinkly] Candidate LinkedIn: " +
         (process.env.NEXT_PUBLIC_LINKEDIN_URL ||
           "https://www.linkedin.com/in/shashank-anand")
     );
