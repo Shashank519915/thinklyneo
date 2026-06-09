@@ -57,6 +57,10 @@ next-env.d.ts
 
 /app/generated/prisma
 
-# agents & local skills config
+# agents & local skills config (Cursor / local tooling — not shipped)
 .agents/
 skills-lock.json
+.github/skills/
+
+# personal RFCs, design notes, experiments (docs/ stays tracked for team setup)
+/learning/
