@@ -15,26 +15,23 @@ export default function BottomToolbar() {
   const pickerAnchorRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-      <div className="flex items-center gap-0.5 md:gap-1 overflow-visible bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl px-1 py-1 md:px-2 md:py-1.5 shadow-sm">
-
-        {/* Sticky note button — UI only for now */}
+    <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2">
+      <div className="wf-canvas-chrome flex items-center gap-0.5 overflow-visible rounded-xl px-1 py-1 md:gap-1 md:px-2 md:py-1.5">
         <button
-          className="p-2 rounded-lg text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900"
+          className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           title="Add sticky note (coming soon)"
         >
           <StickyNote className="h-4 w-4" />
         </button>
 
-        {/* Add node button */}
         <div ref={pickerAnchorRef} className="relative">
           <button
             type="button"
             onClick={() => setIsNodePickerOpen(!isNodePickerOpen)}
-            className={`relative z-[70] rounded p-2 transition-colors ${
+            className={`wf-canvas-chrome-btn relative z-[70] rounded p-2 transition-colors ${
               isNodePickerOpen
-                ? "bg-gray-200 text-gray-900"
-                : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                ? "bg-white/10 text-zinc-100"
+                : "text-zinc-400 hover:text-zinc-100"
             }`}
             title="Add node"
           >

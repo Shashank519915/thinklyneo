@@ -109,22 +109,22 @@ function FilterDropdown({
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-1 rounded-md border border-white/[0.08] bg-[#121215] px-2 py-1 text-[11px] font-medium text-zinc-300 transition-colors hover:bg-white/[0.06]"
       >
         {selected.label}
-        <ChevronDown className="w-3.5 h-3.5 text-gray-400 opacity-60" />
+        <ChevronDown className="h-3.5 w-3.5 text-zinc-500 opacity-60" />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-36 rounded-xl border border-gray-100 bg-white shadow-xl py-1 overflow-hidden">
+        <div className="wf-canvas-panel absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl py-1">
           {FILTER_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               onClick={() => { onChange(opt.value); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-gray-800 hover:bg-gray-50 transition-colors"
+              className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-zinc-200 transition-colors hover:bg-white/[0.06]"
             >
               <span className="w-4 flex-shrink-0">
-                {value === opt.value && <Check className="w-3.5 h-3.5 text-gray-700" />}
+                {value === opt.value && <Check className="h-3.5 w-3.5 text-purple-400" />}
               </span>
               {opt.label}
             </button>
@@ -150,10 +150,10 @@ function RunItem({
 
   return (
     <div
-      className={`rounded-xl border transition-colors mb-2 overflow-hidden ${
+      className={`mb-2 overflow-hidden rounded-xl border transition-colors ${
         isLive
-          ? "border-[#3B82F6] bg-[#EFF6FF]"
-          : "border-gray-200 bg-white hover:border-gray-300"
+          ? "border-blue-500/40 bg-blue-500/10"
+          : "border-white/[0.08] bg-[#121215] hover:border-white/[0.14]"
       }`}
     >
       <button
@@ -178,10 +178,10 @@ function RunItem({
             )}
           </span>
           <div className="min-w-0">
-            <p className="text-[14px] font-semibold text-gray-900 leading-tight">
+            <p className="text-[14px] font-semibold leading-tight text-zinc-100">
               {sd.label}
             </p>
-            <p className="text-[11px] text-gray-400 mt-0.5">
+            <p className="mt-0.5 text-[11px] text-zinc-500">
               {isLive
                 ? "In progress…"
                 : `Credits: ${(() => {
@@ -192,10 +192,10 @@ function RunItem({
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <span className="text-[11px] text-gray-400 tabular-nums">
+          <span className="flex-shrink-0 tabular-nums text-[11px] text-zinc-500">
             {formatTimestamp(run.startedAt)}
           </span>
-          {!isLive && <ChevronRight className="w-4 h-4 text-gray-400" aria-hidden />}
+          {!isLive && <ChevronRight className="h-4 w-4 text-zinc-600" aria-hidden />}
         </div>
       </button>
     </div>
@@ -282,13 +282,13 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
 
   return (
     <div className="flex-shrink-0 relative h-full">
-      <div className="h-full min-h-0 w-[360px] border-l border-gray-200 bg-gray-50">
+      <div className="h-full min-h-0 w-[360px] border-l border-white/[0.08] bg-[#08080A]">
         <div className="flex h-full min-h-0 flex-col">
 
           {/* Sticky header */}
-          <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-4">
+          <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-[#0A0A0C] p-4">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-gray-900">Execution History</div>
+              <div className="text-sm font-semibold text-zinc-100">Execution History</div>
               <button
                 onClick={() => {
                   const hadPreview = useWorkflowStore.getState().previewRunId !== null;
@@ -297,7 +297,7 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
                   setIsHistoryPanelOpen(false);
                   if (hadPreview) scheduleAutoArrangeAfterHistoryPreviewToggle();
                 }}
-                className="inline-flex items-center justify-center rounded-[18px] h-8 px-3 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+                className="inline-flex h-8 items-center justify-center rounded-[18px] px-3 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
               >
                 Close
               </button>
@@ -305,23 +305,23 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
 
             {/* Tab toggle + refresh */}
             <div className="mt-3 flex items-center gap-2">
-              <div className="flex flex-1 rounded-lg border border-gray-200 bg-gray-100 p-0.5">
+              <div className="flex flex-1 rounded-lg border border-white/[0.08] bg-[#121215] p-0.5">
                 <button
                   onClick={() => setActiveTab("ui")}
-                  className={`flex-1 rounded-md py-1.5 px-3 text-[11px] font-medium transition-colors ${
+                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${
                     activeTab === "ui"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-[#0A0A0C] text-zinc-100 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
                   }`}
                 >
                   UI Runs
                 </button>
                 <button
                   onClick={() => setActiveTab("api")}
-                  className={`flex-1 rounded-md py-1.5 px-3 text-[11px] font-medium transition-colors ${
+                  className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${
                     activeTab === "api"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-[#0A0A0C] text-zinc-100 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300"
                   }`}
                 >
                   API Runs
@@ -329,7 +329,7 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
               </div>
               <button
                 onClick={fetchHistory}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-[18px] border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
+                className="wf-canvas-chrome inline-flex h-8 w-8 items-center justify-center rounded-[18px] text-zinc-400 transition-colors hover:text-zinc-200"
                 title="Refresh"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
@@ -340,18 +340,18 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
           {/* Scrollable content */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4">
             {/* Filter row */}
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="text-xs font-medium text-gray-600">Run history</div>
+              <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="text-xs font-medium text-zinc-400">Run history</div>
               <FilterDropdown value={filter} onChange={setFilter} />
             </div>
 
             {/* Run list */}
             {activeTab === "api" ? (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center">
-                <p className="text-[12px] font-medium text-gray-600 mb-1">No API runs yet</p>
-                <p className="text-[11px] text-gray-400 leading-relaxed">
+              <div className="rounded-xl border border-white/[0.08] bg-[#121215] p-4 text-center">
+                <p className="mb-1 text-[12px] font-medium text-zinc-300">No API runs yet</p>
+                <p className="text-[11px] leading-relaxed text-zinc-500">
                   Trigger this workflow externally via{" "}
-                  <code className="bg-gray-100 px-1 py-0.5 rounded text-[10px] font-mono text-gray-600">
+                  <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[10px] text-zinc-400">
                     POST /api/workflows/{"{id}"}/run
                   </code>{" "}
                   with a valid session to see runs here.
@@ -362,7 +362,7 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
                 <SpinningLogo size="sm" />
               </div>
             ) : !showLive && filteredRuns.length === 0 ? (
-              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-center text-xs text-gray-500">
+              <div className="rounded-xl border border-white/[0.08] bg-[#121215] p-4 text-center text-xs text-zinc-500">
                 No runs for this filter yet.
               </div>
             ) : (

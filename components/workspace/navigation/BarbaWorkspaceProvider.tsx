@@ -58,6 +58,7 @@ function releaseTransition(
   transitioning: { current: boolean },
   setIsTransitioning: (value: boolean) => void,
   swapVeilAnim?: { current: Animation | null },
+  completedMode?: WorkspaceTransitionMode,
 ) {
   const container = queryContainer(wrapper);
   const veil = querySwapVeil(container ?? undefined);
@@ -72,6 +73,11 @@ function releaseTransition(
   pendingEnter.current = null;
   transitioning.current = false;
   setIsTransitioning(false);
+  if (typeof window !== "undefined" && completedMode) {
+    window.dispatchEvent(
+      new CustomEvent("thinkly:workspace-transition-end", { detail: { mode: completedMode } }),
+    );
+  }
 }
 
 export function BarbaWorkspaceProvider({ children, wrapperRef }: BarbaWorkspaceProviderProps) {
@@ -83,6 +89,7 @@ export function BarbaWorkspaceProvider({ children, wrapperRef }: BarbaWorkspaceP
   const pathnameRef = useRef(pathname);
   const enterRunId = useRef(0);
   const swapVeilAnimRef = useRef<Animation | null>(null);
+  const lastTransitionModeRef = useRef<WorkspaceTransitionMode>("default");
 
   useEffect(() => {
     pathnameRef.current = pathname;
@@ -109,6 +116,7 @@ export function BarbaWorkspaceProvider({ children, wrapperRef }: BarbaWorkspaceP
       setIsTransitioning(true);
 
       const resolvedMode = resolveTransitionMode(currentPath, targetPath, mode);
+      lastTransitionModeRef.current = resolvedMode;
       const wrapper = wrapperRef.current;
       const container = queryContainer(wrapper);
       const veil = querySwapVeil(container ?? undefined);
@@ -228,6 +236,7 @@ export function BarbaWorkspaceProvider({ children, wrapperRef }: BarbaWorkspaceP
             transitioning,
             setIsTransitioning,
             swapVeilAnimRef,
+            mode,
           );
         }
       }

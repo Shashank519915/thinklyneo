@@ -35,6 +35,12 @@ jobs:
 
   e2e-smoke:
     runs-on: ubuntu-latest
+    env:
+      BACKEND_URL: https://thinklyneo-backend.vercel.app
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_bmF0aW9uYWwtZXdlLTM5LmNsZXJrLmFjY291bnRzLmRldiQ
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      PLAYWRIGHT_LOCAL: "1"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
 
@@ -55,7 +61,8 @@ jobs:
 
       - run: pnpm exec playwright install --with-deps chromium
 
-      - name: Playwright smoke (deployed app, public routes)
+      - name: Build frontend for e2e
+        run: pnpm build
+
+      - name: Playwright smoke (local build, backend proxy)
         run: pnpm test:e2e
-        env:
-          PLAYWRIGHT_BASE_URL: https://thinkly-frontend.vercel.app

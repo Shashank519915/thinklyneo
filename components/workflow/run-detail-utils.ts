@@ -63,13 +63,13 @@ export function statusMeta(status: string) {
 export function statusTextClass(status: string): string {
   switch (status) {
     case "success":
-      return "text-emerald-600";
+      return "text-emerald-400";
     case "failed":
-      return "text-red-600";
+      return "text-red-400";
     case "running":
-      return "text-blue-600";
+      return "text-blue-400";
     default:
-      return "text-amber-600";
+      return "text-amber-400";
   }
 }
 

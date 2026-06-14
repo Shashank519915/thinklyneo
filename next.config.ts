@@ -3,8 +3,16 @@
  */
 
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const appRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  // Prevent Turbopack from treating the parent Thinkly folder as the monorepo root (OOM on Windows).
+  turbopack: {
+    root: appRoot,
+  },
   images: {
     remotePatterns: [
       {
@@ -20,12 +28,15 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${backendUrl}/api/:path*`,
-      },
-    ];
+    return {
+      // Run before filesystem routing so proxied API paths never hit the app 404 page.
+      beforeFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${backendUrl}/api/:path*`,
+        },
+      ],
+    };
   },
 };
 

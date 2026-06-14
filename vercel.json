@@ -6,6 +6,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://thinklyneo-backend.vercel.app/api/:path*"
+    },
+    {
       "source": "/docs",
       "destination": "https://thinkly-6b82c0dd.mintlify.dev/docs"
     },

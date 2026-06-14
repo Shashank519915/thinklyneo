@@ -109,10 +109,10 @@ export default function ControlsBar() {
     return (
       <>
         <Tip label="Expand controls">
-          <div className="flex items-center bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl px-1 py-1 md:px-2 md:py-1.5 shadow-sm">
+          <div className="wf-canvas-chrome flex items-center rounded-xl px-1 py-1 md:px-2 md:py-1.5">
             <button
               onClick={() => setExpanded(true)}
-              className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+              className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
             >
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
@@ -125,26 +125,26 @@ export default function ControlsBar() {
 
   return (
     <>
-      <div className="flex items-center gap-0.5 md:gap-1 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-xl px-1 py-1 md:px-2 md:py-1.5 shadow-sm">
+      <div className="wf-canvas-chrome flex items-center gap-0.5 rounded-xl md:gap-1 px-1 py-1 md:px-2 md:py-1.5">
 
         {/* Collapse */}
         <Tip label="Collapse" side="top-left">
           <button
             onClick={() => setExpanded(false)}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
         </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-gray-200" />
+        <div className="mx-0.5 h-5 w-px bg-white/10" />
 
         {/* Undo */}
         <Tip label="Undo" shortcut="⌘Z">
           <button
             onClick={undo}
             disabled={undoStack.length === 0}
-            className="p-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
           >
             <Undo2 className="h-3.5 w-3.5" />
           </button>
@@ -155,7 +155,7 @@ export default function ControlsBar() {
           <button
             onClick={redo}
             disabled={redoStack.length === 0}
-            className="p-2 rounded-lg transition-colors text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-300"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
           >
             <Redo2 className="h-3.5 w-3.5" />
           </button>
@@ -165,26 +165,26 @@ export default function ControlsBar() {
         <Tip label="Keyboard shortcuts">
           <button
             onClick={() => setShowShortcuts(true)}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <Command className="h-3.5 w-3.5" />
           </button>
         </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-gray-200" />
+        <div className="mx-0.5 h-5 w-px bg-white/10" />
 
         {/* Zoom out */}
         <Tip label="Zoom out" shortcut="−">
           <button
             onClick={() => zoomOut({ duration: 200 })}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <ZoomOut className="h-3.5 w-3.5" />
           </button>
         </Tip>
 
         {/* Zoom % */}
-        <span className="min-w-[36px] md:min-w-[44px] text-center text-xs font-medium text-gray-500 tabular-nums select-none">
+        <span className="min-w-[36px] select-none text-center text-xs font-medium tabular-nums text-zinc-500 md:min-w-[44px]">
           {zoomPct}%
         </span>
 
@@ -192,19 +192,19 @@ export default function ControlsBar() {
         <Tip label="Zoom in" shortcut="+">
           <button
             onClick={() => zoomIn({ duration: 200 })}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <ZoomIn className="h-3.5 w-3.5" />
           </button>
         </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-gray-200" />
+        <div className="mx-0.5 h-5 w-px bg-white/10" />
 
         {/* Fit view */}
         <Tip label="Fit view" shortcut="F">
           <button
             onClick={() => fitView({ padding: 0.1, duration: 400 })}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
@@ -214,7 +214,7 @@ export default function ControlsBar() {
         <Tip label="Auto-arrange" shortcut="⇧A">
           <button
             onClick={autoArrange}
-            className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
           </button>
@@ -227,7 +227,7 @@ export default function ControlsBar() {
             className={`p-2 rounded-lg transition-colors ${
               selectModeActive
                 ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
-                : "text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                : "wf-canvas-chrome-btn text-zinc-400 hover:text-zinc-100"
             }`}
           >
             <SelectModeIcon active={selectModeActive} />
