@@ -260,7 +260,7 @@ export default function RequestInputsNode({
 
   return (
     <div
-      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] overflow-visible transition-all ${getNodeRunBorderClass(
+      className={`wf-node-card w-[380px] rounded-xl border overflow-visible transition-all ${getNodeRunBorderClass(
         {
           isDimmed,
           isExecuting,

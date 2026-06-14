@@ -66,7 +66,7 @@ const SECTION_TITLES: Record<SettingsSection, string> = {
 
 function PlaceholderPanel({ title }: { title: string }) {
   return (
-    <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-gray-500">
+    <div className="flex h-full min-h-[200px] items-center justify-center text-sm text-zinc-500">
       {title} settings coming soon.
     </div>
   );
@@ -138,14 +138,14 @@ function WebhooksPanel() {
 
   return (
     <div className="space-y-6">
-      <p className="text-xs leading-relaxed text-gray-500">
+      <p className="text-xs leading-relaxed text-zinc-500">
         Configure webhook endpoints to receive lifecycle updates when workflow runs
         execute. Each workflow can have one outbound URL and an auto-generated signing
         secret.
       </p>
 
       {workflows.length === 0 ? (
-        <p className="text-xs italic text-gray-500">
+        <p className="text-xs italic text-zinc-500">
           Create a workflow from the Flow tab to configure webhooks.
         </p>
       ) : (
@@ -153,9 +153,9 @@ function WebhooksPanel() {
           {workflows.map((w) => (
             <div
               key={w.id}
-              className="rounded-lg border border-gray-200 bg-white px-3 py-3"
+              className="rounded-lg border border-white/[0.08] bg-[#121215] px-3 py-3"
             >
-              <div className="mb-2 text-sm font-medium text-gray-900">{w.name}</div>
+              <div className="mb-2 text-sm font-medium text-zinc-100">{w.name}</div>
               <input
                 type="url"
                 placeholder="https://your-app.com/webhook"
@@ -163,23 +163,23 @@ function WebhooksPanel() {
                 onChange={(e) =>
                   setDrafts((prev) => ({ ...prev, [w.id]: e.target.value }))
                 }
-                className="mb-2 h-9 w-full rounded-[18px] border border-gray-200 px-3 text-xs outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+                className="mb-2 h-9 w-full rounded-[18px] border border-white/[0.08] bg-[#18181B] px-3 text-xs text-zinc-100 outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-purple-500/40"
               />
               {w.webhookSecret ? (
                 <div className="mb-2 flex items-center gap-2">
-                  <code className="max-w-[220px] truncate rounded-lg bg-gray-50 px-2 py-1 font-mono text-[11px] text-gray-500">
+                  <code className="max-w-[220px] truncate rounded-lg bg-white/[0.04] px-2 py-1 font-mono text-[11px] text-zinc-500">
                     {w.webhookSecret}
                   </code>
                   <button
                     type="button"
                     onClick={() => copySecret(w.webhookSecret!, w.id)}
-                    className="text-[11px] font-medium text-gray-600 hover:underline"
+                    className="text-[11px] font-medium text-zinc-400 hover:text-zinc-200 hover:underline"
                   >
                     {copiedId === w.id ? "Copied" : "Copy secret"}
                   </button>
                 </div>
               ) : (
-                <p className="mb-2 text-[11px] text-gray-500">
+                <p className="mb-2 text-[11px] text-zinc-500">
                   Secret auto-generated on save.
                 </p>
               )}
@@ -187,7 +187,7 @@ function WebhooksPanel() {
                 type="button"
                 onClick={() => saveWebhook(w.id)}
                 disabled={savingId === w.id}
-                className="inline-flex h-8 items-center rounded-[18px] bg-gray-900 px-3 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+                className="inline-flex h-8 items-center rounded-[18px] bg-zinc-100 px-3 text-xs font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
               >
                 {savingId === w.id ? "Saving…" : "Save URL"}
               </button>
@@ -203,14 +203,14 @@ function ApiKeysPanel({ onManage }: { onManage: () => void }) {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
-        <p className="flex-1 text-xs leading-relaxed text-gray-500">
+        <p className="flex-1 text-xs leading-relaxed text-zinc-500">
           Generate, label, and revoke API keys for programmatic access to your account.
           Use these keys with the public REST API or MCP server.
         </p>
         <button
           type="button"
           onClick={onManage}
-          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-[18px] border border-gray-200 bg-white px-4 text-sm font-medium shadow-sm hover:bg-gray-50"
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-[18px] border border-white/[0.08] bg-[#121215] px-4 text-sm font-medium text-zinc-200 transition hover:bg-white/[0.06]"
         >
           <Key className="h-4 w-4" />
           Manage
@@ -218,12 +218,12 @@ function ApiKeysPanel({ onManage }: { onManage: () => void }) {
         </button>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-gray-200 pt-4">
+      <div className="flex items-center justify-between gap-4 border-t border-white/[0.08] pt-4">
         <div className="flex min-w-0 items-start gap-3">
-          <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" />
+          <BookOpen className="mt-0.5 h-4 w-4 shrink-0 text-zinc-500" />
           <div className="min-w-0">
-            <div className="text-sm font-medium text-gray-900">API documentation</div>
-            <p className="mt-1 text-xs leading-relaxed text-gray-500">
+            <div className="text-sm font-medium text-zinc-100">API documentation</div>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
               Review REST API and MCP usage before creating production keys.
             </p>
           </div>
@@ -232,7 +232,7 @@ function ApiKeysPanel({ onManage }: { onManage: () => void }) {
           href="/docs"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-[18px] border border-gray-200 bg-white px-4 text-sm font-medium shadow-sm hover:bg-gray-50"
+          className="inline-flex h-9 shrink-0 items-center gap-2 rounded-[18px] border border-white/[0.08] bg-[#121215] px-4 text-sm font-medium text-zinc-200 transition hover:bg-white/[0.06]"
         >
           View
           <ExternalLink className="h-4 w-4" />
@@ -252,12 +252,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 z-50 bg-black/60" onClick={onClose} />
       <div
         role="dialog"
         aria-modal
         aria-labelledby="settings-title"
-        className="fixed left-1/2 top-1/2 z-[51] grid h-full max-h-[85vh] w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] border border-gray-200 bg-white shadow-lg md:h-[600px]"
+        className="wf-canvas-panel fixed left-1/2 top-1/2 z-[51] grid h-full max-h-[85vh] w-full max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[18px] md:h-[600px]"
       >
         <h2 id="settings-title" className="sr-only">
           Settings
@@ -267,12 +267,12 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         </p>
 
         <div className="flex h-full flex-col overflow-hidden md:flex-row">
-          <div className="flex w-full shrink-0 flex-col border-b border-gray-200 bg-gray-50 md:h-auto md:w-[240px] md:border-b-0 md:border-r">
+          <div className="flex w-full shrink-0 flex-col border-b border-white/[0.08] bg-[#050505] md:h-auto md:w-[240px] md:border-b-0 md:border-r">
             <div className="hidden p-3 md:flex">
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-gray-100"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300"
                 aria-label="Close settings"
               >
                 <X className="h-4 w-4" />
@@ -286,8 +286,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                   onClick={() => setSection(item.id)}
                   className={`flex min-w-fit flex-auto items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-colors md:w-full md:gap-3 md:py-2.5 md:text-sm ${
                     section === item.id
-                      ? "bg-gray-100 text-gray-900"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-white/[0.08] text-zinc-100"
+                      : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300"
                   }`}
                 >
                   {item.icon}
@@ -298,8 +298,8 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <div className="hidden h-[60px] shrink-0 items-center border-b border-gray-200 px-6 md:flex">
-              <h2 className="text-lg font-semibold text-gray-900">
+            <div className="hidden h-[60px] shrink-0 items-center border-b border-white/[0.08] px-6 md:flex">
+              <h2 className="text-lg font-semibold text-zinc-100">
                 {SECTION_TITLES[section]}
               </h2>
             </div>
@@ -318,7 +318,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100 md:hidden"
+          className="absolute right-4 top-4 rounded-lg p-1 text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300 md:hidden"
           aria-label="Close"
         >
           <X className="h-4 w-4" />

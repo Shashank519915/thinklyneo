@@ -54,8 +54,8 @@ export default function ResponseNode({ id, data }: NodeProps) {
 
   return (
     <div
-      className={`w-[380px] rounded-xl border bg-white shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] border-gray-200 overflow-visible transition-all ${
-        isExecuting ? "node-executing" : ""
+      className={`wf-node-card w-[380px] rounded-xl border border-white/[0.08] overflow-visible transition-all ${
+        isExecuting ? "node-executing border-[#7C3AED]" : ""
       } ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
       style={{ minWidth: 380 }}
     >

@@ -4,7 +4,7 @@ Secrets are split across three surfaces: **Vercel backend**, **Vercel frontend**
 
 ---
 
-## Backend (Vercel: `thinkly-backend`)
+## Backend (Vercel: `thinklyneo-backend` → https://thinklyneo-backend.vercel.app)
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
@@ -26,11 +26,11 @@ Secrets are split across three surfaces: **Vercel backend**, **Vercel frontend**
 
 ---
 
-## Frontend (Vercel: `thinkly-frontend`)
+## Frontend (Vercel: `thinklyneo` → https://thinklyneo.vercel.app)
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `BACKEND_URL` | Yes | Backend URL for `/api/*` rewrite proxy |
+| `BACKEND_URL` | Yes | `https://thinklyneo-backend.vercel.app` — backend URL for `/api/*` rewrite proxy |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Must match backend |
 | `CLERK_SECRET_KEY` | Yes | Clerk middleware on protected pages |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Yes | `/sign-in` |

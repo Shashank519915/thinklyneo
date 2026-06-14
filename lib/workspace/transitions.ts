@@ -3,7 +3,9 @@ export type WorkspaceTransitionMode =
   | "minimize"
   | "restore"
   | "open"
-  | "close";
+  | "close"
+  | "brain-morph"
+  | "brain-restore";
 
 /** iOS drawer — morphs on screen */
 const EASE_MORPH = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -36,11 +38,18 @@ export function resolveTransitionMode(
   if (from === "chat" && to === "flow") return "restore";
   if (from === "flow" && to === "playground") return "open";
   if (from === "playground" && to === "flow") return "close";
+  if (from === "chat" && to === "playground") return "minimize";
+  if (from === "playground" && to === "chat") return "restore";
   return "default";
 }
 
 export function queryWorkspaceCard(root?: ParentNode | null): HTMLElement | null {
   return (root ?? document).querySelector("[data-workspace-card]");
+}
+
+function queryIslandInners(root?: ParentNode | null): HTMLElement[] {
+  const scope = root ?? document;
+  return Array.from(scope.querySelectorAll<HTMLElement>("[data-workspace-island-inner]"));
 }
 
 function queryCards(root?: ParentNode | null): HTMLElement[] {
@@ -102,11 +111,17 @@ export function clearWorkspaceInlineStyles(
   const all = [
     ...queryCards(cardRoot),
     ...queryIslands(islandRoot ?? cardRoot),
+    ...queryIslandInners(islandRoot ?? cardRoot),
   ];
   for (const el of all) {
     el.style.opacity = "";
     el.style.transform = "";
     el.style.filter = "";
+    el.style.width = "";
+    el.style.maxWidth = "";
+    el.style.height = "";
+    el.style.borderRadius = "";
+    el.style.overflow = "";
   }
 }
 
@@ -116,6 +131,34 @@ function getHandoffStyles(mode: WorkspaceTransitionMode): {
   card: HandoffStyle;
   island: HandoffStyle;
 } {
+  if (mode === "brain-morph") {
+    return {
+      card: {
+        opacity: "0",
+        transform: "scale(0.38) translateY(-42vh)",
+        filter: "blur(6px)",
+      },
+      island: {
+        opacity: "1",
+        transform: "scale(1) translateY(0px)",
+        filter: "blur(0px)",
+      },
+    };
+  }
+  if (mode === "brain-restore") {
+    return {
+      card: {
+        opacity: "0.35",
+        transform: "scale(0.42) translateY(-38vh)",
+        filter: "blur(5px)",
+      },
+      island: {
+        opacity: "1",
+        transform: "scale(1) translateY(0px)",
+        filter: "blur(0px)",
+      },
+    };
+  }
   if (mode === "minimize") {
     return {
       card: {
@@ -181,7 +224,68 @@ export async function animateWorkspaceLeave(
 
   const cards = queryCards(cardRoot);
   const islands = queryIslands(islandRoot ?? cardRoot);
+  const islandInners = queryIslandInners(islandRoot ?? cardRoot);
   const handoff = getHandoffStyles(mode);
+
+  if (mode === "brain-morph") {
+    for (const el of islandInners) {
+      el.style.width = "min(92vw, 720px)";
+      el.style.maxWidth = "720px";
+      el.style.height = "min(58vh, 480px)";
+      el.style.borderRadius = "28px";
+      el.style.overflow = "hidden";
+    }
+
+    await Promise.all([
+      runAnimation(cards, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 0.55, transform: "scale(0.72) translateY(-18vh)", filter: "blur(2px)", offset: 0.45 },
+        { opacity: 0, transform: "scale(0.38) translateY(-42vh)", filter: "blur(6px)" },
+      ], { duration: 880, easing: EASE_OUT, fill: "forwards" }),
+      runAnimation(islandInners, [
+        {
+          width: "min(92vw, 720px)",
+          maxWidth: "720px",
+          height: "min(58vh, 480px)",
+          borderRadius: "28px",
+          opacity: 0.92,
+        },
+        {
+          width: "320px",
+          maxWidth: "320px",
+          height: "48px",
+          borderRadius: "24px",
+          opacity: 1,
+        },
+      ], { duration: 920, easing: EASE_MORPH, fill: "forwards" }),
+      runAnimation(islands, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 1, transform: "scale(1.02) translateY(-2px)", filter: "blur(0px)" },
+      ], { duration: 920, easing: EASE_MORPH, fill: "forwards" }),
+    ]);
+    return;
+  }
+
+  if (mode === "brain-restore") {
+    await Promise.all([
+      runAnimation(cards, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 0.5, transform: "scale(0.9) translateY(12vh)", filter: "blur(3px)" },
+        { opacity: 0, transform: "scale(0.42) translateY(-38vh)", filter: "blur(5px)" },
+      ], { duration: 720, easing: EASE_OUT, fill: "forwards" }),
+      runAnimation(islandInners, [
+        { width: "320px", maxWidth: "320px", height: "48px", borderRadius: "24px", opacity: 1 },
+        {
+          width: "min(92vw, 720px)",
+          maxWidth: "720px",
+          height: "min(58vh, 480px)",
+          borderRadius: "28px",
+          opacity: 0.95,
+        },
+      ], { duration: 780, easing: EASE_MORPH, fill: "forwards" }),
+    ]);
+    return;
+  }
 
   const cardKeyframes =
     mode === "minimize" || mode === "close"
@@ -298,7 +402,67 @@ export async function animateWorkspaceEnter(
 
   const cards = queryCards(cardRoot);
   const islands = queryIslands(islandRoot ?? cardRoot);
+  const islandInners = queryIslandInners(islandRoot ?? cardRoot);
   const handoff = getHandoffStyles(mode);
+
+  if (mode === "brain-restore") {
+    for (const el of islandInners) {
+      el.style.width = "min(92vw, 720px)";
+      el.style.maxWidth = "720px";
+      el.style.height = "min(58vh, 480px)";
+      el.style.borderRadius = "28px";
+      el.style.overflow = "hidden";
+    }
+    for (const el of cards) {
+      Object.assign(el.style, handoff.card);
+    }
+
+    await Promise.all([
+      runAnimation(islandInners, [
+        {
+          width: "min(92vw, 720px)",
+          maxWidth: "720px",
+          height: "min(58vh, 480px)",
+          borderRadius: "28px",
+          opacity: 0.95,
+        },
+        { width: "320px", maxWidth: "320px", height: "48px", borderRadius: "24px", opacity: 1 },
+      ], { duration: 640, easing: EASE_MORPH, fill: "forwards" }),
+      runAnimation(cards, [
+        { opacity: handoff.card.opacity, transform: handoff.card.transform, filter: handoff.card.filter },
+        { opacity: 0.75, transform: "scale(0.55) translateY(-28vh)", filter: "blur(4px)", offset: 0.35 },
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+      ], { duration: 920, easing: EASE_MORPH, fill: "forwards" }),
+    ]);
+
+    settleAnimations([...cards, ...islands, ...islandInners]);
+    clearWorkspaceInlineStyles(cardRoot, islandRoot);
+    return;
+  }
+
+  if (mode === "brain-morph") {
+    for (const el of islandInners) {
+      Object.assign(el.style, {
+        width: "320px",
+        maxWidth: "320px",
+        height: "48px",
+        borderRadius: "24px",
+      });
+    }
+    for (const el of cards) {
+      Object.assign(el.style, handoff.card);
+    }
+
+    await runAnimation(cards, [
+      { opacity: handoff.card.opacity, transform: handoff.card.transform, filter: handoff.card.filter },
+      { opacity: 0.82, transform: "scale(0.97) translateY(8px)", filter: "blur(2px)", offset: 0.4 },
+      { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+    ], { duration: 900, easing: EASE_MORPH, fill: "forwards" });
+
+    settleAnimations([...cards, ...islands, ...islandInners]);
+    clearWorkspaceInlineStyles(cardRoot, islandRoot);
+    return;
+  }
 
   primeWorkspaceEnter(cardRoot, mode, islandRoot);
 

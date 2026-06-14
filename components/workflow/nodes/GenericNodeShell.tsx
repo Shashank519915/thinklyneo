@@ -116,7 +116,7 @@ export function GenericNodeShell({
   return (
     <div
       data-locked={isLocked ? "true" : undefined}
-      className={`w-[380px] max-w-[380px] rounded-xl border bg-white shadow-2xl transition-all duration-300 overflow-visible ${getNodeRunBorderClass(
+      className={`wf-node-card w-[380px] max-w-[380px] rounded-xl border transition-all duration-300 overflow-visible ${getNodeRunBorderClass(
         {
           isDimmed,
           isLocked,
