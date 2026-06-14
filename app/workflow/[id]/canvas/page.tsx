@@ -8,6 +8,8 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useWorkspaceNavigate } from "@/components/workspace";
+import { useWorkspaceIsland } from "@/components/workspace/shell/WorkspaceIslandContext";
 import { useWorkflowStore } from "@/store/workflow-store";
 import LeftSidebar from "@/components/workflow/LeftSidebar";
 import RightHistoryPanel from "@/components/workflow/RightHistoryPanel";
@@ -22,12 +24,14 @@ import { resolveActiveRunNodeIds, validateWorkflowInputsSync } from "@shashank51
 import WorkflowSaveToast, {
   type WorkflowSaveToastPhase,
 } from "@/components/workflow/WorkflowSaveToast";
+import { dispatchWorkflowSaved } from "@/lib/workflow-save-events";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { useAttachLiveRunOnFocus } from "@/lib/use-attach-live-run-on-focus";
 
 export default function WorkflowCanvasPage() {
   const params = useParams();
   const router = useRouter();
+  const { navigate: workspaceNavigate } = useWorkspaceNavigate();
   const workflowId = params.id as string;
 
   const {
@@ -59,6 +63,11 @@ export default function WorkflowCanvasPage() {
     previewRunTimestamp,
     clearCanvasNodeData,
   } = useWorkflowStore();
+
+  useWorkspaceIsland({
+    mode: "canvas",
+    canvas: { workflowName: workflowName || "Untitled workflow" },
+  });
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -540,8 +549,10 @@ export default function WorkflowCanvasPage() {
         body: JSON.stringify({ name: trimmed }),
       });
       if (myId !== saveGenRef.current) return;
-      if (resp.ok) setSavePhase("saved");
-      else setSavePhase("idle");
+      if (resp.ok) {
+        setSavePhase("saved");
+        dispatchWorkflowSaved(workflowId);
+      } else setSavePhase("idle");
     } catch {
       if (myId !== saveGenRef.current) return;
       setSavePhase("idle");
@@ -636,8 +647,10 @@ export default function WorkflowCanvasPage() {
           }),
         });
         if (myId !== saveGenRef.current) return;
-        if (resp.ok) setSavePhase("saved");
-        else setSavePhase("idle");
+        if (resp.ok) {
+          setSavePhase("saved");
+          dispatchWorkflowSaved(workflowId);
+        } else setSavePhase("idle");
       } catch {
         if (myId !== saveGenRef.current) return;
         setSavePhase("idle");
@@ -748,7 +761,7 @@ export default function WorkflowCanvasPage() {
           type="button"
           onClick={handleExportWorkflow}
           disabled={loading}
-          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="wf-canvas-chrome wf-canvas-chrome-btn flex h-8 w-9 items-center justify-center rounded-lg text-zinc-300 transition-all hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Export workflow"
         >
           <Download className="h-3.5 w-3.5" aria-hidden />
@@ -762,7 +775,7 @@ export default function WorkflowCanvasPage() {
           type="button"
           onClick={handleImportWorkflow}
           disabled={loading}
-          className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm transition-all hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="wf-canvas-chrome wf-canvas-chrome-btn flex h-8 w-9 items-center justify-center rounded-lg text-zinc-300 transition-all hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Import workflow"
         >
           <Upload className="h-3.5 w-3.5" aria-hidden />
@@ -785,7 +798,7 @@ export default function WorkflowCanvasPage() {
         };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F5F5F5]">
+    <div className="wf-canvas-shell flex h-screen overflow-hidden bg-[#050505]">
       <WorkflowSaveToast
         phase={savePhase}
         enterCycle={saveToastCycle}
@@ -799,13 +812,16 @@ export default function WorkflowCanvasPage() {
       />
 
       {/* Canvas area */}
-      <div className="flex flex-1 min-w-0 overflow-hidden relative">
+      <div
+        data-workspace-card
+        className="wf-canvas-shell dotted-grid relative flex min-w-0 flex-1 overflow-hidden bg-[#050505] will-change-transform"
+      >
         <div className="flex flex-col flex-1 min-w-0 relative overflow-hidden h-full">
           {loading ? (
-            <div className="flex flex-1 min-h-0 items-center justify-center bg-[#F5F5F5]">
+            <div className="wf-canvas-shell flex min-h-0 flex-1 items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <SpinningLogo size="md" />
-                <p className="text-[13px] text-gray-500">Loading workflow...</p>
+                <p className="text-[13px] text-zinc-500">Loading workflow...</p>
               </div>
             </div>
           ) : (
@@ -816,10 +832,19 @@ export default function WorkflowCanvasPage() {
               <div className="pointer-events-none absolute left-4 top-[11px] z-50">
                 <div className="pointer-events-auto flex flex-col gap-2">
                   <div className="inline-flex items-center gap-2">
-                    <div className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white/85 px-2 py-1.5 shadow-md backdrop-blur">
+                    <div className="wf-canvas-chrome inline-flex items-center gap-2 rounded-2xl px-2 py-1.5">
+                      <button
+                        onClick={() =>
+                          workspaceNavigate(`/chat?brain=${workflowId}`, "brain-restore")
+                        }
+                        className="inline-flex h-8 flex-shrink-0 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10 px-2.5 text-[11px] font-semibold text-purple-200 transition-colors hover:bg-purple-500/20 wf-canvas-chrome-btn"
+                        title="Open Brain chat for this workflow"
+                      >
+                        Brain
+                      </button>
                       <button
                         onClick={() => router.push(`/workflow/${workflowId}`)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 transition-colors flex-shrink-0"
+                        className="wf-canvas-chrome-btn inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
                         title="Back to Workflow Details"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
@@ -836,7 +861,7 @@ export default function WorkflowCanvasPage() {
                           if (e.key === "Enter") handleNameSave();
                           if (e.key === "Escape") { setEditNameValue(workflowName); setIsEditingName(false); }
                         }}
-                        className="h-8 w-[120px] sm:w-[160px] bg-transparent text-[14px] font-normal text-gray-900 outline-none placeholder:text-gray-400"
+                        className="h-8 w-[120px] bg-transparent text-[14px] font-normal text-zinc-100 outline-none placeholder:text-zinc-600 sm:w-[160px]"
                       />
                     </div>
                   </div>
@@ -853,11 +878,11 @@ export default function WorkflowCanvasPage() {
                           type="button"
                           title="Click to reconnect to live run stream"
                           onClick={() => restoreLiveRun({ force: true })}
-                          className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-colors"
+                          className="wf-canvas-chrome inline-flex h-7 max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-200 backdrop-blur transition-colors hover:border-indigo-400/30 hover:bg-indigo-500/10"
                         >
                           <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />
                           <span className="shrink-0">Viewing live run</span>
-                          <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums">
+                          <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
                             {viewingPillVisual.currentRunId
                               ? viewingPillVisual.currentRunId.length > 14
                                 ? `${viewingPillVisual.currentRunId.slice(0, 8)}…`
@@ -867,15 +892,15 @@ export default function WorkflowCanvasPage() {
                           <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-indigo-400" aria-hidden><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
                         </button>
                       ) : (
-                        <span className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-800 shadow-sm backdrop-blur">
+                        <span className="wf-canvas-chrome inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-200 backdrop-blur">
                           <span className="shrink-0">Viewing run</span>
-                          <span className="font-mono text-[10px] text-gray-500 truncate tabular-nums">
+                          <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
                             {viewingPillVisual.previewRunId && viewingPillVisual.previewRunId.length > 14
                               ? `${viewingPillVisual.previewRunId.slice(0, 8)}…`
                               : viewingPillVisual.previewRunId}
                           </span>
                           {viewingPillVisual.previewRunTimestamp && (
-                            <span className="hidden sm:inline shrink-0 text-gray-400 font-normal">
+                            <span className="hidden shrink-0 font-normal text-zinc-500 sm:inline">
                               · {formatRelativeTime(viewingPillVisual.previewRunTimestamp)}
                             </span>
                           )}
@@ -884,20 +909,20 @@ export default function WorkflowCanvasPage() {
                     </span>
                   )}
                   <span className="hidden sm:inline-flex">
-                    <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
+                    <span className="wf-canvas-chrome inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-300 backdrop-blur">
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
-                      <span className="text-gray-500">Est</span>
+                      <span className="text-zinc-500">Est</span>
                       <span className="tabular-nums">~{estimateWorkflowCostDisplay()}</span>
-                      <span className="text-gray-500">M</span>
+                      <span className="text-zinc-500">M</span>
                     </span>
                   </span>
 
                   <span className="hidden sm:inline-flex">
-                    <span className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-gray-200 bg-white/90 px-2.5 text-[11px] font-medium text-gray-700 shadow-sm backdrop-blur">
+                    <span className="wf-canvas-chrome inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-300 backdrop-blur">
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                      <span className="text-gray-500">Bal</span>
+                      <span className="text-zinc-500">Bal</span>
                       <span className="tabular-nums">{balance !== null ? (balance / 1000000).toFixed(2) : "0.00"}</span>
-                      <span className="text-gray-500">M</span>
+                      <span className="text-zinc-500">M</span>
                     </span>
                   </span>
                 </div>
@@ -950,7 +975,7 @@ export default function WorkflowCanvasPage() {
                       <button
                         type="button"
                         onClick={() => setIsHistoryPanelOpen(true)}
-                        className="flex h-8 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm transition-all hover:bg-gray-100"
+                        className="wf-canvas-chrome wf-canvas-chrome-btn flex h-8 w-9 items-center justify-center rounded-lg text-zinc-300 transition-all hover:text-zinc-100"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       </button>

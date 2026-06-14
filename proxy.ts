@@ -1,27 +1,35 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 /** using proxy.ts file instead of middleware, because Next.js supports it and warns to use it for better support. */
 
-/** Routes that bypass auth (login pages, public API, hosted MCP) */
+/** Page routes that bypass Clerk (API routes are excluded via matcher — backend handles auth). */
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/docs(.*)",
-  "/api/v1(.*)",
-  "/api/mcp(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
+const clerkHandler = clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
 });
 
+/** Skip Clerk when secret is unset (e.g. CI e2e without repo secrets). */
+export default function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (!process.env.CLERK_SECRET_KEY?.trim()) {
+    return NextResponse.next();
+  }
+  return clerkHandler(request, event);
+}
+
 export const config = {
   matcher: [
-    // Skip Next.js internals, all static files, and versioned public API routes
-    "/((?!_next|api/v1|api/mcp|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Clerk session routes only (not Bearer-token public API or MCP)
-    "/(api(?!/v1)(?!/mcp)|trpc)(.*)",
+    // Skip Next.js internals, static files, and all /api/* (rewritten to backend).
+    "/((?!_next|api/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // tRPC only — API auth is enforced by the backend after rewrite.
+    "/(trpc)(.*)",
   ],
 };

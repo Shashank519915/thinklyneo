@@ -15,6 +15,9 @@ import type { ApiKeyRecord } from "./types";
 
 const MAX_KEYS = 10;
 
+const inputClass =
+  "rounded-[18px] border border-white/[0.08] bg-[#18181B] text-zinc-100 outline-none placeholder:text-zinc-600 focus-visible:ring-2 focus-visible:ring-purple-500/40";
+
 function formatMaskedKey(maskedKey: string): string {
   if (!maskedKey) return "••••••••";
   const prefix = maskedKey.replace(/\.\.\..*$/, "").replace(/_+$/, "");
@@ -172,18 +175,18 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-[60] bg-black/40" onClick={onClose} />
+      <div className="fixed inset-0 z-[60] bg-black/60" onClick={onClose} />
       <div
         role="dialog"
         aria-modal
-        className="fixed left-1/2 top-1/2 z-[61] flex max-h-[80vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-[18px] border border-gray-200 bg-white p-6 shadow-lg"
+        className="wf-canvas-panel fixed left-1/2 top-1/2 z-[61] flex max-h-[80vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-[18px] p-6"
       >
         <div className="flex flex-col space-y-1.5 text-left">
-          <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight text-gray-900">
-            <Key className="h-[18px] w-[18px] text-gray-900" aria-hidden />
+          <h2 className="flex items-center gap-2 text-lg font-semibold leading-none tracking-tight text-zinc-100">
+            <Key className="h-[18px] w-[18px] text-zinc-300" aria-hidden />
             API Keys
           </h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-zinc-500">
             Create and manage API keys for REST API access. Max {MAX_KEYS} keys.
           </p>
         </div>
@@ -196,13 +199,13 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
               maxLength={64}
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="h-10 flex-1 rounded-[18px] border border-gray-200 bg-white px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+              className={`h-10 flex-1 px-3 text-sm ${inputClass}`}
             />
             <button
               type="button"
               onClick={createKey}
               disabled={creating || keys.length >= MAX_KEYS}
-              className="inline-flex h-8 shrink-0 items-center justify-center rounded-[18px] bg-gray-900 px-3 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+              className="inline-flex h-8 shrink-0 items-center justify-center rounded-[18px] bg-zinc-100 px-3 text-xs font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
             >
               {creating ? "Creating…" : "Create Key"}
             </button>
@@ -210,59 +213,59 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <Gauge className="h-3 w-3 shrink-0 text-gray-500" aria-hidden />
-              <label className="shrink-0 text-[11px] text-gray-500">Per min</label>
+              <Gauge className="h-3 w-3 shrink-0 text-zinc-500" aria-hidden />
+              <label className="shrink-0 text-[11px] text-zinc-500">Per min</label>
               <input
                 type="number"
                 min={1}
                 max={60}
                 value={perMin}
                 onChange={(e) => setPerMin(Number(e.target.value))}
-                className="h-7 w-20 rounded-[18px] border border-gray-200 px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+                className={`h-7 w-20 px-2 text-xs ${inputClass}`}
               />
             </div>
             <div className="flex items-center gap-1.5">
-              <label className="shrink-0 text-[11px] text-gray-500">Per day</label>
+              <label className="shrink-0 text-[11px] text-zinc-500">Per day</label>
               <input
                 type="number"
                 min={1}
                 value={perDay}
                 onChange={(e) => setPerDay(Number(e.target.value))}
-                className="h-7 w-24 rounded-[18px] border border-gray-200 px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+                className={`h-7 w-24 px-2 text-xs ${inputClass}`}
               />
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 shrink-0 text-gray-500" aria-hidden />
-            <label className="shrink-0 text-[11px] text-gray-500">Expires</label>
+            <Calendar className="h-3 w-3 shrink-0 text-zinc-500" aria-hidden />
+            <label className="shrink-0 text-[11px] text-zinc-500">Expires</label>
             <input
               type="date"
               min={todayForDateInput()}
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="h-7 rounded-[18px] border border-gray-200 px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+              className={`h-7 px-2 text-xs [color-scheme:dark] ${inputClass}`}
             />
-            <span className="text-[11px] text-gray-500">Optional</span>
+            <span className="text-[11px] text-zinc-500">Optional</span>
           </div>
         </div>
 
         {newKey && (
           <div className="space-y-2">
             <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
-              <span className="text-[12px] text-amber-700">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-400" aria-hidden />
+              <span className="text-[12px] text-amber-300">
                 Copy your key now — it won&apos;t be shown again.
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 truncate rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+              <code className="flex-1 truncate rounded-lg border border-white/[0.08] bg-[#121215] px-3 py-2 font-mono text-xs text-zinc-200">
                 {newKey}
               </code>
               <button
                 type="button"
                 onClick={() => copyKey(newKey)}
-                className="inline-flex h-8 items-center gap-1 rounded-[18px] border border-gray-200 bg-white px-3 text-xs font-medium shadow-sm hover:bg-gray-50"
+                className="inline-flex h-8 items-center gap-1 rounded-[18px] border border-white/[0.08] bg-[#121215] px-3 text-xs font-medium text-zinc-200 transition hover:bg-white/[0.06]"
               >
                 <Copy className="h-3.5 w-3.5" />
                 {copied ? "Copied" : "Copy"}
@@ -271,14 +274,14 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
             <button
               type="button"
               onClick={() => setNewKey(null)}
-              className="inline-flex h-8 items-center rounded-[18px] px-3 text-[12px] font-medium text-gray-600 hover:bg-gray-100"
+              className="inline-flex h-8 items-center rounded-[18px] px-3 text-[12px] font-medium text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
             >
               Dismiss
             </button>
           </div>
         )}
 
-        <div className="h-px w-full shrink-0 bg-gray-200" />
+        <div className="h-px w-full shrink-0 bg-white/[0.08]" />
 
         <div className="flex-1 space-y-2 overflow-y-auto">
           {loading ? (
@@ -286,12 +289,12 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
               <SpinningLogo size="sm" />
             </div>
           ) : keys.length === 0 ? (
-            <p className="py-4 text-center text-xs text-gray-500">No API keys yet.</p>
+            <p className="py-4 text-center text-xs text-zinc-500">No API keys yet.</p>
           ) : (
             keys.map((k) => (
               <div
                 key={k.id}
-                className="rounded-lg border border-gray-200 bg-white px-3 py-2.5"
+                className="rounded-lg border border-white/[0.08] bg-[#121215] px-3 py-2.5"
               >
                 <div className="flex items-center gap-3">
                   <div className="min-w-0 flex-1">
@@ -307,20 +310,20 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                               if (e.key === "Enter") saveName(k.id);
                               if (e.key === "Escape") setEditingNameId(null);
                             }}
-                            className="h-7 min-w-0 flex-1 rounded-lg border border-gray-200 px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-gray-300"
+                            className={`h-7 min-w-0 flex-1 rounded-lg px-2 text-sm ${inputClass}`}
                             autoFocus
                           />
                           <button
                             type="button"
                             onClick={() => saveName(k.id)}
-                            className="text-xs font-medium text-gray-900 hover:underline"
+                            className="text-xs font-medium text-zinc-200 hover:underline"
                           >
                             Save
                           </button>
                         </div>
                       ) : (
                         <>
-                          <span className="truncate text-sm font-medium text-gray-900">
+                          <span className="truncate text-sm font-medium text-zinc-100">
                             {k.name}
                           </span>
                           <button
@@ -329,7 +332,7 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                               setEditingNameId(k.id);
                               setNameDraft(k.name);
                             }}
-                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[18px] hover:bg-gray-100"
+                            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[18px] text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300"
                             title="Edit name"
                           >
                             <Pencil className="h-3 w-3" />
@@ -338,11 +341,11 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                       )}
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
-                      <code className="font-mono text-xs text-gray-500">
+                      <code className="font-mono text-xs text-zinc-500">
                         {formatMaskedKey(k.maskedKey)}
                       </code>
                       {k.expiresAt && (
-                        <span className="text-[11px] text-gray-500">
+                        <span className="text-[11px] text-zinc-500">
                           {formatExpiry(k.expiresAt)}
                         </span>
                       )}
@@ -352,7 +355,7 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                     type="button"
                     onClick={() => revokeKey(k.id)}
                     disabled={revokingId === k.id}
-                    className="inline-flex h-8 shrink-0 items-center rounded-[18px] border border-gray-200 bg-white px-3 text-xs font-medium shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                    className="inline-flex h-8 shrink-0 items-center rounded-[18px] border border-white/[0.08] bg-white/[0.04] px-3 text-xs font-medium text-zinc-300 transition hover:bg-white/[0.08] disabled:opacity-50"
                   >
                     {revokingId === k.id ? "Revoking…" : "Revoke"}
                   </button>
@@ -372,9 +375,9 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                             perMin: Number(e.target.value),
                           }))
                         }
-                        className="h-6 w-16 rounded-lg border border-gray-200 px-1.5 text-[11px]"
+                        className={`h-6 w-16 rounded-lg px-1.5 text-[11px] ${inputClass}`}
                       />
-                      <span className="text-[11px] text-gray-500">/min</span>
+                      <span className="text-[11px] text-zinc-500">/min</span>
                       <input
                         type="number"
                         min={1}
@@ -385,30 +388,30 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                             perDay: Number(e.target.value),
                           }))
                         }
-                        className="h-6 w-20 rounded-lg border border-gray-200 px-1.5 text-[11px]"
+                        className={`h-6 w-20 rounded-lg px-1.5 text-[11px] ${inputClass}`}
                       />
-                      <span className="text-[11px] text-gray-500">/day</span>
+                      <span className="text-[11px] text-zinc-500">/day</span>
                       <button
                         type="button"
                         onClick={() => saveRates(k.id)}
-                        className="text-[11px] font-medium text-gray-900 hover:underline"
+                        className="text-[11px] font-medium text-zinc-200 hover:underline"
                       >
                         Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingRatesId(null)}
-                        className="text-[11px] text-gray-500 hover:underline"
+                        className="text-[11px] text-zinc-500 hover:underline"
                       >
                         Cancel
                       </button>
                     </div>
                   ) : (
                     <>
-                      <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                      <div className="flex items-center gap-1 text-[11px] text-zinc-500">
                         <Gauge className="h-[11px] w-[11px] shrink-0" aria-hidden />
                         <span>{k.rateLimitPerMin ?? 60}/min</span>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-zinc-700">|</span>
                         <span>{k.rateLimitPerDay ?? 1000}/day</span>
                       </div>
                       <button
@@ -420,7 +423,7 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
                             perDay: k.rateLimitPerDay ?? 1000,
                           });
                         }}
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[18px] hover:bg-gray-100"
+                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[18px] text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300"
                         title="Edit rate limits"
                       >
                         <Pencil className="h-2.5 w-2.5" />
@@ -436,7 +439,7 @@ export function ApiKeysManageModal({ onClose }: ApiKeysManageModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100"
+          className="absolute right-4 top-4 rounded-lg p-1 text-zinc-500 transition hover:bg-white/[0.06] hover:text-zinc-300"
           aria-label="Close"
         >
           <X className="h-4 w-4" />

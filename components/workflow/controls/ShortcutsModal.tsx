@@ -52,36 +52,36 @@ export function ShortcutsModal({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-[500px] max-h-[80vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col z-[100000]">
-        <div className="flex items-start justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="wf-canvas-panel relative z-[100000] flex max-h-[80vh] w-[500px] flex-col overflow-hidden rounded-2xl">
+        <div className="flex items-start justify-between border-b border-white/[0.08] px-6 pb-4 pt-6">
           <div>
-            <h2 className="text-[16px] font-semibold text-gray-900">Keyboard Shortcuts</h2>
-            <p className="text-[13px] text-gray-500 mt-0.5">Quickly navigate and create with these shortcuts.</p>
+            <h2 className="text-[16px] font-semibold text-zinc-100">Keyboard Shortcuts</h2>
+            <p className="mt-0.5 text-[13px] text-zinc-500">Quickly navigate and create with these shortcuts.</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors bg-transparent border-0 cursor-pointer"
+            className="cursor-pointer rounded-lg border-0 bg-transparent p-1.5 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-300"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-4 space-y-5">
+        <div className="space-y-5 overflow-y-auto px-6 py-4">
           {SHORTCUTS.map((group) => (
             <div key={group.section}>
-              <p className="text-[13px] font-semibold text-gray-900 mb-3">{group.section}</p>
+              <p className="mb-3 text-[13px] font-semibold text-zinc-200">{group.section}</p>
               <div className="space-y-0">
                 {group.items.map((item) => (
                   <div
                     key={item.label}
-                    className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0"
+                    className="flex items-center justify-between border-b border-white/[0.06] py-2.5 last:border-0"
                   >
-                    <span className="text-[13px] text-gray-700">{item.label}</span>
+                    <span className="text-[13px] text-zinc-400">{item.label}</span>
                     <div className="flex items-center gap-1">
                       {item.keys.map((k, i) => (
                         <kbd
                           key={i}
-                          className="inline-flex items-center justify-center min-w-[32px] h-6 px-2 rounded-md border border-gray-200 bg-gray-50 text-[11px] font-medium text-gray-600"
+                          className="inline-flex h-6 min-w-[32px] items-center justify-center rounded-md border border-white/[0.1] bg-[#121215] px-2 text-[11px] font-medium text-zinc-400"
                         >
                           {k}
                         </kbd>

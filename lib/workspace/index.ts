@@ -1,4 +1,11 @@
 export {
+  stashBrainEditHandoff,
+  readBrainEditHandoff,
+  clearBrainEditHandoff,
+  type BrainEditHandoff,
+} from "./brain-edit-handoff";
+
+export {
   consumeBridgedEnterMode,
   clearBridgedEnterMode,
   setBridgedEnterMode,

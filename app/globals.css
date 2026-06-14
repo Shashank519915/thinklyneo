@@ -90,13 +90,15 @@ body::after {
     box-shadow:
       0 0 0 2px rgba(124, 58, 237, 0.5),
       0 0 8px 2px rgba(124, 58, 237, 0.15),
-      0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+      0 18px 44px -14px rgba(124, 58, 237, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
   }
   50% {
     box-shadow:
       0 0 0 3px rgba(124, 58, 237, 0.7),
       0 0 20px 6px rgba(124, 58, 237, 0.25),
-      0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+      0 22px 52px -12px rgba(124, 58, 237, 0.38),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 }
 
@@ -134,9 +136,27 @@ body::after {
   transition: box-shadow 0.25s ease, border-color 0.25s ease !important;
 }
 
+.wf-canvas-shell .react-flow__node.selected > div.wf-node-card:first-child:not(.node-executing) {
+  box-shadow:
+    0 0 0 1.5px #7c3aed,
+    0 16px 40px -18px rgba(124, 58, 237, 0.26),
+    0 8px 20px -12px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  border-color: #a78bfa !important;
+}
+
 /* Suppress selection ring entirely when the node is locked */
 .react-flow__node.selected > div[data-locked="true"]:not(.node-executing) {
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1) !important;
+  border-color: #facc15 !important;
+}
+
+.wf-canvas-shell .react-flow__node.selected > div.wf-node-card[data-locked="true"]:not(.node-executing) {
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.45),
+    0 14px 34px -16px rgba(250, 204, 21, 0.12),
+    0 6px 18px -10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
   border-color: #facc15 !important;
 }
 
@@ -221,7 +241,16 @@ body::after {
   animation: fadeScaleIn 150ms ease-out forwards;
 }
 
-/* React Flow background override */
+/* Canvas uses the same CSS dotted-grid as dashboard — React Flow must stay transparent */
+.wf-canvas-shell .react-flow {
+  background: transparent !important;
+}
+
+.wf-canvas-shell .react-flow__pane {
+  background-color: transparent !important;
+}
+
+/* Legacy: non-shell flows fall back to light until migrated */
 .react-flow__background {
   background-color: #F5F5F5 !important;
 }
@@ -280,7 +309,192 @@ body::after {
 
 /* Workflow canvas: fade/slide in when API load completes (see page.tsx) */
 .workflow-page-canvas-enter {
-  animation: authClerkLoadedIn 0.5s ease-out both;
+  animation: wfCanvasEnter 680ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes wfCanvasEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* Dark canvas shell — matches workspace #050505 backplate + dotted grid */
+.wf-canvas-shell {
+  background-color: #050505;
+}
+
+.wf-canvas-shell.dotted-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.wf-canvas-chrome {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a0c;
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 20px 40px -15px rgba(0, 0, 0, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.wf-canvas-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a0c;
+  color: #f4f4f5;
+  box-shadow:
+    0 24px 48px -12px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.wf-canvas-shell ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wf-canvas-shell ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.wf-canvas-chrome-btn {
+  transition:
+    background-color 150ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.wf-canvas-chrome-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── Canvas node cards: dark surfaces + purple ambient shadow (state borders unchanged) ── */
+.wf-canvas-shell .wf-node-card {
+  background-color: var(--node-bg);
+  color: #f4f4f5;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 14px 36px -18px rgba(139, 92, 246, 0.11),
+    0 6px 18px -10px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  transition:
+    box-shadow 0.3s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.25s ease,
+    background-color 0.2s ease;
+}
+
+/* Pending / locked — yellow border from getNodeRunBorderClass; subtle amber halo */
+.wf-canvas-shell .wf-node-card.border-yellow-400:not(.node-executing) {
+  box-shadow:
+    0 0 0 1px rgba(250, 204, 21, 0.42),
+    0 14px 34px -16px rgba(250, 204, 21, 0.12),
+    0 6px 18px -10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.wf-canvas-shell .wf-node-card.border-red-300:not(.node-executing) {
+  box-shadow:
+    0 0 0 1px rgba(252, 165, 165, 0.32),
+    0 14px 34px -16px rgba(239, 68, 68, 0.1),
+    0 6px 18px -10px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Interior fields — remap light Tailwind surfaces inside node cards only */
+.wf-canvas-shell .wf-node-card .border-gray-100,
+.wf-canvas-shell .wf-node-card .border-gray-200 {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.wf-canvas-shell .wf-node-card .border-gray-300,
+.wf-canvas-shell .wf-node-card .border-dashed.border-gray-300 {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.wf-canvas-shell .wf-node-card [class*="bg-[#F5F5F5]"],
+.wf-canvas-shell .wf-node-card [class*="bg-[#FAFAFB]"] {
+  background-color: #18181b !important;
+}
+
+.wf-canvas-shell .wf-node-card .bg-white {
+  background-color: #1c1c21 !important;
+}
+
+.wf-canvas-shell .wf-node-card .bg-gray-100 {
+  background-color: #18181b !important;
+}
+
+.wf-canvas-shell .wf-node-card .bg-gray-50 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.wf-canvas-shell .wf-node-card .hover\:bg-gray-50:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.wf-canvas-shell .wf-node-card .hover\:bg-gray-100:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.wf-canvas-shell .wf-node-card .hover\:bg-gray-200:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wf-canvas-shell .wf-node-card .text-gray-900 { color: #f4f4f5 !important; }
+.wf-canvas-shell .wf-node-card .text-gray-800 { color: #e4e4e7 !important; }
+.wf-canvas-shell .wf-node-card .text-gray-700 { color: #d4d4d8 !important; }
+.wf-canvas-shell .wf-node-card .text-gray-600 { color: #a1a1aa !important; }
+.wf-canvas-shell .wf-node-card .text-gray-500 { color: #71717a !important; }
+.wf-canvas-shell .wf-node-card .text-gray-400 { color: #71717a !important; }
+
+.wf-canvas-shell .wf-node-card .hover\:text-gray-600:hover,
+.wf-canvas-shell .wf-node-card .hover\:text-gray-700:hover,
+.wf-canvas-shell .wf-node-card .hover\:text-gray-900:hover {
+  color: #e4e4e7 !important;
+}
+
+.wf-canvas-shell .wf-node-card .bg-red-50,
+.wf-canvas-shell .wf-node-card .bg-red-50\/30 {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+}
+
+.wf-canvas-shell .wf-node-card .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.28) !important;
+}
+
+.wf-canvas-shell .wf-node-card .hover\:bg-red-100:hover {
+  background-color: rgba(239, 68, 68, 0.14) !important;
+}
+
+.wf-canvas-shell .wf-node-card .bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.wf-canvas-shell .wf-node-card [class*="bg-gray-200/"],
+.wf-canvas-shell .wf-node-card [class*="bg-gray-100/"] {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.wf-canvas-shell .upload-popup-container {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background-color: #0a0a0c !important;
+  color: #f4f4f5;
+  box-shadow:
+    0 24px 48px -12px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.wf-canvas-shell .upload-popup-container .text-gray-500 {
+  color: #71717a !important;
+}
+
+.wf-canvas-shell .wf-node-card .placeholder-gray-400::placeholder {
+  color: #52525b !important;
 }
 
 /* Workflow PATCH save toast — fade + subtle vertical motion */

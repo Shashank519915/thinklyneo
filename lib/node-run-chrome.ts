@@ -25,10 +25,10 @@ export function getNodeRunBorderClass(opts: {
   hasError: boolean;
   isRunPending: boolean;
 }): string {
-  if (opts.isDimmed) return "border-gray-200";
+  if (opts.isDimmed) return "border-white/[0.06]";
   if (opts.isLocked) return "border-yellow-400";
   if (opts.isExecuting) return "node-executing border-[#7C3AED]";
   if (opts.hasError) return "border-red-300";
   if (opts.isRunPending) return "border-yellow-400";
-  return "border-gray-200";
+  return "border-white/[0.08]";
 }

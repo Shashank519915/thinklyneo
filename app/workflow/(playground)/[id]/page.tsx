@@ -911,25 +911,22 @@ curl -X GET ${apiOrigin}/api/v1/runs/RUN_ID \\
 
         {activeTab === "workflow" && (
               <div className="h-full overflow-auto p-4 sm:p-6">
-                <div className="rounded-[18px] border border-gray-200 bg-white text-gray-900 shadow-sm">
-                  {/* Header: title + white Edit button */}
+                <div className="rounded-[18px] border border-white/[0.08] bg-[#0A0A0C]/90 text-zinc-100 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
                   <div className="flex flex-row items-center justify-between px-6 py-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Workflow Structure</h3>
+                    <h3 className="text-lg font-semibold text-zinc-100">Workflow Structure</h3>
                     <button
-                      onClick={() => router.push(`/workflow/${workflowId}/canvas`)}
-                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 cursor-pointer"
+                      onClick={() => workspaceNavigate(`/workflow/${workflowId}/canvas`, "open")}
+                      className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[18px] border border-white/8 bg-white/[0.03] px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-zinc-100 cursor-pointer"
                     >
                       <Pencil className="h-3.5 w-3.5" aria-hidden />
                       Edit Workflow
                     </button>
                   </div>
 
-                  {/* Divider */}
-                  <div className="h-px w-full bg-gray-200" />
+                  <div className="h-px w-full bg-white/[0.05]" />
 
-                  {/* Canvas box (read-only) */}
                   <div
-                    className="relative overflow-hidden rounded-b-[18px] p-0"
+                    className="relative overflow-hidden rounded-b-[18px] bg-[#050505] p-0"
                     style={{ height: "clamp(400px, calc(-260px + 100vh), 700px)" }}
                   >
                     <Canvas readOnly={true} />

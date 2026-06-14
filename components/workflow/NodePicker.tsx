@@ -134,10 +134,10 @@ function NodeRow({
     <button
       type="button"
       onClick={() => onSelect(entry.nodeType)}
-      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-gray-50"
+      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors hover:bg-white/[0.06]"
     >
       {entry.icon}
-      <span className="min-w-0 truncate text-[13px] text-gray-700">{entry.label}</span>
+      <span className="min-w-0 truncate text-[13px] text-zinc-200">{entry.label}</span>
     </button>
   );
 }
@@ -205,13 +205,13 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
       style={{ bottom: "calc(100% + 14px)", left: 0 }}
     >
       <div
-        className="w-[280px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white/95 shadow-2xl backdrop-blur"
+        className="wf-canvas-panel w-[280px] shrink-0 overflow-hidden rounded-2xl shadow-2xl fade-scale-in"
         style={{ height: 430 }}
       >
         <div className="p-2.5">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
               <input
                 ref={searchRef}
                 placeholder="Search nodes or models..."
@@ -220,13 +220,13 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
                   setQuery(e.target.value);
                   if (e.target.value.trim()) setActiveCategory(null);
                 }}
-                className="w-full rounded-xl border border-transparent bg-transparent py-2 pl-10 pr-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-0"
+                className="w-full rounded-xl border border-white/[0.06] bg-white/[0.04] py-2 pl-10 pr-3 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-purple-500/40"
               />
             </div>
             <button
               type="button"
               onClick={() => setIsNodePickerOpen(false)}
-              className="shrink-0 rounded-lg p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              className="shrink-0 rounded-lg p-2 text-zinc-500 transition-colors hover:bg-white/[0.06] hover:text-zinc-200"
               title="Close"
             >
               <X className="h-4 w-4" />
@@ -241,7 +241,7 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
                 <NodeRow key={n.id} entry={n} onSelect={handleSelect} />
               ))}
               {searchResults.length === 0 && (
-                <div className="px-2.5 py-2 text-[12px] text-gray-400">
+                <div className="px-2.5 py-2 text-[12px] text-zinc-500">
                   No results for &ldquo;{query}&rdquo;
                 </div>
               )}
@@ -249,7 +249,7 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
           ) : (
             <>
               <div className="pb-1">
-                <div className="flex items-center gap-2 px-2 py-0.5 text-[11px] text-gray-500">
+                <div className="flex items-center gap-2 px-2 py-0.5 text-[11px] text-zinc-500">
                   <Clock3 className="h-3.5 w-3.5" />
                   Recent
                 </div>
@@ -273,15 +273,15 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
                       }
                       className={`flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide transition-colors ${
                         isActive
-                          ? "bg-gray-100 text-gray-800"
-                          : "text-gray-500 hover:bg-gray-50"
+                          ? "bg-white/10 text-zinc-100"
+                          : "text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300"
                       }`}
                     >
                       {section.icon}
                       <span className="flex-1">{section.label}</span>
-                      <span className="text-[10px] font-normal text-gray-400">{count}</span>
+                      <span className="text-[10px] font-normal text-zinc-600">{count}</span>
                       <ChevronRight
-                        className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${
+                        className={`h-4 w-4 shrink-0 text-zinc-600 transition-transform ${
                           isActive ? "rotate-90" : ""
                         }`}
                       />
@@ -296,10 +296,10 @@ export default function NodePicker({ anchorRef }: NodePickerProps) {
 
       {activeCategory && activeCategoryMeta && !searchResults && (
         <div
-          className="ml-2 w-[240px] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white/95 shadow-2xl backdrop-blur"
+          className="wf-canvas-panel ml-2 w-[240px] shrink-0 overflow-hidden rounded-2xl shadow-2xl fade-scale-in"
           style={{ height: 430 }}
         >
-          <div className="flex items-center gap-2 border-b border-gray-100 px-3 py-2.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+          <div className="flex items-center gap-2 border-b border-white/[0.06] px-3 py-2.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
             {activeCategoryMeta.icon}
             {activeCategoryMeta.label}
           </div>

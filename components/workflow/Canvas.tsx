@@ -8,8 +8,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
   MiniMap,
   addEdge,
   type Connection,
@@ -525,7 +523,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
   }, [workflowIdStore, nodes.length, fitView, setViewport, viewportStorageKey]);
 
   return (
-    <div ref={canvasRef} className="relative h-full w-full overflow-hidden bg-[#F5F5F5]">
+    <div ref={canvasRef} className="wf-canvas-shell dotted-grid relative h-full w-full overflow-hidden">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -568,7 +566,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
         deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
         multiSelectionKeyCode={readOnly ? null : "Shift"}
         fitViewOptions={{ padding: 0.1 }}
-        style={{ background: "#F5F5F5" }}
+        style={{ background: "transparent" }}
         proOptions={{ hideAttribution: true }}
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
@@ -576,13 +574,6 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
         nodesFocusable={!readOnly}
         edgesFocusable={!readOnly}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1.5}
-          color="#D1D5DB"
-        />
-
         {/* MiniMap inside ReactFlow — must be a child of ReactFlow */}
         {minimapOpen && (
           <MiniMap
@@ -606,7 +597,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
       {minimapOpen ? (
         <button
           onClick={() => setMinimapOpen(false)}
-          className="absolute bottom-[92px] right-[8px] w-9 h-9 flex items-center justify-center bg-white hover:bg-gray-50 rounded-xl border border-gray-200 text-gray-500 hover:text-gray-700 transition-colors shadow-md z-20"
+          className="wf-canvas-chrome wf-canvas-chrome-btn absolute bottom-[92px] right-[8px] z-20 flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200"
           title="Collapse minimap"
         >
           <Minimize2 className="w-4 h-4" />
@@ -615,7 +606,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
         <div className="absolute bottom-4 right-4 z-10">
           <button
             onClick={() => setMinimapOpen(true)}
-            className="w-10 h-10 flex items-center justify-center bg-white border border-gray-200 rounded-xl shadow-md text-gray-500 hover:bg-gray-50 transition-colors"
+            className="wf-canvas-chrome wf-canvas-chrome-btn flex h-10 w-10 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200"
             title="Show minimap"
           >
             <Map className="w-5 h-5" />
