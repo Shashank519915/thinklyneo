@@ -72,10 +72,12 @@ export function MessageBubble({
   message,
   assistantName,
   hideClientTools = false,
+  isStreaming = false,
 }: {
   message: UIMessage;
   assistantName: string;
   hideClientTools?: boolean;
+  isStreaming?: boolean;
 }) {
   const isUser = message.role === "user";
   const text = extractText(message.parts);
@@ -93,7 +95,7 @@ export function MessageBubble({
     return (
       <div className="flex justify-end">
         <div className="max-w-[min(100%,380px)] rounded-[20px] rounded-br-md bg-gradient-to-br from-[#5E5CE6] to-[#7C3AED] px-4 py-2.5 text-[13px] leading-relaxed text-white">
-          {text}
+          <ChatMarkdown content={text} />
         </div>
       </div>
     );
@@ -104,7 +106,7 @@ export function MessageBubble({
       <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">{assistantName}</div>
       {text && (
         <div className="rounded-[20px] rounded-bl-md border border-white/5 bg-[#1C1C1E] px-4 py-2.5 text-[13px] leading-relaxed text-zinc-100">
-          <ChatMarkdown content={text} />
+          <ChatMarkdown content={text} isStreaming={isStreaming} />
         </div>
       )}
       {toolParts.map((part, i) => (

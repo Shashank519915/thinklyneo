@@ -48,8 +48,32 @@ export function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function ChatMarkdown({ content }: { content: string }) {
-  if (!content || !content.trim()) return null;
+export function ChatMarkdown({
+  content,
+  isStreaming = false,
+}: {
+  content: string;
+  isStreaming?: boolean;
+}) {
+  const [displayedContent, setDisplayedContent] = useState(content);
+
+  useState(() => {
+    // initialize
+    setDisplayedContent(content);
+  });
+
+  React.useEffect(() => {
+    if (!isStreaming) {
+      setDisplayedContent(content);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDisplayedContent(content);
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [content, isStreaming]);
+
+  if (!displayedContent || !displayedContent.trim()) return null;
 
   return (
     <ReactMarkdown
@@ -64,9 +88,9 @@ export function ChatMarkdown({ content }: { content: string }) {
         h3: ({ children }) => (
           <h3 className="mb-1.5 mt-3 text-xs font-semibold text-zinc-200 first:mt-0">{children}</h3>
         ),
-        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed text-zinc-200">{children}</p>,
-        ul: ({ children }) => <ul className="mb-2.5 list-disc pl-5 space-y-1 last:mb-0 text-zinc-200">{children}</ul>,
-        ol: ({ children }) => <ol className="mb-2.5 list-decimal pl-5 space-y-1 last:mb-0 text-zinc-200">{children}</ol>,
+        p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+        ul: ({ children }) => <ul className="mb-2.5 list-disc pl-5 space-y-1 last:mb-0">{children}</ul>,
+        ol: ({ children }) => <ol className="mb-2.5 list-decimal pl-5 space-y-1 last:mb-0">{children}</ol>,
         li: ({ children }) => <li className="leading-relaxed">{children}</li>,
         strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
         blockquote: ({ children }) => (
@@ -111,7 +135,7 @@ export function ChatMarkdown({ content }: { content: string }) {
           </th>
         ),
         td: ({ children }) => (
-          <td className="border-b border-white/5 px-3 py-1.5 text-zinc-300">{children}</td>
+          <td className="border-b border-white/5 px-3 py-1.5">{children}</td>
         ),
         tr: ({ children }) => <tr className="even:bg-white/[0.01] hover:bg-white/[0.02] transition-colors">{children}</tr>,
         a: ({ href, children }) => (
@@ -126,7 +150,7 @@ export function ChatMarkdown({ content }: { content: string }) {
         ),
       }}
     >
-      {content}
+      {displayedContent}
     </ReactMarkdown>
   );
 }

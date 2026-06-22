@@ -527,46 +527,46 @@ export default function ChatWorkspace() {
 
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
-      <aside className="flex w-full flex-col border-r border-white/[0.05] bg-[#08080A]/60 lg:w-[280px]">
-        <div className="border-b border-white/[0.05] p-3">
-          <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-black/40 p-1">
-            {(Object.keys(MODE_META) as ChatMode[]).map((m) => (
+      {mode !== "helper" && (
+        <aside className="flex w-full flex-col border-r border-white/[0.05] bg-[#08080A]/60 lg:w-[280px]">
+          <div className="border-b border-white/[0.05] p-3">
+            <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-black/40 p-1">
+              {(Object.keys(MODE_META) as ChatMode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    stop();
+                    resetBrainClientState();
+                    setMode(m);
+                    setActiveChatId(null);
+                    setMessages([]);
+                    setActiveBlueprint(null);
+                    setBoundWorkflowId(null);
+                    setWorkflowContextNote(null);
+                    setCompletedRun(null);
+                    setChatError(null);
+                  }}
+                  className={cn(
+                    "flex-1 rounded-lg py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                    mode === m ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300",
+                  )}
+                >
+                  {MODE_META[m].label}
+                </button>
+              ))}
+            </div>
+            {mode === "thinkly" && (
               <button
-                key={m}
                 type="button"
-                onClick={() => {
-                  stop();
-                  resetBrainClientState();
-                  setMode(m);
-                  setActiveChatId(null);
-                  setMessages([]);
-                  setActiveBlueprint(null);
-                  setBoundWorkflowId(null);
-                  setWorkflowContextNote(null);
-                  setCompletedRun(null);
-                  setChatError(null);
-                }}
-                className={cn(
-                  "flex-1 rounded-lg py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
-                  mode === m ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300",
-                )}
+                onClick={() => void createThinklyChat()}
+                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-xs text-zinc-300 hover:bg-white/5"
               >
-                {MODE_META[m].label}
+                <Plus className="h-3.5 w-3.5" />
+                New plan
               </button>
-            ))}
+            )}
           </div>
-          {mode === "thinkly" && (
-            <button
-              type="button"
-              onClick={() => void createThinklyChat()}
-              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-xs text-zinc-300 hover:bg-white/5"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New plan
-            </button>
-          )}
-        </div>
-        {mode !== "helper" && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             {modeChats.map((c) => (
               <button
@@ -586,16 +586,51 @@ export default function ChatWorkspace() {
               </button>
             ))}
           </div>
-        )}
-      </aside>
+        </aside>
+      )}
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="border-b border-white/[0.05] px-4 py-3">
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-white">{meta.label}</h2>
-              <p className="text-[10px] text-zinc-500">{meta.description}</p>
-            </div>
+            {mode === "helper" ? (
+              <div className="flex items-center gap-4">
+                <div className="flex w-[260px] gap-1 rounded-xl border border-white/[0.06] bg-black/40 p-1">
+                  {(Object.keys(MODE_META) as ChatMode[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => {
+                        stop();
+                        resetBrainClientState();
+                        setMode(m);
+                        setActiveChatId(null);
+                        setMessages([]);
+                        setActiveBlueprint(null);
+                        setBoundWorkflowId(null);
+                        setWorkflowContextNote(null);
+                        setCompletedRun(null);
+                        setChatError(null);
+                      }}
+                      className={cn(
+                        "flex-1 rounded-lg py-1 text-[9px] font-bold uppercase tracking-wider transition-colors",
+                        mode === m ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300",
+                      )}
+                    >
+                      {MODE_META[m].label}
+                    </button>
+                  ))}
+                </div>
+                <div className="hidden border-l border-white/10 pl-4 sm:block">
+                  <h2 className="text-xs font-semibold text-white">{meta.label}</h2>
+                  <p className="text-[9px] text-zinc-500">{meta.description}</p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-sm font-semibold text-white">{meta.label}</h2>
+                <p className="text-[10px] text-zinc-500">{meta.description}</p>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               {mode === "brain" && workflowId && (
                 <button
@@ -662,12 +697,13 @@ export default function ChatWorkspace() {
                 pending={handoffPending}
               />
             )}
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <MessageBubble
                 key={msg.id}
                 message={msg}
                 assistantName={meta.label}
                 hideClientTools
+                isStreaming={isStreaming && idx === messages.length - 1}
               />
             ))}
             {isStreaming && (
@@ -712,48 +748,45 @@ export default function ChatWorkspace() {
         </footer>
       </section>
 
-      <aside className="hidden min-h-0 w-full flex-col border-l border-white/[0.05] bg-[#060608]/80 xl:flex xl:w-[min(100%,360px)]">
-        <div className="border-b border-white/[0.05] px-4 py-3">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-            Context
-          </span>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-          {activeBlueprint && blueprintGraph && !liveRun && (
-            <>
-              <BlueprintSummary blueprint={activeBlueprint} />
-              <WorkflowCanvasPreview
-                nodes={blueprintGraph.nodes}
-                edges={blueprintGraph.edges}
-                workflowName={activeBlueprint.title ?? "Blueprint"}
-              />
-              {mode === "thinkly" && activeBlueprint.confidence !== "draft" && (
-                <button
-                  type="button"
-                  onClick={() => void activateBlueprint()}
-                  className="w-full rounded-full bg-white py-2 text-xs font-bold text-black hover:bg-zinc-100"
-                >
-                  Activate Blueprint → Brain
-                </button>
-              )}
-            </>
-          )}
-          {mode === "brain" && workflowId && (
-            <button
-              type="button"
-              onClick={() => openCanvasEdit()}
-              className="w-full rounded-full border border-white/15 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/5"
-            >
-              Edit workflow in canvas
-            </button>
-          )}
-          {!activeBlueprint && mode === "helper" && (
-            <p className="text-xs text-zinc-500">
-              Ask about node inputs, outputs, credits, and wiring conventions.
-            </p>
-          )}
-        </div>
-      </aside>
+      {mode !== "helper" && (
+        <aside className="hidden min-h-0 w-full flex-col border-l border-white/[0.05] bg-[#060608]/80 xl:flex xl:w-[min(100%,360px)]">
+          <div className="border-b border-white/[0.05] px-4 py-3">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+              Context
+            </span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
+            {activeBlueprint && blueprintGraph && !liveRun && (
+              <>
+                <BlueprintSummary blueprint={activeBlueprint} />
+                <WorkflowCanvasPreview
+                  nodes={blueprintGraph.nodes}
+                  edges={blueprintGraph.edges}
+                  workflowName={activeBlueprint.title ?? "Blueprint"}
+                />
+                {mode === "thinkly" && activeBlueprint.confidence !== "draft" && (
+                  <button
+                    type="button"
+                    onClick={() => void activateBlueprint()}
+                    className="w-full rounded-full bg-white py-2 text-xs font-bold text-black hover:bg-zinc-100"
+                  >
+                    Activate Blueprint → Brain
+                  </button>
+                )}
+              </>
+            )}
+            {mode === "brain" && workflowId && (
+              <button
+                type="button"
+                onClick={() => openCanvasEdit()}
+                className="w-full rounded-full border border-white/15 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/5"
+              >
+                Edit workflow in canvas
+              </button>
+            )}
+          </div>
+        </aside>
+      )}
     </div>
   );
 }
