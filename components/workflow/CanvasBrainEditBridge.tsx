@@ -28,7 +28,7 @@ function CanvasBrainEditRestore({ workflowId }: { workflowId: string }) {
       morph: false,
       onDoneEditing: () => {
         clearBrainEditMode();
-        navigate("/chat", "brain-restore");
+        navigate("/chat/brain", "brain-restore");
       },
     });
   }, [workflowId, setBrainEditMode, clearBrainEditMode, navigate]);

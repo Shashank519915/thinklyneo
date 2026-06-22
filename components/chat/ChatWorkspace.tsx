@@ -7,19 +7,16 @@ import {
   type UIMessage,
 } from "ai";
 import { useChat } from "@ai-sdk/react";
-import { ArrowUp, Loader2, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import type { Blueprint, ChatKind, ChatRecord } from "@/lib/chat/types";
 import { blueprintToFlowGraph } from "@/lib/chat/blueprint-to-graph";
 import { useBrainClientTools } from "@/lib/chat/use-brain-client-tools";
 import { useAttachLiveRunOnFocus } from "@/lib/use-attach-live-run-on-focus";
 import type { PlaygroundOutputSection } from "@/lib/playground-output";
 import { MessageBubble } from "./ChatMessageParts";
-import { BlueprintSummary } from "./BlueprintFlowPreview";
-import { WorkflowCanvasPreview } from "./WorkflowCanvasPreview";
 import { LiveRunPanel } from "./LiveRunPanel";
-import { EditHandoffCard, PinnedRunBadge } from "./ChatClientToolCards";
-import { ChatCreditBadge, RunCompletionPanel, WorkflowContextNote } from "./ChatRunExtras";
+import { EditHandoffCard } from "./ChatClientToolCards";
+import { RunCompletionPanel, WorkflowContextNote } from "./ChatRunExtras";
 import { useWorkspaceNavigate } from "@/components/workspace/navigation";
 import { useWorkspaceIsland } from "@/components/workspace/shell/WorkspaceIslandContext";
 import {
@@ -27,8 +24,12 @@ import {
   clearBrainEditHandoff,
   stashBrainEditHandoff,
 } from "@/lib/workspace/brain-edit-handoff";
+import { ChatSidebar } from "./parts/ChatSidebar";
+import { ChatHeader } from "./parts/ChatHeader";
+import { ChatInput } from "./parts/ChatInput";
+import { ChatContextSidebar } from "./parts/ChatContextSidebar";
 
-type ChatMode = ChatKind;
+export type ChatMode = ChatKind;
 
 type ActiveRun = {
   orchestratorRunId: string;
@@ -36,7 +37,7 @@ type ActiveRun = {
   workflowRunId?: string;
 };
 
-const MODE_META: Record<ChatMode, { label: string; api: string; description: string }> = {
+export const MODE_META: Record<ChatMode, { label: string; api: string; description: string }> = {
   helper: {
     label: "Node Helper",
     api: "/api/chat/helper",
@@ -86,14 +87,13 @@ function extractRunFromToolParts(messages: UIMessage[]): ActiveRun | null {
   return null;
 }
 
-export default function ChatWorkspace() {
+export default function ChatWorkspace({ mode }: { mode: ChatMode }) {
   const { navigate } = useWorkspaceNavigate();
   const { setBrainEditMode } = useWorkspaceIsland({
     createWorkflow: () => navigate("/dashboard"),
     onImportClick: () => navigate("/dashboard"),
   });
 
-  const [mode, setMode] = useState<ChatMode>("thinkly");
   const [chats, setChats] = useState<ChatRecord[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -353,7 +353,6 @@ export default function ChatWorkspace() {
       if (!handoff) return;
       clearBrainEditHandoff();
       setActiveChatId(handoff.chatId);
-      setMode("brain");
       void loadChat(handoff.chatId);
       void refreshWorkflowContext(handoff.workflowId, handoff.chatId);
     };
@@ -370,6 +369,14 @@ export default function ChatWorkspace() {
   }, [refreshChats]);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get("chatId");
+    if (cid) {
+      setActiveChatId(cid);
+    }
+  }, []);
+
+  useEffect(() => {
     if (deepLinkHandledRef.current) return;
     const params = new URLSearchParams(window.location.search);
     const wfId = params.get("brain");
@@ -383,7 +390,6 @@ export default function ChatWorkspace() {
       });
       const json = await res.json();
       if (json.data?.id) {
-        setMode("brain");
         setActiveChatId(json.data.id);
         setBoundWorkflowId(json.data.workflowId ?? wfId);
         await refreshChats();
@@ -468,13 +474,8 @@ export default function ChatWorkspace() {
       return;
     }
     if (json.data?.id) {
-      setMode("brain");
-      setActiveChatId(json.data.id);
-      if (json.data.workflowId) setBoundWorkflowId(json.data.workflowId);
       resetBrainClientState();
-      await refreshChats();
-      await loadChat(json.data.id);
-      setChatError(null);
+      navigate(`/chat/brain?chatId=${json.data.id}`);
     }
   }
 
@@ -523,140 +524,41 @@ export default function ChatWorkspace() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, status, liveRun, pendingHandoff, completedRun, workflowContextNote]);
 
-  const modeChats = chats.filter((c) => c.kind === mode);
-
   return (
     <div className="flex h-full min-h-0 flex-col lg:flex-row">
-      {mode !== "helper" && (
-        <aside className="flex w-full flex-col border-r border-white/[0.05] bg-[#08080A]/60 lg:w-[280px]">
-          <div className="border-b border-white/[0.05] p-3">
-            <div className="flex gap-1 rounded-xl border border-white/[0.06] bg-black/40 p-1">
-              {(Object.keys(MODE_META) as ChatMode[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => {
-                    stop();
-                    resetBrainClientState();
-                    setMode(m);
-                    setActiveChatId(null);
-                    setMessages([]);
-                    setActiveBlueprint(null);
-                    setBoundWorkflowId(null);
-                    setWorkflowContextNote(null);
-                    setCompletedRun(null);
-                    setChatError(null);
-                  }}
-                  className={cn(
-                    "flex-1 rounded-lg py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
-                    mode === m ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300",
-                  )}
-                >
-                  {MODE_META[m].label}
-                </button>
-              ))}
-            </div>
-            {mode === "thinkly" && (
-              <button
-                type="button"
-                onClick={() => void createThinklyChat()}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 py-2 text-xs text-zinc-300 hover:bg-white/5"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New plan
-              </button>
-            )}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {modeChats.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => {
-                  setActiveChatId(c.id);
-                  void loadChat(c.id);
-                }}
-                className={cn(
-                  "w-full border-b border-white/[0.03] px-3 py-3 text-left text-sm",
-                  activeChatId === c.id ? "bg-white/[0.06]" : "hover:bg-white/[0.03]",
-                )}
-              >
-                <div className="truncate font-medium text-zinc-200">{c.title ?? "Untitled"}</div>
-                <div className="truncate text-[10px] text-zinc-500">{c.kind}</div>
-              </button>
-            ))}
-          </div>
-        </aside>
-      )}
+      <ChatSidebar
+        mode={mode}
+        chats={chats}
+        activeChatId={activeChatId}
+        onSelectChat={(chatId) => {
+          setActiveChatId(chatId);
+          void loadChat(chatId);
+        }}
+        onCreateThinklyChat={() => void createThinklyChat()}
+        onNavigate={(href) => {
+          stop();
+          resetBrainClientState();
+          navigate(href);
+        }}
+      />
 
       <section className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <header className="border-b border-white/[0.05] px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            {mode === "helper" ? (
-              <div className="flex items-center gap-4">
-                <div className="flex w-[260px] gap-1 rounded-xl border border-white/[0.06] bg-black/40 p-1">
-                  {(Object.keys(MODE_META) as ChatMode[]).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => {
-                        stop();
-                        resetBrainClientState();
-                        setMode(m);
-                        setActiveChatId(null);
-                        setMessages([]);
-                        setActiveBlueprint(null);
-                        setBoundWorkflowId(null);
-                        setWorkflowContextNote(null);
-                        setCompletedRun(null);
-                        setChatError(null);
-                      }}
-                      className={cn(
-                        "flex-1 rounded-lg py-1 text-[9px] font-bold uppercase tracking-wider transition-colors",
-                        mode === m ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300",
-                      )}
-                    >
-                      {MODE_META[m].label}
-                    </button>
-                  ))}
-                </div>
-                <div className="hidden border-l border-white/10 pl-4 sm:block">
-                  <h2 className="text-xs font-semibold text-white">{meta.label}</h2>
-                  <p className="text-[9px] text-zinc-500">{meta.description}</p>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <h2 className="text-sm font-semibold text-white">{meta.label}</h2>
-                <p className="text-[10px] text-zinc-500">{meta.description}</p>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              {mode === "brain" && workflowId && (
-                <button
-                  type="button"
-                  onClick={() => openCanvasEdit()}
-                  className="xl:hidden rounded-full border border-white/15 px-3 py-1 text-[10px] font-semibold text-zinc-200"
-                >
-                  Edit canvas
-                </button>
-              )}
-              {pinnedRun && (
-                <PinnedRunBadge orchestratorRunId={pinnedRun.orchestratorRunId} active={!completedRun} />
-              )}
-              {creditBalanceMicro != null && <ChatCreditBadge microcredits={creditBalanceMicro} />}
-              {isStreaming && (
-                <button
-                  type="button"
-                  onClick={() => stop()}
-                  className="text-[10px] font-mono text-red-400 hover:text-red-300"
-                >
-                  Stop
-                </button>
-              )}
-            </div>
-          </div>
-        </header>
+        <ChatHeader
+          mode={mode}
+          isStreaming={isStreaming}
+          pinnedRun={pinnedRun}
+          completedRun={Boolean(completedRun)}
+          creditBalanceMicro={creditBalanceMicro}
+          workflowId={workflowId}
+          activeChatTitle={activeChat?.title ?? undefined}
+          onStop={() => stop()}
+          onOpenCanvasEdit={() => openCanvasEdit()}
+          onNavigate={(href) => {
+            stop();
+            resetBrainClientState();
+            navigate(href);
+          }}
+        />
 
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
@@ -715,78 +617,26 @@ export default function ChatWorkspace() {
           </div>
         </div>
 
-        <footer className="border-t border-white/[0.05] px-4 py-3">
-          <div className="mx-auto flex max-w-2xl items-end gap-2">
-            <textarea
-              rows={1}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder={`Message ${meta.label}…`}
-              disabled={!activeChatId || loadingChats}
-              className="min-h-[40px] flex-1 resize-none rounded-[20px] border border-white/8 bg-[#1C1C1E]/90 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-purple-500/35"
-            />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={!draft.trim() || isStreaming || !activeChatId}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-full transition-all",
-                draft.trim() && !isStreaming
-                  ? "bg-gradient-to-br from-[#5E5CE6] to-[#7C3AED] text-white"
-                  : "border border-white/5 bg-white/5 text-zinc-600",
-              )}
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
-          </div>
-        </footer>
+        <ChatInput
+          mode={mode}
+          draft={draft}
+          isStreaming={isStreaming}
+          activeChatId={activeChatId}
+          loadingChats={loadingChats}
+          onDraftChange={setDraft}
+          onSend={handleSend}
+        />
       </section>
 
-      {mode !== "helper" && (
-        <aside className="hidden min-h-0 w-full flex-col border-l border-white/[0.05] bg-[#060608]/80 xl:flex xl:w-[min(100%,360px)]">
-          <div className="border-b border-white/[0.05] px-4 py-3">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-              Context
-            </span>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 space-y-4">
-            {activeBlueprint && blueprintGraph && !liveRun && (
-              <>
-                <BlueprintSummary blueprint={activeBlueprint} />
-                <WorkflowCanvasPreview
-                  nodes={blueprintGraph.nodes}
-                  edges={blueprintGraph.edges}
-                  workflowName={activeBlueprint.title ?? "Blueprint"}
-                />
-                {mode === "thinkly" && activeBlueprint.confidence !== "draft" && (
-                  <button
-                    type="button"
-                    onClick={() => void activateBlueprint()}
-                    className="w-full rounded-full bg-white py-2 text-xs font-bold text-black hover:bg-zinc-100"
-                  >
-                    Activate Blueprint → Brain
-                  </button>
-                )}
-              </>
-            )}
-            {mode === "brain" && workflowId && (
-              <button
-                type="button"
-                onClick={() => openCanvasEdit()}
-                className="w-full rounded-full border border-white/15 py-2 text-xs font-semibold text-zinc-200 hover:bg-white/5"
-              >
-                Edit workflow in canvas
-              </button>
-            )}
-          </div>
-        </aside>
-      )}
+      <ChatContextSidebar
+        mode={mode}
+        activeBlueprint={activeBlueprint}
+        blueprintGraph={blueprintGraph}
+        workflowId={workflowId}
+        hasLiveRun={Boolean(liveRun)}
+        onActivateBlueprint={() => void activateBlueprint()}
+        onOpenCanvasEdit={() => openCanvasEdit()}
+      />
     </div>
   );
 }
