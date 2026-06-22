@@ -3,6 +3,7 @@
 import type { UIMessage } from "ai";
 import { Loader2, Wrench, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "./ChatMarkdown";
 
 const CLIENT_UI_TOOLS = new Set(["offer_edit_handoff", "pin_live_run"]);
 
@@ -103,7 +104,7 @@ export function MessageBubble({
       <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">{assistantName}</div>
       {text && (
         <div className="rounded-[20px] rounded-bl-md border border-white/5 bg-[#1C1C1E] px-4 py-2.5 text-[13px] leading-relaxed text-zinc-100">
-          {text}
+          <ChatMarkdown content={text} />
         </div>
       )}
       {toolParts.map((part, i) => (

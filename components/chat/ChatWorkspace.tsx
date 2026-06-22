@@ -394,36 +394,48 @@ export default function ChatWorkspace() {
     })();
   }, [loadChat, refreshChats]);
 
+  // 1) Resolve activeChatId when mode/chats change — do NOT load messages here
   useEffect(() => {
     const modeChats = chats.filter((c) => c.kind === mode);
+
     if (mode === "helper") {
       const helper = modeChats[0];
       if (helper) {
-        setActiveChatId(helper.id);
-        void loadChat(helper.id);
-      } else if (!helperBootstrapRef.current) {
-        helperBootstrapRef.current = true;
-        void fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ kind: "helper" }),
-        })
-          .then((r) => r.json())
-          .then((json) => {
-            if (json.data?.id) {
-              setActiveChatId(json.data.id);
-              void loadChat(json.data.id);
-            }
-            return refreshChats();
-          });
+        if (activeChatId !== helper.id) {
+          setActiveChatId(helper.id);
+        }
+        return;
       }
+
+      if (helperBootstrapRef.current) return;
+      helperBootstrapRef.current = true;
+
+      void fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "helper" }),
+      })
+        .then((r) => r.json())
+        .then((json) => {
+          if (json.data?.id) {
+            setActiveChatId(json.data.id);
+          }
+          return refreshChats();
+        });
       return;
     }
+
+    // thinkly / brain: pick first chat if none selected
     if (!activeChatId && modeChats.length > 0) {
       setActiveChatId(modeChats[0].id);
-      void loadChat(modeChats[0].id);
     }
-  }, [mode, chats, activeChatId, refreshChats, loadChat]);
+  }, [mode, chats, activeChatId, refreshChats]);
+
+  // 2) Load messages only when activeChatId changes
+  useEffect(() => {
+    if (!activeChatId) return;
+    void loadChat(activeChatId);
+  }, [activeChatId, loadChat]);
 
   async function createThinklyChat() {
     const res = await fetch("/api/chat", {
