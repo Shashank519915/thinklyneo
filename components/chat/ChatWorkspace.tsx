@@ -55,6 +55,31 @@ export const MODE_META: Record<ChatMode, { label: string; api: string; descripti
   },
 };
 
+/**
+ * Extract the most recent propose_blueprint tool output from live client messages.
+ * This means the blueprint shows immediately when the tool call completes on the stream,
+ * without waiting for the DB persist + syncChatFromServer round-trip.
+ */
+function extractBlueprintFromClientMessages(messages: UIMessage[]): Blueprint | null {
+  for (const msg of [...messages].reverse()) {
+    if (msg.role !== "assistant") continue;
+    for (const part of msg.parts) {
+      const toolName =
+        part.type === "dynamic-tool"
+          ? (part as { toolName?: string }).toolName
+          : part.type.startsWith("tool-")
+            ? part.type.replace(/^tool-/, "")
+            : null;
+      if (toolName !== "propose_blueprint") continue;
+      const out = "output" in part ? part.output : null;
+      if (!out) continue;
+      const raw = typeof out === "string" ? (() => { try { return JSON.parse(out) as unknown; } catch { return null; } })() : out;
+      if (raw && typeof raw === "object") return raw as Blueprint;
+    }
+  }
+  return null;
+}
+
 function extractRunFromToolParts(messages: UIMessage[]): ActiveRun | null {
   for (const msg of [...messages].reverse()) {
     if (msg.role !== "assistant") continue;
@@ -172,6 +197,13 @@ export default function ChatWorkspace({ mode }: { mode: ChatMode }) {
   useEffect(() => {
     messagesLengthRef.current = messages.length;
   }, [messages]);
+
+  // Eagerly surface blueprint from live stream — do not wait for DB sync
+  useEffect(() => {
+    if (mode !== "thinkly") return;
+    const bp = extractBlueprintFromClientMessages(messages);
+    if (bp) setActiveBlueprint(bp);
+  }, [mode, messages]);
 
   const refreshWorkflowContext = useCallback(async (workflowId: string, chatId?: string) => {
     if (chatId) {
