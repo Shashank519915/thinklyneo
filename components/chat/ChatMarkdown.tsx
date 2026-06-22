@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Check, Copy } from "lucide-react";
@@ -56,21 +56,35 @@ export function ChatMarkdown({
   isStreaming?: boolean;
 }) {
   const [displayedContent, setDisplayedContent] = useState(content);
+  const lastUpdateRef = useRef(0);
+  const pendingUpdateRef = useRef<string | null>(null);
 
-  useState(() => {
-    // initialize
-    setDisplayedContent(content);
-  });
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isStreaming) {
       setDisplayedContent(content);
       return;
     }
-    const timer = setTimeout(() => {
+
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateRef.current;
+
+    if (timeSinceLastUpdate >= 100) {
       setDisplayedContent(content);
-    }, 80);
-    return () => clearTimeout(timer);
+      lastUpdateRef.current = now;
+      pendingUpdateRef.current = null;
+    } else {
+      pendingUpdateRef.current = content;
+      
+      const timer = setTimeout(() => {
+        if (pendingUpdateRef.current !== null) {
+          setDisplayedContent(pendingUpdateRef.current);
+          lastUpdateRef.current = Date.now();
+          pendingUpdateRef.current = null;
+        }
+      }, 100 - timeSinceLastUpdate);
+
+      return () => clearTimeout(timer);
+    }
   }, [content, isStreaming]);
 
   if (!displayedContent || !displayedContent.trim()) return null;
