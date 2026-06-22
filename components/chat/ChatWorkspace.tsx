@@ -709,7 +709,7 @@ export default function ChatWorkspace() {
             {isStreaming && (
               <div className="flex items-center gap-2 text-xs text-zinc-500">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Streaming…
+                Thinking…
               </div>
             )}
           </div>
