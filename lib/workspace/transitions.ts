@@ -5,7 +5,8 @@ export type WorkspaceTransitionMode =
   | "open"
   | "close"
   | "brain-morph"
-  | "brain-restore";
+  | "brain-restore"
+  | "chat-switch";
 
 /** iOS drawer — morphs on screen */
 const EASE_MORPH = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -34,6 +35,7 @@ export function resolveTransitionMode(
   if (requested !== "default") return requested;
   const from = getWorkspaceNamespace(fromPath);
   const to = getWorkspaceNamespace(toPath);
+  if (from === "chat" && to === "chat") return "chat-switch";
   if (from === "flow" && to === "chat") return "minimize";
   if (from === "chat" && to === "flow") return "restore";
   if (from === "flow" && to === "playground") return "open";
@@ -131,6 +133,20 @@ function getHandoffStyles(mode: WorkspaceTransitionMode): {
   card: HandoffStyle;
   island: HandoffStyle;
 } {
+  if (mode === "chat-switch") {
+    return {
+      card: {
+        opacity: "0",
+        transform: "scale(1) translateY(0px)",
+        filter: "blur(0px)",
+      },
+      island: {
+        opacity: "1",
+        transform: "scale(1) translateY(0px)",
+        filter: "blur(0px)",
+      },
+    };
+  }
   if (mode === "brain-morph") {
     return {
       card: {
@@ -226,6 +242,20 @@ export async function animateWorkspaceLeave(
   const islands = queryIslands(islandRoot ?? cardRoot);
   const islandInners = queryIslandInners(islandRoot ?? cardRoot);
   const handoff = getHandoffStyles(mode);
+
+  if (mode === "chat-switch") {
+    await Promise.all([
+      runAnimation(cards, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 0, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+      ], { duration: 150, easing: "ease-in-out", fill: "forwards" }),
+      runAnimation(islands, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+      ], { duration: 150, easing: "ease-in-out", fill: "forwards" }),
+    ]);
+    return;
+  }
 
   if (mode === "brain-morph") {
     for (const el of islandInners) {
@@ -404,6 +434,23 @@ export async function animateWorkspaceEnter(
   const islands = queryIslands(islandRoot ?? cardRoot);
   const islandInners = queryIslandInners(islandRoot ?? cardRoot);
   const handoff = getHandoffStyles(mode);
+
+  if (mode === "chat-switch") {
+    primeWorkspaceEnter(cardRoot, mode, islandRoot);
+    await Promise.all([
+      runAnimation(cards, [
+        { opacity: 0, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+      ], { duration: 180, easing: "ease-in-out", fill: "forwards" }),
+      runAnimation(islands, [
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+        { opacity: 1, transform: "scale(1) translateY(0px)", filter: "blur(0px)" },
+      ], { duration: 180, easing: "ease-in-out", fill: "forwards" }),
+    ]);
+    settleAnimations([...cards, ...islands]);
+    clearWorkspaceInlineStyles(cardRoot, islandRoot);
+    return;
+  }
 
   if (mode === "brain-restore") {
     for (const el of islandInners) {

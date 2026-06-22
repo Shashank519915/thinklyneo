@@ -835,7 +835,7 @@ export default function WorkflowCanvasPage() {
                     <div className="wf-canvas-chrome inline-flex items-center gap-2 rounded-2xl px-2 py-1.5">
                       <button
                         onClick={() =>
-                          workspaceNavigate(`/chat?brain=${workflowId}`, "brain-restore")
+                          workspaceNavigate(`/chat/brain?brain=${workflowId}`, "brain-restore")
                         }
                         className="inline-flex h-8 flex-shrink-0 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10 px-2.5 text-[11px] font-semibold text-purple-200 transition-colors hover:bg-purple-500/20 wf-canvas-chrome-btn"
                         title="Open Brain chat for this workflow"
