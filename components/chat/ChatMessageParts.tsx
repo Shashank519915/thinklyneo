@@ -32,6 +32,34 @@ export function ToolPartRow({ part }: { part: UIMessage["parts"][number] }) {
   const isRunning = state === "input-streaming" || state === "input-available";
   const isError = state === "output-error";
 
+  if (toolName === "propose_blueprint") {
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-xs",
+          isError && "border-red-500/30 bg-red-500/5",
+        )}
+      >
+        {isRunning ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-purple-400" />
+            <span className="font-medium text-zinc-300">Building blueprint…</span>
+          </>
+        ) : isError ? (
+          <>
+            <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+            <span className="font-medium text-red-300">Blueprint creation failed</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+            <span className="font-medium text-zinc-200">Blueprint proposed ✓</span>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
