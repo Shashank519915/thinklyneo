@@ -12,19 +12,15 @@ const isPublicRoute = createRouteMatcher([
   "/docs(.*)",
 ]);
 
-const clerkHandler = clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
-    await auth.protect();
-  }
-});
+const clerkHandler = process.env.CLERK_SECRET_KEY?.trim()
+  ? clerkMiddleware(async (auth, request) => {
+      if (!isPublicRoute(request)) {
+        await auth.protect();
+      }
+    })
+  : () => NextResponse.next();
 
-/** Skip Clerk when secret is unset (e.g. CI e2e without repo secrets). */
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (!process.env.CLERK_SECRET_KEY?.trim()) {
-    return NextResponse.next();
-  }
-  return clerkHandler(request, event);
-}
+export default clerkHandler;
 
 export const config = {
   matcher: [
