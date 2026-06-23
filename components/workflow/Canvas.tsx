@@ -18,6 +18,8 @@ import {
   useReactFlow,
   useViewport,
   ReactFlowProvider,
+  getNodesBounds,
+  getViewportForBounds,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useWorkflowStore } from "@/store/workflow-store";
@@ -478,7 +480,6 @@ function CanvasInner({
         e.preventDefault();
         const currentNodes = nodes;
         if (currentNodes.length > 0) {
-          const { getNodesBounds, getViewportForBounds } = require("@xyflow/react");
           const bounds = getNodesBounds(currentNodes);
           const leftWidth = sidebarCollapsed ? 76 : 260;
           const rightWidth = isHistoryPanelOpen ? 360 : 0;
@@ -550,7 +551,6 @@ function CanvasInner({
       } else {
         const currentNodes = nodes;
         if (currentNodes.length > 0) {
-          const { getNodesBounds, getViewportForBounds } = require("@xyflow/react");
           const bounds = getNodesBounds(currentNodes);
           const leftWidth = sidebarCollapsed ? 76 : 260;
           const rightWidth = isHistoryPanelOpen ? 360 : 0;
