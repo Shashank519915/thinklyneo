@@ -12,15 +12,14 @@ const isPublicRoute = createRouteMatcher([
   "/docs(.*)",
 ]);
 
-const clerkHandler = process.env.CLERK_SECRET_KEY?.trim()
-  ? clerkMiddleware(async (auth, request) => {
-      if (!isPublicRoute(request)) {
-        await auth.protect();
-      }
-    })
-  : () => NextResponse.next();
-
-export default clerkHandler;
+export default clerkMiddleware(async (auth, request) => {
+  if (!process.env.CLERK_SECRET_KEY?.trim()) {
+    return;
+  }
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
