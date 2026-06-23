@@ -11,13 +11,16 @@ function WorkflowShellInner({ children }: { children: ReactNode }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  const paddingLeft = sidebarCollapsed ? 76 : 260;
+
   return (
     <BarbaWorkspaceProvider wrapperRef={wrapperRef}>
       <WorkspaceIslandProvider>
         <div
           ref={wrapperRef}
           data-barba="wrapper"
-          className="dotted-grid flex h-screen overflow-hidden bg-[#050505] text-foreground"
+          className="dotted-grid flex h-screen overflow-hidden bg-[#050505] text-foreground transition-[padding] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          style={{ paddingLeft }}
         >
           <LeftSidebar
             collapsed={sidebarCollapsed}
