@@ -475,7 +475,25 @@ function CanvasInner({
       }
       // F → fit view
       if (e.key === "f" || e.key === "F") {
-        e.preventDefault(); fitView({ padding: 0.1, duration: 400 }); return;
+        e.preventDefault();
+        const currentNodes = nodes;
+        if (currentNodes.length > 0) {
+          const { getNodesBounds, getViewportForBounds } = require("@xyflow/react");
+          const bounds = getNodesBounds(currentNodes);
+          const leftWidth = sidebarCollapsed ? 76 : 260;
+          const rightWidth = isHistoryPanelOpen ? 360 : 0;
+          const cw = window.innerWidth;
+          const ch = window.innerHeight;
+          const aw = cw - leftWidth - rightWidth;
+          if (aw > 0 && ch > 0) {
+            const vp = getViewportForBounds(bounds, aw, ch, 0.2, 2.5, 0.1);
+            vp.x += leftWidth;
+            setViewport(vp, { duration: 400 });
+            return;
+          }
+        }
+        fitView({ padding: 0.1, duration: 400 });
+        return;
       }
       // S → toggle select mode
       if (e.key === "s" || e.key === "S") {
@@ -530,7 +548,25 @@ function CanvasInner({
       if (saved) {
         setViewport(saved, { duration: 0 });
       } else {
-        fitView({ padding: 0.12, duration: 220 });
+        const currentNodes = nodes;
+        if (currentNodes.length > 0) {
+          const { getNodesBounds, getViewportForBounds } = require("@xyflow/react");
+          const bounds = getNodesBounds(currentNodes);
+          const leftWidth = sidebarCollapsed ? 76 : 260;
+          const rightWidth = isHistoryPanelOpen ? 360 : 0;
+          const cw = window.innerWidth;
+          const ch = window.innerHeight;
+          const aw = cw - leftWidth - rightWidth;
+          if (aw > 0 && ch > 0) {
+            const vp = getViewportForBounds(bounds, aw, ch, 0.2, 2.5, 0.12);
+            vp.x += leftWidth;
+            setViewport(vp, { duration: 220 });
+          } else {
+            fitView({ padding: 0.12, duration: 220 });
+          }
+        } else {
+          fitView({ padding: 0.12, duration: 220 });
+        }
       }
     }, 100);
     return () => window.clearTimeout(t);
@@ -630,16 +666,19 @@ function CanvasInner({
         </button>
       ) : (
         <div className={cn(
-          "absolute bottom-4 z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          "absolute bottom-4 z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]",
           isHistoryPanelOpen ? "right-[376px]" : "right-4"
         )}>
-          <button
-            onClick={() => setMinimapOpen(true)}
-            className="wf-canvas-chrome wf-canvas-chrome-btn flex h-10 w-10 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200"
-            title="Show minimap"
-          >
-            <Map className="w-5 h-5" />
-          </button>
+          <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden flex items-center justify-center">
+            <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+            <button
+              onClick={() => setMinimapOpen(true)}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+              title="Show minimap"
+            >
+              <Map className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
  

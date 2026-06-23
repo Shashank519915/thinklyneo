@@ -22,7 +22,7 @@ import {
   LayoutGrid,
   Move,
 } from "lucide-react";
-import { useReactFlow, useViewport } from "@xyflow/react";
+import { useReactFlow, useViewport, getNodesBounds, getViewportForBounds } from "@xyflow/react";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { useAutoArrange } from "./useAutoArrange";
 import { ShortcutsModal } from "./ShortcutsModal";
@@ -80,11 +80,17 @@ function Tip({
 // ─── ControlsBar ─────────────────────────────────────────────────────────────
 
 /** Canvas HUD reacting to Zoom/Fit/`thinkly:auto-arrange` broadcasts. */
-export default function ControlsBar() {
+export default function ControlsBar({
+  sidebarCollapsed = true,
+  isHistoryPanelOpen = false,
+}: {
+  sidebarCollapsed?: boolean;
+  isHistoryPanelOpen?: boolean;
+}) {
   const [expanded, setExpanded] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  const { fitView } = useReactFlow();
+  const { fitView, getNodes, setViewport } = useReactFlow();
   const { zoomIn, zoomOut } = useReactFlow();
   const { zoom } = useViewport();
 
@@ -102,6 +108,40 @@ export default function ControlsBar() {
     window.addEventListener("thinkly:auto-arrange", handler);
     return () => window.removeEventListener("thinkly:auto-arrange", handler);
   }, [autoArrange]);
+
+  const handleFitView = React.useCallback(() => {
+    const nodes = getNodes();
+    if (nodes.length === 0) return;
+
+    const bounds = getNodesBounds(nodes);
+    const leftWidth = sidebarCollapsed ? 76 : 260;
+    const rightWidth = isHistoryPanelOpen ? 360 : 0;
+
+    const containerWidth = window.innerWidth;
+    const containerHeight = window.innerHeight;
+
+    const availableWidth = containerWidth - leftWidth - rightWidth;
+    const availableHeight = containerHeight;
+
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      fitView({ padding: 0.1, duration: 400 });
+      return;
+    }
+
+    const viewport = getViewportForBounds(
+      bounds,
+      availableWidth,
+      availableHeight,
+      0.2, // minZoom matches Canvas
+      2.5, // maxZoom matches Canvas
+      0.1  // padding
+    );
+
+    // Offset the viewport X by the left sidebar width to center it in the available area
+    viewport.x += leftWidth;
+
+    setViewport(viewport, { duration: 400 });
+  }, [getNodes, sidebarCollapsed, isHistoryPanelOpen, setViewport, fitView]);
 
   const zoomPct = Math.round(zoom * 100);
 
@@ -208,7 +248,7 @@ export default function ControlsBar() {
           {/* Fit view */}
           <Tip label="Fit view" shortcut="F">
             <button
-              onClick={() => fitView({ padding: 0.1, duration: 400 })}
+              onClick={handleFitView}
               className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
             >
               <Maximize2 className="h-3.5 w-3.5" />
