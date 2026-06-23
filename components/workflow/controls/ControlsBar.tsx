@@ -9,7 +9,7 @@
  *  - ShortcutsModal   — keyboard cheat-sheet modal   (./ShortcutsModal)
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ChevronRight,
   ChevronLeft,
@@ -109,7 +109,7 @@ export default function ControlsBar({
     return () => window.removeEventListener("thinkly:auto-arrange", handler);
   }, [autoArrange]);
 
-  const handleFitView = React.useCallback(() => {
+  const handleFitView = useCallback(() => {
     const nodes = getNodes();
     if (nodes.length === 0) return;
 
