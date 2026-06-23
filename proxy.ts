@@ -12,25 +12,24 @@ const isPublicRoute = createRouteMatcher([
   "/docs(.*)",
 ]);
 
-export default clerkMiddleware(
-  async (auth, request) => {
-    // If running in an environment without real keys (e.g. CI), bypass auth completely
-    if (!process.env.CLERK_SECRET_KEY?.trim()) {
-      return NextResponse.next();
-    }
+// In CI/E2E environments where secrets are missing, we inject a dummy key 
+// so `clerkMiddleware` doesn't crash on initialization.
+const isMissingKey = !process.env.CLERK_SECRET_KEY?.trim();
+if (isMissingKey) {
+  process.env.CLERK_SECRET_KEY = "sk_test_dummyKeyForCI123456789";
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY = "pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA";
+}
 
-    if (!isPublicRoute(request)) {
-      await auth.protect();
-    }
-  },
-  {
-    // Provide a fallback dummy key to prevent Clerk from throwing on initialization in CI
-    secretKey: process.env.CLERK_SECRET_KEY || "sk_test_dummyKeyForCI123456789",
-    publishableKey:
-      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
-      "pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA",
+export default clerkMiddleware(async (auth, request) => {
+  // If running in an environment without real keys (e.g. CI), bypass auth completely
+  if (isMissingKey) {
+    return NextResponse.next();
   }
-);
+
+  if (!isPublicRoute(request)) {
+    await auth.protect();
+  }
+});
 
 export const config = {
   matcher: [
