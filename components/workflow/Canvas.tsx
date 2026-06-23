@@ -509,7 +509,7 @@ function CanvasInner({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, fitView, selectModeActive, setSelectModeActive, nodes, edges, selectedNodeIds, setNodes, setEdges, pushHistory, setSelectedNodeIds]);
+  }, [undo, redo, fitView, selectModeActive, setSelectModeActive, nodes, edges, selectedNodeIds, setNodes, setEdges, pushHistory, setSelectedNodeIds, sidebarCollapsed, isHistoryPanelOpen, setViewport]);
 
   useEffect(() => {
     fittedWorkflowRef.current = null;
@@ -688,7 +688,10 @@ function CanvasInner({
           "absolute bottom-4 z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
           sidebarCollapsed ? "left-[92px]" : "left-[276px]"
         )}>
-          <ControlsBar />
+          <ControlsBar
+            sidebarCollapsed={sidebarCollapsed}
+            isHistoryPanelOpen={isHistoryPanelOpen}
+          />
         </div>
       )}
  
