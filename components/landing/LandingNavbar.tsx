@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { useLandingNavigate } from "./LandingPage";
 import { motion, AnimatePresence } from "motion/react";
+import Link from "next/link";
 
 export function LandingNavbar() {
   const { isSignedIn } = useAuth();
@@ -36,7 +37,7 @@ export function LandingNavbar() {
           className="flex h-14 items-center justify-between rounded-full bg-black/60 px-6 backdrop-blur-2xl ring-1 ring-white/10 shadow-[0_8px_32px_-4px_rgba(0,0,0,0.5)] w-[calc(100vw-3rem)] md:w-max min-w-[300px] gap-8"
         >
           {/* Logo */}
-          <a
+          <Link
             href="/"
             onClick={(e) => handleLink(e, "/")}
             className="flex items-center gap-2 group cursor-pointer shrink-0"
@@ -47,7 +48,7 @@ export function LandingNavbar() {
             <span className="font-sans text-sm font-medium tracking-tight text-white select-none">
               Thinkly
             </span>
-          </a>
+          </Link>
 
           {/* Desktop Links */}
           <div className="hidden md:flex items-center gap-6">
@@ -77,13 +78,13 @@ export function LandingNavbar() {
                 </button>
               ) : (
                 <>
-                  <a
+                  <Link
                     href="/sign-in"
                     onClick={(e) => handleLink(e, "/sign-in")}
                     className="text-xs font-medium text-zinc-400 hover:text-white transition-colors duration-300"
                   >
                     Log in
-                  </a>
+                  </Link>
                   <button
                     onClick={(e) => handleLink(e, "/sign-up")}
                     className="group relative inline-flex h-8 items-center justify-center rounded-full bg-white px-4 text-xs font-medium text-black hover:bg-zinc-200 transition-colors duration-300 overflow-hidden active:scale-[0.98]"

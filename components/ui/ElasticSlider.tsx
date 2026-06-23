@@ -95,6 +95,9 @@ const Slider: React.FC<SliderProps> = ({
   const overflow = useMotionValue(0);
   const scale = useMotionValue(1);
 
+  const leftX = useTransform(() => (region === 'left' ? -overflow.get() / scale.get() : 0));
+  const rightX = useTransform(() => (region === 'right' ? overflow.get() / scale.get() : 0));
+
   useEffect(() => {
     if (!isControlled) {
       setLocalValue(defaultValue);
@@ -176,7 +179,7 @@ const Slider: React.FC<SliderProps> = ({
               transition: { duration: 0.25 }
             }}
             style={{
-              x: useTransform(() => (region === 'left' ? -overflow.get() / scale.get() : 0))
+              x: leftX
             }}
           >
             {leftIcon}
@@ -234,7 +237,7 @@ const Slider: React.FC<SliderProps> = ({
               transition: { duration: 0.25 }
             }}
             style={{
-              x: useTransform(() => (region === 'right' ? overflow.get() / scale.get() : 0))
+              x: rightX
             }}
           >
             {rightIcon}
