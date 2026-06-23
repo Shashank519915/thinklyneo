@@ -25,24 +25,28 @@ export default function SignUpPage() {
         <SignUp
           appearance={{
             variables: {
-              colorPrimary: "#7C3AED",
-              colorBackground: "#FFFFFF",
-              colorInputBackground: "#F5F5F5",
-              colorInputText: "#111827",
-              colorText: "#111827",
-              colorTextSecondary: "#6B7280",
+              colorPrimary: "#ffffff",
+              colorBackground: "#0A0A0A",
+              colorInputBackground: "#111111",
+              colorInputText: "#ffffff",
+              colorText: "#ffffff",
+              colorTextSecondary: "#888888",
               borderRadius: "12px",
-              fontFamily: "Inter, system-ui, sans-serif",
+              fontFamily: "var(--font-sans), sans-serif",
             },
             elements: {
-              card: "shadow-xl border border-gray-200 rounded-xl",
-              headerTitle: "text-gray-900 font-semibold",
-              headerSubtitle: "text-gray-500",
+              card: "shadow-2xl border border-white/10 bg-[#0A0A0A] rounded-xl",
+              headerTitle: "text-white font-medium tracking-tight",
+              headerSubtitle: "text-zinc-500",
               formButtonPrimary:
-                "bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium",
+                "bg-white hover:bg-zinc-200 text-black font-medium active:scale-97 transition-transform duration-100",
               formFieldInput:
-                "border border-gray-200 bg-[#F5F5F5] rounded-lg text-gray-900",
-              footerActionLink: "text-[#7C3AED] hover:text-[#6D28D9]",
+                "border border-white/10 bg-[#111111] rounded-lg text-white focus:border-white/30",
+              footerActionLink: "text-white hover:text-zinc-300 font-medium",
+              dividerLine: "bg-white/10",
+              dividerText: "text-zinc-600",
+              socialButtonsBlockButton: "border border-white/10 bg-[#111111] hover:bg-white/5 text-white active:scale-97 transition-transform duration-100",
+              socialButtonsBlockButtonText: "text-white font-medium",
             },
           }}
         />

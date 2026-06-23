@@ -42,6 +42,7 @@ interface RunHistoryItem {
 
 interface RightHistoryPanelProps {
   workflowId: string;
+  isOpen: boolean;
 }
 
 /**
@@ -205,7 +206,7 @@ function RunItem({
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 /** Sidebar listing `/api/workflows/:id/history` + synthetic in-flight run mirrored from workflow store state. */
-export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps) {
+export default function RightHistoryPanel({ workflowId, isOpen }: RightHistoryPanelProps) {
   const {
     setIsHistoryPanelOpen,
     runHistory,
@@ -281,12 +282,26 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
   });
 
   return (
-    <div className="flex-shrink-0 relative h-full">
-      <div className="h-full min-h-0 w-[360px] border-l border-white/[0.08] bg-[#08080A]">
-        <div className="flex h-full min-h-0 flex-col">
+    <div
+      className="absolute right-0 top-0 bottom-0 z-40 flex flex-col transition-[width,padding,opacity] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden pointer-events-none"
+      style={{
+        width: isOpen ? 360 : 0,
+        padding: isOpen ? 12 : 0,
+        opacity: isOpen ? 1 : 0,
+      }}
+    >
+      {/* Outer Bezel (matches LeftSidebar outer style) */}
+      <div className="flex flex-col h-full rounded-[2rem] p-1.5 border border-white/10 bg-white/[0.02] backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)] w-[336px] relative pointer-events-auto">
+        
+        {/* Inner Core Bezel (matches LeftSidebar inner style) */}
+        <div className="rounded-[calc(2rem-6px)] bg-[#0A0A0C]/90 border border-white/5 flex flex-col h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] relative overflow-hidden w-full">
+          {/* CSS Film Grain Noise overlay */}
+          <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+          
+          <div className="flex h-full min-h-0 flex-col relative z-10">
 
-          {/* Sticky header */}
-          <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-[#0A0A0C] p-4">
+            {/* Sticky header */}
+          <div className="sticky top-0 z-10 border-b border-white/[0.08] bg-[#0A0A0C]/90 backdrop-blur-md p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm font-semibold text-zinc-100">Execution History</div>
               <button
@@ -383,6 +398,7 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
           </div>
         </div>
       </div>
+    </div>
 
       {detailsRun && (
         <RunDetailsModal

@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   },
 };
 
+import ClickSpark from "@/components/ui/ClickSpark";
+
 /**
  * Wraps the entire app with `ClerkProvider` and shared typography/background tokens.
  *
@@ -39,8 +41,16 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={`${inter.variable} h-full antialiased`}>
-        <body className="min-h-full bg-[#F5F5F5] text-gray-900">
-          {children}
+        <body className="min-h-full bg-[#050505] text-white">
+          <ClickSpark
+            sparkColor="#7C3AED"
+            sparkSize={8}
+            sparkRadius={14}
+            sparkCount={8}
+            duration={350}
+          >
+            {children}
+          </ClickSpark>
         </body>
       </html>
     </ClerkProvider>

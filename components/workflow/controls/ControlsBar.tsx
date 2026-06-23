@@ -109,13 +109,16 @@ export default function ControlsBar() {
     return (
       <>
         <Tip label="Expand controls">
-          <div className="wf-canvas-chrome flex items-center rounded-xl px-1 py-1 md:px-2 md:py-1.5">
-            <button
-              onClick={() => setExpanded(true)}
-              className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+          <div className="p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]">
+            <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1.5 flex items-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+              <button
+                onClick={() => setExpanded(true)}
+                className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
         </Tip>
         {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}
@@ -125,114 +128,117 @@ export default function ControlsBar() {
 
   return (
     <>
-      <div className="wf-canvas-chrome flex items-center gap-0.5 rounded-xl md:gap-1 px-1 py-1 md:px-2 md:py-1.5">
+      <div className="p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]">
+        <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1 md:py-1.5 flex items-center gap-0.5 md:gap-1 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
+          <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
 
-        {/* Collapse */}
-        <Tip label="Collapse" side="top-left">
-          <button
-            onClick={() => setExpanded(false)}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Collapse */}
+          <Tip label="Collapse" side="top-left">
+            <button
+              onClick={() => setExpanded(false)}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10 relative z-10" />
 
-        {/* Undo */}
-        <Tip label="Undo" shortcut="⌘Z">
-          <button
-            onClick={undo}
-            disabled={undoStack.length === 0}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
-          >
-            <Undo2 className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Undo */}
+          <Tip label="Undo" shortcut="⌘Z">
+            <button
+              onClick={undo}
+              disabled={undoStack.length === 0}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
+            >
+              <Undo2 className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        {/* Redo */}
-        <Tip label="Redo" shortcut="⌘⇧Z">
-          <button
-            onClick={redo}
-            disabled={redoStack.length === 0}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
-          >
-            <Redo2 className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Redo */}
+          <Tip label="Redo" shortcut="⌘⇧Z">
+            <button
+              onClick={redo}
+              disabled={redoStack.length === 0}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100 disabled:cursor-not-allowed disabled:text-zinc-700"
+            >
+              <Redo2 className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        {/* Keyboard shortcuts */}
-        <Tip label="Keyboard shortcuts">
-          <button
-            onClick={() => setShowShortcuts(true)}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <Command className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Keyboard shortcuts */}
+          <Tip label="Keyboard shortcuts">
+            <button
+              onClick={() => setShowShortcuts(true)}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <Command className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10 relative z-10" />
 
-        {/* Zoom out */}
-        <Tip label="Zoom out" shortcut="−">
-          <button
-            onClick={() => zoomOut({ duration: 200 })}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Zoom out */}
+          <Tip label="Zoom out" shortcut="−">
+            <button
+              onClick={() => zoomOut({ duration: 200 })}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        {/* Zoom % */}
-        <span className="min-w-[36px] select-none text-center text-xs font-medium tabular-nums text-zinc-500 md:min-w-[44px]">
-          {zoomPct}%
-        </span>
+          {/* Zoom % */}
+          <span className="min-w-[36px] select-none text-center text-xs font-medium tabular-nums text-zinc-500 md:min-w-[44px] relative z-10">
+            {zoomPct}%
+          </span>
 
-        {/* Zoom in */}
-        <Tip label="Zoom in" shortcut="+">
-          <button
-            onClick={() => zoomIn({ duration: 200 })}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Zoom in */}
+          <Tip label="Zoom in" shortcut="+">
+            <button
+              onClick={() => zoomIn({ duration: 200 })}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        <div className="mx-0.5 h-5 w-px bg-white/10" />
+          <div className="mx-0.5 h-5 w-px bg-white/10 relative z-10" />
 
-        {/* Fit view */}
-        <Tip label="Fit view" shortcut="F">
-          <button
-            onClick={() => fitView({ padding: 0.1, duration: 400 })}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <Maximize2 className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Fit view */}
+          <Tip label="Fit view" shortcut="F">
+            <button
+              onClick={() => fitView({ padding: 0.1, duration: 400 })}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        {/* Auto-arrange */}
-        <Tip label="Auto-arrange" shortcut="⇧A">
-          <button
-            onClick={autoArrange}
-            className="wf-canvas-chrome-btn rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-          </button>
-        </Tip>
+          {/* Auto-arrange */}
+          <Tip label="Auto-arrange" shortcut="⇧A">
+            <button
+              onClick={autoArrange}
+              className="wf-canvas-chrome-btn relative z-10 rounded-lg p-2 text-zinc-400 transition-colors hover:text-zinc-100"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+          </Tip>
 
-        {/* Select mode */}
-        <Tip label={selectModeActive ? "Exit select mode" : "Select mode"} shortcut="S" side="top-right">
-          <button
-            onClick={() => setSelectModeActive(!selectModeActive)}
-            className={`p-2 rounded-lg transition-colors ${
-              selectModeActive
-                ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
-                : "wf-canvas-chrome-btn text-zinc-400 hover:text-zinc-100"
-            }`}
-          >
-            <SelectModeIcon active={selectModeActive} />
-          </button>
-        </Tip>
+          {/* Select mode */}
+          <Tip label={selectModeActive ? "Exit select mode" : "Select mode"} shortcut="S" side="top-right">
+            <button
+              onClick={() => setSelectModeActive(!selectModeActive)}
+              className={`p-2 rounded-lg transition-colors relative z-10 ${
+                selectModeActive
+                  ? "bg-[#7C3AED] text-white hover:bg-[#6D28D9]"
+                  : "wf-canvas-chrome-btn text-zinc-400 hover:text-zinc-100"
+              }`}
+            >
+              <SelectModeIcon active={selectModeActive} />
+            </button>
+          </Tip>
+        </div>
       </div>
 
       {showShortcuts && <ShortcutsModal onClose={() => setShowShortcuts(false)} />}

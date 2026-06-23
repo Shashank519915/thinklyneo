@@ -1,15 +1,22 @@
 /**
- * @fileoverview Root route (`/`): server redirect so authenticated users land on the workflow list
- * without a separate marketing homepage (assignment routing model).
+ * @fileoverview Root route (`/`): renders a premium landing page for public users
+ * or redirects authenticated users directly to the dashboard.
  */
 
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { LandingPage } from "@/components/landing/LandingPage";
 
 /**
- * Server component entry for `/`; immediately sends browsers to `/dashboard`.
- *
- * @returns Never returns — `redirect` throws internally in Next.js.
+ * Server component entry for `/`; checks Clerk auth and either redirects to `/dashboard`
+ * or shows the marketing landing page.
  */
-export default function Home() {
-  redirect("/dashboard");
+export default async function Home() {
+  const { userId } = await auth();
+
+  if (userId) {
+    redirect("/dashboard");
+  }
+
+  return <LandingPage />;
 }

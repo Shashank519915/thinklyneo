@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import type { Edge, Node, NodeProps } from "@xyflow/react";
-import GenericNode from "@/components/workflow/nodes/GenericNode";
+import GenericNode from "@/components/workflow/nodes/generic/GenericNode";
 import { ReactFlowTestWrapper } from "./helpers/react-flow-wrapper";
 
 const baseNodes: Node[] = [

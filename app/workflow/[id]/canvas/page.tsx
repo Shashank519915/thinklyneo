@@ -798,7 +798,7 @@ export default function WorkflowCanvasPage() {
         };
 
   return (
-    <div className="wf-canvas-shell flex h-screen overflow-hidden bg-[#050505]">
+    <div className="wf-canvas-shell relative flex h-screen overflow-hidden bg-[#050505]">
       <WorkflowSaveToast
         phase={savePhase}
         enterCycle={saveToastCycle}
@@ -826,174 +826,167 @@ export default function WorkflowCanvasPage() {
             </div>
           ) : (
             <div className="workflow-page-canvas-enter flex flex-1 min-h-0 flex-col relative overflow-hidden">
-              <Canvas />
+              <Canvas sidebarCollapsed={sidebarCollapsed} />
 
               {/* Floating top-left panel */}
-              <div className="pointer-events-none absolute left-4 top-[11px] z-50">
-                <div className="pointer-events-auto flex flex-col gap-2">
-                  <div className="inline-flex items-center gap-2">
-                    <div className="wf-canvas-chrome inline-flex items-center gap-2 rounded-2xl px-2 py-1.5">
-                      <button
-                        onClick={() =>
-                          workspaceNavigate(`/chat/brain?brain=${workflowId}`, "brain-restore")
-                        }
-                        className="inline-flex h-8 flex-shrink-0 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10 px-2.5 text-[11px] font-semibold text-purple-200 transition-colors hover:bg-purple-500/20 wf-canvas-chrome-btn"
-                        title="Open Brain chat for this workflow"
-                      >
-                        Brain
-                      </button>
-                      <button
-                        onClick={() => router.push(`/workflow/${workflowId}`)}
-                        className="wf-canvas-chrome-btn inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
-                        title="Back to Workflow Details"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      </button>
-                      <input
-                        ref={nameInputRef}
-                        placeholder="Untitled"
-                        maxLength={120}
-                        value={isEditingName ? editNameValue : workflowName}
-                        onChange={(e) => setEditNameValue(e.target.value)}
-                        onFocus={() => { setIsEditingName(true); setEditNameValue(workflowName); }}
-                        onBlur={handleNameSave}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleNameSave();
-                          if (e.key === "Escape") { setEditNameValue(workflowName); setIsEditingName(false); }
-                        }}
-                        className="h-8 w-[120px] bg-transparent text-[14px] font-normal text-zinc-100 outline-none placeholder:text-zinc-600 sm:w-[160px]"
-                      />
-                    </div>
+              <div className={cn(
+                "pointer-events-none absolute top-4 z-50 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                sidebarCollapsed ? "left-[92px]" : "left-[276px]"
+              )}>
+                <div className="pointer-events-auto flex items-center p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]">
+                  <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1.5 flex items-center gap-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden">
+                    <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+                    <button
+                      onClick={() =>
+                        workspaceNavigate(`/chat/brain?brain=${workflowId}`, "brain-restore")
+                      }
+                      className="relative z-10 inline-flex h-8 flex-shrink-0 items-center justify-center rounded-xl border border-purple-500/30 bg-purple-500/10 px-2.5 text-[11px] font-semibold text-purple-200 transition-colors hover:bg-purple-500/20 wf-canvas-chrome-btn"
+                      title="Open Brain chat for this workflow"
+                    >
+                      Brain
+                    </button>
+                    <button
+                      onClick={() => router.push(`/workflow/${workflowId}`)}
+                      className="wf-canvas-chrome-btn relative z-10 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-colors hover:bg-white/[0.08] hover:text-zinc-100"
+                      title="Back to Workflow Details"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+                    </button>
+                    <input
+                      ref={nameInputRef}
+                      placeholder="Untitled"
+                      maxLength={120}
+                      value={isEditingName ? editNameValue : workflowName}
+                      onChange={(e) => setEditNameValue(e.target.value)}
+                      onFocus={() => { setIsEditingName(true); setEditNameValue(workflowName); }}
+                      onBlur={handleNameSave}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleNameSave();
+                        if (e.key === "Escape") { setEditNameValue(workflowName); setIsEditingName(false); }
+                      }}
+                      className="relative z-10 h-8 w-[80px] sm:w-[120px] lg:w-[160px] bg-transparent text-[14px] font-normal text-zinc-100 outline-none placeholder:text-zinc-600 transition-all duration-300"
+                    />
                   </div>
                 </div>
               </div>
 
-              {/* Floating top-right */}
-              <div className="absolute top-[11px] right-4 z-10 flex items-start gap-2 pointer-events-auto">
-                <div className="flex items-center gap-2">
-                  {viewingPillPhase !== "hidden" && (
-                    <span className={cn("inline-flex max-w-[min(100vw-8rem,18rem)] sm:max-w-none", viewingPillPhase === "leaving" ? "wf-viewing-pill--leave" : "wf-viewing-pill--enter")}>
-                      {viewingPillVisual.isRunning ? (
-                        <button
-                          type="button"
-                          title="Click to reconnect to live run stream"
-                          onClick={() => restoreLiveRun({ force: true })}
-                          className="wf-canvas-chrome inline-flex h-7 max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-200 backdrop-blur transition-colors hover:border-indigo-400/30 hover:bg-indigo-500/10"
-                        >
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />
-                          <span className="shrink-0">Viewing live run</span>
-                          <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
-                            {viewingPillVisual.currentRunId
-                              ? viewingPillVisual.currentRunId.length > 14
-                                ? `${viewingPillVisual.currentRunId.slice(0, 8)}…`
-                                : viewingPillVisual.currentRunId
-                              : "…"}
-                          </span>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-indigo-400" aria-hidden><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-                        </button>
-                      ) : (
-                        <span className="wf-canvas-chrome inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-200 backdrop-blur">
-                          <span className="shrink-0">Viewing run</span>
-                          <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
-                            {viewingPillVisual.previewRunId && viewingPillVisual.previewRunId.length > 14
-                              ? `${viewingPillVisual.previewRunId.slice(0, 8)}…`
-                              : viewingPillVisual.previewRunId}
-                          </span>
-                          {viewingPillVisual.previewRunTimestamp && (
-                            <span className="hidden shrink-0 font-normal text-zinc-500 sm:inline">
-                              · {formatRelativeTime(viewingPillVisual.previewRunTimestamp)}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                  <span className="hidden sm:inline-flex">
-                    <span className="wf-canvas-chrome inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-300 backdrop-blur">
+              {/* Floating top-right panel */}
+              <div className={cn(
+                "absolute top-4 z-50 flex items-center gap-2 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                isHistoryPanelOpen ? "right-[376px]" : "right-4"
+              )}>
+                {/* Stats plate (Est, Bal) — hidden on smaller laptops/viewports to prevent Dynamic Island overlap */}
+                <div className="pointer-events-auto hidden xl:flex items-center p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]">
+                  <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1.5 flex items-center gap-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-hidden h-9">
+                    <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+                    
+                    <span className="relative z-10 inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-300">
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>
                       <span className="text-zinc-500">Est</span>
                       <span className="tabular-nums">~{estimateWorkflowCostDisplay()}</span>
                       <span className="text-zinc-500">M</span>
                     </span>
-                  </span>
 
-                  <span className="hidden sm:inline-flex">
-                    <span className="wf-canvas-chrome inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium text-zinc-300 backdrop-blur">
+                    <div className="h-4 w-px bg-white/10 relative z-10" />
+
+                    <span className="relative z-10 inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-300">
                       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
                       <span className="text-zinc-500">Bal</span>
                       <span className="tabular-nums">{balance !== null ? (balance / 1000000).toFixed(2) : "0.00"}</span>
                       <span className="text-zinc-500">M</span>
                     </span>
-                  </span>
+                  </div>
                 </div>
 
-                <div className="flex flex-col items-center gap-1">
-                  <div className="flex items-center gap-1">
-                    <div className="group relative">
-                      <button
-                        type="button"
-                        onClick={() => !isRunning && runWorkflow("full")}
-                        disabled={isRunning}
-                        className={`flex h-8 w-9 items-center justify-center rounded-lg border shadow-sm transition-all ${
-                          isRunning 
-                            ? "border-[#818cf8] bg-[#818cf8] text-white/90 cursor-not-allowed" 
-                            : "border-[#6366f1] bg-[#6366f1] text-white hover:bg-[#4f46e5] hover:border-[#4f46e5]"
-                        }`}
-                      >
-                        {isRunning ? (
-                          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                {/* Control buttons plate */}
+                <div className="pointer-events-auto flex items-center p-[4px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)]">
+                  <div className="relative rounded-[calc(1rem-4px)] bg-[#0A0A0C]/90 border border-white/5 px-2 py-1.5 flex items-center gap-1.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] overflow-visible h-9">
+                    <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+                    
+                    {viewingPillPhase !== "hidden" && (
+                      <span className={cn("relative z-10 inline-flex max-w-[min(100vw-8rem,18rem)] sm:max-w-none", viewingPillPhase === "leaving" ? "wf-viewing-pill--leave" : "wf-viewing-pill--enter")}>
+                        {viewingPillVisual.isRunning ? (
+                          <button
+                            type="button"
+                            title="Click to reconnect to live run stream"
+                            onClick={() => restoreLiveRun({ force: true })}
+                            className="inline-flex h-7 max-w-full min-w-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium text-zinc-200 border border-indigo-500/20 bg-indigo-500/10 transition-colors hover:border-indigo-400/30 hover:bg-indigo-500/20"
+                          >
+                            <span className="h-2 w-2 shrink-0 rounded-full bg-[#6366f1] animate-pulse" aria-hidden />
+                            <span className="shrink-0">Viewing live run</span>
+                            <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
+                              {viewingPillVisual.currentRunId
+                                ? viewingPillVisual.currentRunId.length > 14
+                                  ? `${viewingPillVisual.currentRunId.slice(0, 8)}…`
+                                  : viewingPillVisual.currentRunId
+                                : "…"}
+                            </span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-indigo-400" aria-hidden><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                          </button>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                          <span className="inline-flex h-7 max-w-full min-w-0 items-center gap-1.5 rounded-lg px-2 text-[11px] font-medium text-zinc-200 bg-white/[0.04] border border-white/[0.08]">
+                            <span className="shrink-0">Viewing run</span>
+                            <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500">
+                              {viewingPillVisual.previewRunId && viewingPillVisual.previewRunId.length > 14
+                                ? `${viewingPillVisual.previewRunId.slice(0, 8)}…`
+                                : viewingPillVisual.previewRunId}
+                            </span>
+                            {viewingPillVisual.previewRunTimestamp && (
+                              <span className="hidden shrink-0 font-normal text-zinc-500 sm:inline">
+                                · {formatRelativeTime(viewingPillVisual.previewRunTimestamp)}
+                              </span>
+                            )}
+                          </span>
                         )}
-                      </button>
-                      <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                        {isRunning ? "Running..." : "Run Workflow"}
                       </span>
-                    </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => !isRunning && runWorkflow("full")}
+                      disabled={isRunning}
+                      className={`relative z-10 flex h-7 w-8 items-center justify-center rounded-lg border shadow-sm transition-all ${
+                        isRunning 
+                          ? "border-[#818cf8] bg-[#818cf8] text-white/90 cursor-not-allowed" 
+                          : "border-[#6366f1] bg-[#6366f1] text-white hover:bg-[#4f46e5] hover:border-[#4f46e5]"
+                      }`}
+                    >
+                      {isRunning ? (
+                        <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                      )}
+                    </button>
 
                     {isRunning && (
-                      <div className="group relative animate-in fade-in slide-in-from-right-2 duration-300">
-                        <button
-                          type="button"
-                          onClick={handleCancelRun}
-                          className="flex h-8 w-9 items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-100"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
-                        </button>
-                        <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                          Cancel Run
-                        </span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCancelRun}
+                        className="relative z-10 flex h-7 w-8 items-center justify-center rounded-lg border border-red-500/30 bg-red-500/10 text-red-400 shadow-sm transition-all hover:bg-red-500/20"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                      </button>
                     )}
-                  </div>
-                  {isHistoryPanelOpen ? importExportButtons : null}
-                </div>
 
-                {!isHistoryPanelOpen && (
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="group relative">
+                    {!isHistoryPanelOpen && (
                       <button
                         type="button"
                         onClick={() => setIsHistoryPanelOpen(true)}
-                        className="wf-canvas-chrome wf-canvas-chrome-btn flex h-8 w-9 items-center justify-center rounded-lg text-zinc-300 transition-all hover:text-zinc-100"
+                        className="relative z-10 flex h-7 w-8 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-zinc-300 transition-all hover:bg-white/[0.08] hover:text-zinc-100"
+                        title="Execution History"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       </button>
-                      <span className="pointer-events-none absolute right-0 top-full z-50 mt-2 hidden whitespace-nowrap rounded-md bg-gray-900 px-2 py-1 text-[11px] font-medium text-white shadow-md group-hover:block">
-                        Execution History
-                      </span>
-                    </div>
+                    )}
                     {importExportButtons}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {isHistoryPanelOpen && (
-          <RightHistoryPanel workflowId={workflowId} />
-        )}
+        <RightHistoryPanel workflowId={workflowId} isOpen={isHistoryPanelOpen} />
       </div>
 
       {orchestratorState && (

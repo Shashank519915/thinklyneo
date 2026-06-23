@@ -5,35 +5,29 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { type NodeProps } from "@xyflow/react";
+import BorderGlow from "@/components/ui/BorderGlow";
 import {
   Plus,
   Info,
-  Pencil,
-  Trash2,
-  GripVertical,
-  Upload,
-  X,
-  Maximize2,
-  Copy,
+  ChevronDown,
+  AlignLeft,
   Hash,
   Check,
   Image,
   Music,
   Video,
   FileText,
-  AlignLeft,
-  ChevronDown,
 } from "lucide-react";
 import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/workflow-store";
 import TextExpandModal from "../TextExpandModal";
 import { sanitizeError } from "@/lib/utils";
-import { UploadPopup } from "./UploadPopup";
 import { uploadFilesViaApi } from "@/lib/upload";
 import { getNodeRunBorderClass } from "@/lib/node-run-chrome";
 import { syncLinkedTargetInputFromField } from "@/lib/promoted-input-value";
-import { maxAssetsForField } from "@/lib/request-inputs";
 import { removeRequestFieldAndEdges } from "@/lib/promote-to-request";
+import { maxAssetsForField } from "@/lib/request-inputs";
+import { RequestInputFieldItem } from "./requestInputs/RequestInputFieldItem";
 
 interface RequestInputsData {
   label: string;
@@ -44,6 +38,7 @@ interface RequestInputsData {
 export default function RequestInputsNode({
   id,
   data,
+  selected = false,
 }: NodeProps) {
   const nodeData = data as unknown as RequestInputsData;
   const { updateNodeData, readOnly, nodes, edges, setNodes, setEdges } = useWorkflowStore();
@@ -259,94 +254,105 @@ export default function RequestInputsNode({
   };
 
   return (
-    <div
-      className={`wf-node-card w-[380px] rounded-xl border overflow-visible transition-all ${getNodeRunBorderClass(
-        {
-          isDimmed,
-          isExecuting,
-          hasError: !!error,
-          isRunPending,
-        }
-      )} ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
-      style={{ minWidth: 380 }}
+    <BorderGlow
+      selected={selected}
+      nodeColor="requestInputs"
+      borderRadius={20}
+      glowIntensity={0.85}
+      fillOpacity={0.15}
     >
+      <div
+        className={`wf-node-card w-[380px] rounded-[1.25rem] bg-white/[0.03] border border-white/5 p-[5px] backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-white/10 overflow-visible ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+        style={{ minWidth: 380, overflow: "visible" }}
+      >
+      <div
+        className={`w-full h-full rounded-[calc(1.25rem-5px)] bg-[#0A0A0A] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] border transition-all duration-300 ${getNodeRunBorderClass(
+          {
+            isDimmed,
+            isExecuting,
+            hasError: !!error,
+            isRunPending,
+          }
+        )}`}
+        style={{ overflow: "visible" }}
+      >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[14px] font-medium text-gray-900">
-            Request-Inputs
+      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3.5">
+        <div className="flex items-center gap-2">
+          <span className="cursor-grab select-none text-[15px] font-semibold tracking-wide text-zinc-100 uppercase font-mono leading-none">
+            Requests
           </span>
-          <div className="group/tip relative">
-            <Info className="w-3.5 h-3.5 text-gray-400 cursor-default" />
-            <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[280px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/tip:block">
+          <div className="group/tip relative shrink-0">
+            <Info className="w-3.5 h-3.5 text-zinc-500 hover:text-zinc-300 cursor-default transition-colors" />
+            <div className="pointer-events-none absolute left-1/2 top-full z-[9999] mt-1.5 hidden w-max max-w-[280px] -translate-x-1/2 rounded-lg border border-white/10 bg-[#0A0A0C] px-3 py-2 text-[11px] font-normal leading-relaxed text-zinc-300 shadow-xl group-hover/tip:block backdrop-blur-md">
               Define the input fields for your workflow. These become the request parameters when running via Playground or API.
             </div>
           </div>
         </div>
         
         {!readOnly && (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 ml-3">
             {/* Add field dropdown */}
             <div className="relative group/add">
-              <button className="nodrag flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-[#F5F5F5] text-gray-500 hover:bg-gray-100">
+              <button className="nodrag flex h-8 w-8 items-center justify-center rounded-lg border border-white/5 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 transition-colors">
                 <Plus className="w-4 h-4" />
               </button>
               <div className="pointer-events-none group-hover/add:pointer-events-auto absolute right-0 top-full pt-1 hidden group-hover/add:block z-50 min-w-[140px]">
-                <div className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden py-1 min-w-[140px]">
+                <div className="bezel-container border border-white/10 rounded-xl bg-[#0A0A0C]/95 backdrop-blur-md shadow-2xl overflow-hidden py-1 min-w-[140px]">
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("text_field")}
                   >
-                    <AlignLeft className="w-3.5 h-3.5 text-gray-400" />
+                    <AlignLeft className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Text</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("number_field")}
                   >
-                    <Hash className="w-3.5 h-3.5 text-gray-400" />
+                    <Hash className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Number</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("boolean_field")}
                   >
-                    <Check className="w-3.5 h-3.5 text-gray-400" />
+                    <Check className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Boolean</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("image_field")}
                   >
-                    <Image className="w-3.5 h-3.5 text-gray-400" />
+                    <Image className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Image</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("audio_field")}
                   >
-                    <Music className="w-3.5 h-3.5 text-gray-400" />
+                    <Music className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Audio</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("video_field")}
                   >
-                    <Video className="w-3.5 h-3.5 text-gray-400" />
+                    <Video className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Video</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("media_field")}
                   >
-                    <Music className="w-3.5 h-3.5 text-gray-400" />
+                    <Music className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Media</span>
                   </button>
                   <button
-                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
                     onMouseDown={() => addField("file_field")}
                   >
-                    <FileText className="w-3.5 h-3.5 text-gray-400" />
+                    <FileText className="w-3.5 h-3.5 text-zinc-500" />
                     <span>File</span>
                   </button>
                 </div>
@@ -358,7 +364,7 @@ export default function RequestInputsNode({
 
       {/* Error state */}
       {nodeError && (
-        <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-600">
+        <div className="mx-4 mt-3 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-[12px] text-red-400">
           {sanitizeError(nodeError)}
         </div>
       )}
@@ -366,598 +372,36 @@ export default function RequestInputsNode({
       {/* Fields */}
       <div className="px-4 py-4 space-y-4 overflow-visible">
         {fields.length === 0 && (
-          <p className="text-[12px] text-gray-400 text-center py-2">
+          <p className="text-[12px] text-zinc-500 text-center py-2">
             Click + to add input fields
           </p>
         )}
 
         {fields.map((field) => {
           const displayValue = getFieldDisplayValue(field) ?? "";
-          const urls = displayValue ? displayValue.split(",").filter(Boolean) : [];
-          const maxAssets = maxAssetsForField(field);
-          const handleColorVal = handleColor(field.type);
-
           return (
-            <div key={field.id} className={`relative overflow-visible transition-all ${isFieldNew(field.id) ? "opacity-40 grayscale pointer-events-none" : ""}`}>
-              {/* Output handle — pinned to the label row top, slightly below */}
-              <div
-                className="absolute flex items-center"
-                style={{ right: "-21px", top: "14px", transform: "translateY(-50%)", zIndex: 50 }}
-              >
-                <Handle
-                  type="source"
-                  position={Position.Right}
-                  id={field.id}
-                  className="!relative !transform-none source connectable connectablestart connectableend connectionindicator"
-                  style={{
-                    background: handleColorVal,
-                    border: `2px solid ${handleColorVal}80`,
-                    width: 14,
-                    height: 14,
-                    cursor: "crosshair",
-                    ["--handle-color" as any]: handleColorVal,
-                  }}
-                />
-              </div>
-
-              <div className="w-full">
-                {/* Field label row */}
-                <div className="mb-2 flex w-full items-center gap-2">
-                  {!readOnly && (
-                    <div className="nodrag cursor-grab text-gray-400 hover:text-gray-600 active:cursor-grabbing">
-                      <GripVertical className="w-3.5 h-3.5" />
-                    </div>
-                  )}
-
-                  {editingFieldId === field.id && !readOnly ? (
-                    <input
-                      autoFocus
-                      type="text"
-                      value={editingLabel}
-                      onChange={(e) => setEditingLabel(e.target.value)}
-                      onBlur={() => saveLabel(field.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveLabel(field.id);
-                        if (e.key === "Escape") setEditingFieldId(null);
-                      }}
-                      className="nodrag flex-1 min-w-0 text-[12px] font-medium text-gray-900 bg-[#F5F5F5] border border-[#7C3AED] rounded px-1 outline-none"
-                    />
-                  ) : (
-                    <span
-                      className={`group/label flex min-w-0 flex-1 items-center gap-1 text-[12px] font-medium text-gray-900 ${readOnly ? "cursor-default" : "cursor-pointer"}`}
-                      title={field.label}
-                      onClick={() => !readOnly && startEditLabel(field)}
-                    >
-                      <span className="truncate">{field.label}</span>
-                      {!readOnly && (
-                        <Pencil
-                          className="w-3 h-3 shrink-0 opacity-0 group-hover/label:opacity-100 text-gray-400"
-                        />
-                      )}
-                      {/* Field-level Info Tooltip */}
-                      <span className="group/tip relative flex shrink-0 text-gray-400">
-                        <Info className="w-3 h-3 cursor-help text-gray-400" />
-                        <div className="pointer-events-none absolute left-1/2 bottom-full z-[9999] mb-1.5 hidden w-max max-w-[280px] -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-gray-700 shadow-lg group-hover/tip:block">
-                          Parameter ID: {field.id}
-                        </div>
-                      </span>
-                    </span>
-                  )}
-
-                  {!readOnly && (
-                    <div className="ml-auto flex items-center gap-1">
-                      {/* Copy Value Button */}
-                      <button
-                        className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                        title="Copy value"
-                        onClick={() => copyToClipboard(field.value)}
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                      {/* Delete Button */}
-                      <button
-                        className="nodrag rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500"
-                        title="Delete"
-                        onClick={() => removeField(field.id)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Field input */}
-                {field.type === "select_field" && (field.selectOptions?.length ?? 0) > 0 && (
-                  <div className="relative custom-select-container">
-                    <button
-                      type="button"
-                      disabled={isPreviewMode || readOnly}
-                      onClick={() =>
-                        setActiveSelectFieldId(
-                          activeSelectFieldId === field.id ? null : field.id
-                        )
-                      }
-                      className="nodrag flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 disabled:opacity-50 outline-none focus:border-[#7C3AED] cursor-pointer"
-                    >
-                      <span className="truncate">
-                        {field.selectOptions?.find((o) => o.value === displayValue)?.label ||
-                          displayValue ||
-                          "Select option..."}
-                      </span>
-                      <ChevronDown className="h-4 w-4 shrink-0 text-gray-500 opacity-50" />
-                    </button>
-                    {activeSelectFieldId === field.id && !isPreviewMode && !readOnly && (
-                      <div className="absolute left-0 top-full z-50 mt-1.5 flex min-w-full flex-col rounded-2xl border border-gray-100 bg-white p-1.5 text-left shadow-xl">
-                        <div className="nowheel flex max-h-[260px] flex-col gap-0.5 overflow-y-auto">
-                          {field.selectOptions?.map((opt) => {
-                            const isSelected = opt.value === displayValue;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => {
-                                  updateField(field.id, { value: opt.value });
-                                  setActiveSelectFieldId(null);
-                                }}
-                                className={`flex w-full items-center gap-1.5 rounded-xl px-3 py-2 text-left text-[13px] font-medium transition-colors ${
-                                  isSelected
-                                    ? "bg-gray-100/60 text-gray-900"
-                                    : "text-gray-700 hover:bg-gray-50"
-                                }`}
-                              >
-                                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                                  {isSelected && (
-                                    <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                                  )}
-                                </span>
-                                <span className="truncate">{opt.label}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {field.type === "text_field" && (
-                  <div className="relative">
-                    <textarea
-                      placeholder={readOnly ? "No text configured" : "Enter text..."}
-                      rows={3}
-                      value={displayValue}
-                      readOnly={isPreviewMode || readOnly}
-                      onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })}
-                      className={`nodrag nowheel w-full min-w-0 resize-y rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-[13px] text-gray-900 outline-none focus:border-[#7C3AED] focus:shadow-[0_0_0_1px_#7C3AED] ${isPreviewMode || readOnly ? "cursor-default resize-none" : ""}`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setActiveExpandFieldId(field.id)}
-                      className="nodrag absolute bottom-2 right-2 flex h-6 w-6 items-center justify-center rounded-md bg-gray-200/80 text-gray-500 hover:bg-gray-300 shadow-sm"
-                      title="Expand"
-                    >
-                      <Maximize2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                )}
-
-                {field.type === "number_field" &&
-                  field.numberMin !== undefined &&
-                  field.numberMax !== undefined && (
-                  <div className="flex min-w-0 items-center gap-2">
-                    <input
-                      type="range"
-                      min={field.numberMin}
-                      max={field.numberMax}
-                      step={field.numberStep ?? 1}
-                      value={
-                        displayValue !== ""
-                          ? Number(displayValue)
-                          : field.numberMin
-                      }
-                      disabled={isPreviewMode || readOnly}
-                      onChange={(e) =>
-                        !isPreviewMode &&
-                        !readOnly &&
-                        updateField(field.id, { value: e.target.value })
-                      }
-                      className="nodrag h-2 min-w-[60px] flex-1 appearance-none rounded-lg bg-gray-200 accent-[#EC4899] disabled:opacity-50"
-                    />
-                    <input
-                      type="number"
-                      min={field.numberMin}
-                      max={field.numberMax}
-                      step={field.numberStep ?? 1}
-                      value={displayValue}
-                      disabled={isPreviewMode || readOnly}
-                      onChange={(e) =>
-                        !isPreviewMode &&
-                        !readOnly &&
-                        updateField(field.id, { value: e.target.value })
-                      }
-                      className="nodrag w-14 shrink-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-1.5 py-1 text-center text-xs text-gray-900 outline-none disabled:opacity-50"
-                    />
-                  </div>
-                )}
-
-                {field.type === "number_field" &&
-                  (field.numberMin === undefined || field.numberMax === undefined) && (
-                  <input
-                    type="number"
-                    step="any"
-                    placeholder={readOnly ? "No number configured" : "Enter number..."}
-                    value={displayValue}
-                    readOnly={isPreviewMode || readOnly}
-                    onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })}
-                    className={`nodrag nowheel w-full min-w-0 rounded-lg border border-gray-200 bg-[#F5F5F5] px-3 py-2 text-sm text-gray-900 outline-none focus:border-[#7C3AED] disabled:opacity-50 ${isPreviewMode || readOnly ? "cursor-default" : ""}`}
-                  />
-                )}
-
-                {field.type === "boolean_field" && (
-                  <div className="w-full min-w-0">
-                    <label className="nodrag flex cursor-pointer items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={displayValue === "true"}
-                        disabled={isPreviewMode || readOnly}
-                        onChange={(e) => !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.checked ? "true" : "false" })}
-                        className="h-4 w-4 rounded border-gray-300 text-[#7C3AED] focus:ring-[#7C3AED] disabled:opacity-50"
-                      />
-                      <span className="text-sm text-gray-700 select-none">
-                        {displayValue === "true" ? "True" : "False"}
-                      </span>
-                    </label>
-                  </div>
-                )}
-
-                {field.type === "image_field" && (
-                  <div className="space-y-2">
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < maxAssets && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title="Upload image"
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload image{urls.length > 0 && ` (${urls.length}/${maxAssets})`}</span>
-                              </>
-                            )}
-                          </button>
-                          <UploadPopup
-                            open={activeUploadPopup === field.id}
-                            onClose={() => setActiveUploadPopup(null)}
-                            onUpload={() => document.getElementById(`file-input-${field.id}`)?.click()}
-                          />
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No image used</span>
-                        </div>
-                      )
-                    )}
-
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 grid grid-cols-3 gap-2">
-                        {urls.map((url, idx) => (
-                          <div key={idx} className="group relative">
-                            <div
-                              className="overflow-hidden rounded-md bg-gray-50"
-                              style={{
-                                border: "2px solid rgba(59, 130, 246, 0.3)",
-                                aspectRatio: "1 / 1",
-                              }}
-                            >
-                              <img
-                                src={url}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            </div>
-                            {!isPreviewMode && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updatedUrls = urls.filter((_, i) => i !== idx);
-                                  updateField(field.id, {
-                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                  });
-                                }}
-                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                title="Remove"
-                              >
-                                <X className="w-2.5 h-2.5 text-white" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Hidden file input */}
-                    {!isPreviewMode && !readOnly && (
-                      <input
-                        id={`file-input-${field.id}`}
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        className="sr-only"
-                        disabled={uploadingFields[field.id]}
-                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {field.type === "video_field" && (
-                  <div className="space-y-2">
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < maxAssets && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title="Upload video"
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload video{urls.length > 0 && ` (${urls.length}/${maxAssets})`}</span>
-                              </>
-                            )}
-                          </button>
-                          <UploadPopup
-                            open={activeUploadPopup === field.id}
-                            onClose={() => setActiveUploadPopup(null)}
-                            onUpload={() => document.getElementById(`file-input-${field.id}`)?.click()}
-                          />
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No video used</span>
-                        </div>
-                      )
-                    )}
-
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 grid grid-cols-2 gap-2">
-                        {urls.map((url, idx) => (
-                          <div key={idx} className="group relative">
-                            <div
-                              className="overflow-hidden rounded-md bg-black/5"
-                              style={{
-                                border: "2px solid rgba(34, 197, 94, 0.3)",
-                                aspectRatio: "16 / 10",
-                              }}
-                            >
-                              <video
-                                src={url}
-                                className="nodrag h-full w-full object-cover"
-                                preload="metadata"
-                                playsInline
-                                controls
-                                controlsList="nodownload nofullscreen"
-                              />
-                            </div>
-                            {!isPreviewMode && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updatedUrls = urls.filter((_, i) => i !== idx);
-                                  updateField(field.id, {
-                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                  });
-                                }}
-                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                title="Remove"
-                              >
-                                <X className="w-2.5 h-2.5 text-white" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Hidden file input */}
-                    {!isPreviewMode && !readOnly && (
-                      <input
-                        id={`file-input-${field.id}`}
-                        type="file"
-                        multiple
-                        accept="video/*"
-                        className="sr-only"
-                        disabled={uploadingFields[field.id]}
-                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {(field.type === "audio_field" || field.type === "media_field") && (
-                  <div className="space-y-2">
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title={`Upload ${field.type === "audio_field" ? "audio" : "media"}`}
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload {field.type === "audio_field" ? "audio" : "media"}{urls.length > 0 && ` (${urls.length}/10)`}</span>
-                              </>
-                            )}
-                          </button>
-                          <UploadPopup
-                            open={activeUploadPopup === field.id}
-                            onClose={() => setActiveUploadPopup(null)}
-                            onUpload={() => document.getElementById(`file-input-${field.id}`)?.click()}
-                          />
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No {field.type === "audio_field" ? "audio" : "media"} used</span>
-                        </div>
-                      )
-                    )}
-
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 space-y-2">
-                        {urls.map((url, idx) => (
-                          <div key={idx} className="group relative">
-                            <audio
-                              src={url}
-                              controls
-                              className="w-full"
-                            />
-                            {!isPreviewMode && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const updatedUrls = urls.filter((_, i) => i !== idx);
-                                  updateField(field.id, {
-                                    value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                  });
-                                }}
-                                className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                title="Remove"
-                              >
-                                <X className="w-2.5 h-2.5 text-white" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Hidden file input */}
-                    {!isPreviewMode && !readOnly && (
-                      <input
-                        id={`file-input-${field.id}`}
-                        type="file"
-                        multiple
-                        accept="audio/*,video/*"
-                        className="sr-only"
-                        disabled={uploadingFields[field.id]}
-                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {field.type === "file_field" && (
-                  <div className="space-y-2">
-                    {!isPreviewMode && !readOnly ? (
-                      urls.length < 10 && (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            disabled={uploadingFields[field.id]}
-                            onMouseDown={(e) => e.stopPropagation()} onClick={() => setActiveUploadPopup(activeUploadPopup === field.id ? null : field.id)}
-                            className="nodrag flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-[#F5F5F5] px-3 py-2.5 text-xs text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors disabled:opacity-50"
-                            title="Upload file"
-                          >
-                            {uploadingFields[field.id] ? (
-                              <span>Uploading...</span>
-                            ) : (
-                              <>
-                                <Upload className="w-3.5 h-3.5" />
-                                <span className="capitalize">Upload file{urls.length > 0 && ` (${urls.length}/10)`}</span>
-                              </>
-                            )}
-                          </button>
-                          <UploadPopup
-                            open={activeUploadPopup === field.id}
-                            onClose={() => setActiveUploadPopup(null)}
-                            onUpload={() => document.getElementById(`file-input-${field.id}`)?.click()}
-                          />
-                        </div>
-                      )
-                    ) : (
-                      urls.length === 0 && (
-                        <div className="flex items-center justify-center w-full h-10 rounded-lg border border-dashed border-gray-200 bg-[#F5F5F5]">
-                          <span className="text-[11px] text-gray-400 font-medium">No file used</span>
-                        </div>
-                      )
-                    )}
-
-                    {urls.length > 0 && (
-                      <div className="nodrag nopan mt-2 space-y-2">
-                        {urls.map((url, idx) => {
-                          const filename = url.split("/").pop() || `File ${idx + 1}`;
-                          return (
-                            <div key={idx} className="group relative">
-                              <div
-                                className="flex items-center gap-2 overflow-hidden rounded-md px-2 py-1.5 bg-white"
-                                style={{
-                                  border: "2px solid rgba(168, 85, 247, 0.3)",
-                                }}
-                              >
-                                <span className="truncate text-xs text-gray-600 font-mono">
-                                  {filename}
-                                </span>
-                              </div>
-                              {!isPreviewMode && !readOnly && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updatedUrls = urls.filter((_, i) => i !== idx);
-                                    updateField(field.id, {
-                                      value: updatedUrls.length > 0 ? updatedUrls.join(",") : null,
-                                    });
-                                  }}
-                                  className="absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-500 cursor-pointer border-0"
-                                  title="Remove"
-                                >
-                                  <X className="w-2.5 h-2.5 text-white" />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Hidden file input */}
-                    {!isPreviewMode && !readOnly && (
-                      <input
-                        id={`file-input-${field.id}`}
-                        type="file"
-                        multiple
-                        accept="*/*"
-                        className="sr-only"
-                        disabled={uploadingFields[field.id]}
-                        onChange={(e) => handleFileUpload(field.id, field.type, e)}
-                      />
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <RequestInputFieldItem
+              key={field.id}
+              field={field}
+              readOnly={readOnly}
+              isPreviewMode={isPreviewMode}
+              isNewField={isFieldNew(field.id)}
+              displayValue={displayValue}
+              activeSelectFieldId={activeSelectFieldId}
+              setActiveSelectFieldId={setActiveSelectFieldId}
+              updateField={updateField}
+              removeField={removeField}
+              activeUploadPopup={activeUploadPopup}
+              setActiveUploadPopup={setActiveUploadPopup}
+              uploadingFields={uploadingFields}
+              handleFileUpload={handleFileUpload}
+              copyToClipboard={copyToClipboard}
+              setActiveExpandFieldId={setActiveExpandFieldId}
+              editingFieldId={editingFieldId}
+              setEditingFieldId={setEditingFieldId}
+              editingLabel={editingLabel}
+              setEditingLabel={setEditingLabel}
+            />
           );
         })}
       </div>
@@ -977,6 +421,8 @@ export default function RequestInputsNode({
           />
         );
       })()}
+      </div>
     </div>
+    </BorderGlow>
   );
 }

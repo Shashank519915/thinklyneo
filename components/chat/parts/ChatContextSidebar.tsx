@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { BlueprintSummary } from "../BlueprintFlowPreview";
-import { WorkflowCanvasPreview } from "../WorkflowCanvasPreview";
+import { BlueprintSummary } from "../preview/BlueprintFlowPreview";
+import { WorkflowCanvasPreview } from "../preview/WorkflowCanvasPreview";
 import type { Blueprint } from "@/lib/chat/types";
 import type { ChatMode } from "../ChatWorkspace";
 

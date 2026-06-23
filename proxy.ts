@@ -6,24 +6,17 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 
 /** Page routes that bypass Clerk (API routes are excluded via matcher — backend handles auth). */
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/docs(.*)",
 ]);
 
-const clerkHandler = clerkMiddleware(async (auth, request) => {
+export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
 });
-
-/** Skip Clerk when secret is unset (e.g. CI e2e without repo secrets). */
-export default function proxy(request: NextRequest, event: NextFetchEvent) {
-  if (!process.env.CLERK_SECRET_KEY?.trim()) {
-    return NextResponse.next();
-  }
-  return clerkHandler(request, event);
-}
 
 export const config = {
   matcher: [
