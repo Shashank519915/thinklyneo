@@ -12,15 +12,25 @@ const isPublicRoute = createRouteMatcher([
   "/docs(.*)",
 ]);
 
-const clerkHandler = process.env.CLERK_SECRET_KEY?.trim()
-  ? clerkMiddleware(async (auth, request) => {
-      if (!isPublicRoute(request)) {
-        await auth.protect();
-      }
-    })
-  : (request: NextRequest) => NextResponse.next();
+export default clerkMiddleware(
+  async (auth, request) => {
+    // If running in an environment without real keys (e.g. CI), bypass auth completely
+    if (!process.env.CLERK_SECRET_KEY?.trim()) {
+      return NextResponse.next();
+    }
 
-export default clerkHandler;
+    if (!isPublicRoute(request)) {
+      await auth.protect();
+    }
+  },
+  {
+    // Provide a fallback dummy key to prevent Clerk from throwing on initialization in CI
+    secretKey: process.env.CLERK_SECRET_KEY || "sk_test_dummyKeyForCI123456789",
+    publishableKey:
+      process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+      "pk_test_ZHVtbXkuY2xlcmsuYWNjb3VudHMuZGV2JA",
+  }
+);
 
 export const config = {
   matcher: [
