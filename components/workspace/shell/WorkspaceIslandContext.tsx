@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import DynamicIsland from "@/components/dashboard/DynamicIsland";
-import { BrainEditIsland } from "@/components/chat/BrainEditIsland";
+import { BrainEditIsland } from "@/components/chat/run/BrainEditIsland";
 import { CanvasWorkflowIsland } from "@/components/workflow/CanvasWorkflowIsland";
 import { WorkspaceDynamicIslandFrame } from "./WorkspaceDynamicIslandFrame";
 import { WORKFLOW_SAVED_EVENT } from "@/lib/workflow-save-events";

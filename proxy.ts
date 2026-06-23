@@ -6,6 +6,7 @@ import type { NextFetchEvent, NextRequest } from "next/server";
 
 /** Page routes that bypass Clerk (API routes are excluded via matcher — backend handles auth). */
 const isPublicRoute = createRouteMatcher([
+  "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/docs(.*)",

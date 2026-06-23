@@ -129,11 +129,11 @@ export default function LeftSidebar({ collapsed = false, onToggle }: LeftSidebar
   return (
     <>
       <div
-        className="group/sidebar relative flex flex-shrink-0 flex-col overflow-hidden bg-[#050505] p-3 h-screen transition-[width] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+        className="group/sidebar absolute left-0 top-0 bottom-0 z-40 flex flex-col overflow-hidden p-3 h-screen transition-[width] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] pointer-events-none"
         style={{ width }}
       >
         {/* Outer Bezel (matches card grid outer style) */}
-        <div className="flex flex-col h-full rounded-[2rem] p-1.5 border border-white/10 bg-white/[0.02] backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)] w-full relative">
+        <div className="flex flex-col h-full rounded-[2rem] p-1.5 border border-white/10 bg-white/[0.02] backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)] w-full relative pointer-events-auto">
           
           {/* Inner Core Bezel (matches card core style) */}
           <div className="rounded-[calc(2rem-6px)] bg-[#0A0A0C]/90 border border-white/5 flex flex-col h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] relative overflow-hidden p-3 w-full justify-between">

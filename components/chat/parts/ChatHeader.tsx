@@ -2,8 +2,8 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { PinnedRunBadge } from "../ChatClientToolCards";
-import { ChatCreditBadge } from "../ChatRunExtras";
+import { PinnedRunBadge } from "../feed/ChatClientToolCards";
+import { ChatCreditBadge } from "../run/ChatRunExtras";
 import { MODE_META } from "../ChatWorkspace";
 import type { ChatMode } from "../ChatWorkspace";
 

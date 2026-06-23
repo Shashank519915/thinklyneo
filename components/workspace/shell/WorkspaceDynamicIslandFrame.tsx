@@ -13,7 +13,7 @@ export function WorkspaceDynamicIslandFrame({ children }: { children: ReactNode 
         <div className="pointer-events-auto" data-workspace-island-inner>{children}</div>
       </div>
 
-      <div className="pointer-events-none fixed top-2 left-1/2 z-0 h-[120px] w-[400px] -translate-x-1/2 rounded-full bg-purple-500/[0.06] blur-[60px]" />
+      <div className="pointer-events-none fixed top-2 left-1/2 z-10 h-[120px] w-[400px] -translate-x-1/2 rounded-full bg-purple-500/[0.06] blur-[60px]" />
     </>
   );
 }

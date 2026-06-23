@@ -13,10 +13,10 @@ import { blueprintToFlowGraph } from "@/lib/chat/blueprint-to-graph";
 import { useBrainClientTools } from "@/lib/chat/use-brain-client-tools";
 import { useAttachLiveRunOnFocus } from "@/lib/use-attach-live-run-on-focus";
 import type { PlaygroundOutputSection } from "@/lib/playground-output";
-import { MessageBubble } from "./ChatMessageParts";
-import { LiveRunPanel } from "./LiveRunPanel";
-import { EditHandoffCard } from "./ChatClientToolCards";
-import { RunCompletionPanel, WorkflowContextNote } from "./ChatRunExtras";
+import { MessageBubble } from "./feed/ChatMessageParts";
+import { LiveRunPanel } from "./run/LiveRunPanel";
+import { EditHandoffCard } from "./feed/ChatClientToolCards";
+import { RunCompletionPanel, WorkflowContextNote } from "./run/ChatRunExtras";
 import { useWorkspaceNavigate } from "@/components/workspace/navigation";
 import { useWorkspaceIsland } from "@/components/workspace/shell/WorkspaceIslandContext";
 import {

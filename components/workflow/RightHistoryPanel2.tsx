@@ -935,9 +935,16 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
   });
 
   return (
-    <div className="flex-shrink-0 relative h-full">
-      <div className="h-full min-h-0 w-[360px] border-l border-gray-200 bg-gray-50">
-        <div className="flex h-full min-h-0 flex-col">
+    <div className="flex-shrink-0 relative h-full bg-[#050505] p-3 w-[360px]">
+      {/* Outer Bezel (matches LeftSidebar outer style) */}
+      <div className="flex flex-col h-full rounded-[2rem] p-1.5 border border-white/10 bg-white/[0.02] backdrop-blur-3xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)] w-full relative">
+        
+        {/* Inner Core Bezel (matches LeftSidebar inner style) */}
+        <div className="rounded-[calc(2rem-6px)] bg-[#0A0A0C]/90 border border-white/5 flex flex-col h-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] relative overflow-hidden w-full">
+          {/* CSS Film Grain Noise overlay */}
+          <div className="absolute inset-0 pointer-events-none glass-noise z-0" />
+          
+          <div className="flex h-full min-h-0 flex-col relative z-10">
 
           {/* Sticky header */}
           <div className="sticky top-0 z-10 border-b border-gray-200 bg-white p-4">
@@ -1061,5 +1068,6 @@ export default function RightHistoryPanel({ workflowId }: RightHistoryPanelProps
         </div>
       </div>
     </div>
+  </div>
   );
 }

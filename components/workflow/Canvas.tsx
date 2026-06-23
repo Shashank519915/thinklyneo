@@ -22,7 +22,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
-import { generateEdgeId, getSourceHandleColor } from "@/lib/utils";
+import { cn, generateEdgeId, getSourceHandleColor } from "@/lib/utils";
 import {
   cropImageDefinition,
   openrouterLlmDefinition,
@@ -35,7 +35,14 @@ import {
   type NodeDefinition,
 } from "@shashank519915/shared";
 import RequestInputsNode from "./nodes/RequestInputsNode";
-import GenericNode from "./nodes/GenericNode";
+import CropImageNode from "./nodes/cropImage/CropImageNode";
+import GeminiNode from "./nodes/gemini/GeminiNode";
+import OpenRouterNode from "./nodes/openRouter/OpenRouterNode";
+import GptImage2Node from "./nodes/gptImage2/GptImage2Node";
+import KlingV3Node from "./nodes/klingV3/KlingV3Node";
+import MergeVideoNode from "./nodes/mergeVideo/MergeVideoNode";
+import MergeAVNode from "./nodes/mergeAV/MergeAVNode";
+import ExtractAudioNode from "./nodes/extractAudio/ExtractAudioNode";
 import ResponseNode from "./nodes/ResponseNode";
 import AnimatedEdge from "./edges/AnimatedEdge";
 import BottomToolbar from "./BottomToolbar";
@@ -44,14 +51,14 @@ import { Map, Minimize2, Play, X } from "lucide-react";
 
 const nodeTypes = {
   requestInputs: RequestInputsNode,
-  cropImage: GenericNode,
-  gemini: GenericNode,
-  openRouter: GenericNode,
-  gptImage2: GenericNode,
-  klingV3: GenericNode,
-  mergeVideo: GenericNode,
-  mergeAV: GenericNode,
-  extractAudio: GenericNode,
+  cropImage: CropImageNode,
+  gemini: GeminiNode,
+  openRouter: OpenRouterNode,
+  gptImage2: GptImage2Node,
+  klingV3: KlingV3Node,
+  mergeVideo: MergeVideoNode,
+  mergeAV: MergeAVNode,
+  extractAudio: ExtractAudioNode,
   response: ResponseNode,
 };
 
@@ -186,7 +193,13 @@ function RunPill({
 }
 
 /** React Flow tree with store wiring (nodes/edges, undo, select mode panning vs marquee per `selectionOnDrag`). */
-function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
+function CanvasInner({
+  readOnly = false,
+  sidebarCollapsed = true,
+}: {
+  readOnly?: boolean;
+  sidebarCollapsed?: boolean;
+}) {
   const {
     nodes,
     edges,
@@ -207,6 +220,7 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
     selectModeActive,
     setSelectModeActive,
     setReadOnly,
+    isHistoryPanelOpen,
   } = useWorkflowStore();
   const workflowIdStore = useWorkflowStore((s) => s.workflowId);
 
@@ -576,34 +590,49 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
       >
         {/* MiniMap inside ReactFlow — must be a child of ReactFlow */}
         {minimapOpen && (
-          <MiniMap
-            nodeColor={(node) => getNodeColor(node.type)}
-            maskColor="rgba(0,0,0,0.75)"
-            style={{
-              width: 160,
-              height: 100,
-              border: "1px solid #374151",
-              borderRadius: 8,
-              background: "#111827",
-            }}
-            position="bottom-right"
-            zoomable
-            pannable
-          />
+          <div className={cn(
+            "absolute bottom-4 z-10 p-[5px] rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-[0_20px_40px_-15px_rgba(0,0,0,0.85)] pointer-events-auto transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            isHistoryPanelOpen ? "right-[376px]" : "right-4"
+          )}>
+            <div className="relative rounded-[calc(1rem-5px)] bg-[#0A0A0C]/90 border border-white/5 overflow-hidden shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]">
+              <div className="absolute inset-0 pointer-events-none glass-noise z-10" />
+              <MiniMap
+                nodeColor={(node) => getNodeColor(node.type)}
+                maskColor="rgba(0,0,0,0.75)"
+                style={{
+                  width: 160,
+                  height: 100,
+                  border: "none",
+                  borderRadius: 0,
+                  background: "transparent",
+                  margin: 0,
+                  position: "relative",
+                }}
+                zoomable
+                pannable
+              />
+            </div>
+          </div>
         )}
       </ReactFlow>
-
-      {/* MiniMap collapse button — large white rounded square at top-right outside corner */}
+ 
+      {/* MiniMap collapse button */}
       {minimapOpen ? (
         <button
           onClick={() => setMinimapOpen(false)}
-          className="wf-canvas-chrome wf-canvas-chrome-btn absolute bottom-[92px] right-[8px] z-20 flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200"
+          className={cn(
+            "wf-canvas-chrome wf-canvas-chrome-btn absolute bottom-[136px] z-20 flex h-9 w-9 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+            isHistoryPanelOpen ? "right-[376px]" : "right-4"
+          )}
           title="Collapse minimap"
         >
           <Minimize2 className="w-4 h-4" />
         </button>
       ) : (
-        <div className="absolute bottom-4 right-4 z-10">
+        <div className={cn(
+          "absolute bottom-4 z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          isHistoryPanelOpen ? "right-[376px]" : "right-4"
+        )}>
           <button
             onClick={() => setMinimapOpen(true)}
             className="wf-canvas-chrome wf-canvas-chrome-btn flex h-10 w-10 items-center justify-center rounded-xl text-zinc-400 hover:text-zinc-200"
@@ -613,16 +642,24 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
           </button>
         </div>
       )}
-
+ 
       {/* Bottom-left controls bar */}
       {!readOnly && (
-        <div className="absolute bottom-4 left-4 z-10">
+        <div className={cn(
+          "absolute bottom-4 z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          sidebarCollapsed ? "left-[92px]" : "left-[276px]"
+        )}>
           <ControlsBar />
         </div>
       )}
-
+ 
       {/* Bottom-centre toolbar (sticky note + add node button) */}
-      {!readOnly && <BottomToolbar />}
+      {!readOnly && (
+        <BottomToolbar
+          sidebarCollapsed={sidebarCollapsed}
+          isHistoryPanelOpen={isHistoryPanelOpen}
+        />
+      )}
 
       {/* Run N nodes pill — floats above top-left of selected nodes bounding box */}
       {!readOnly && (
@@ -641,10 +678,16 @@ function CanvasInner({ readOnly = false }: { readOnly?: boolean }) {
 }
 
 /** Wraps `<ReactFlowProvider>` around `CanvasInner` so hooks like `useReactFlow()` resolve correctly. */
-export default function Canvas({ readOnly = false }: { readOnly?: boolean }) {
+export default function Canvas({
+  readOnly = false,
+  sidebarCollapsed = true,
+}: {
+  readOnly?: boolean;
+  sidebarCollapsed?: boolean;
+}) {
   return (
     <ReactFlowProvider>
-      <CanvasInner readOnly={readOnly} />
+      <CanvasInner readOnly={readOnly} sidebarCollapsed={sidebarCollapsed} />
     </ReactFlowProvider>
   );
 }

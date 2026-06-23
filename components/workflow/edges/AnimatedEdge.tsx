@@ -69,22 +69,38 @@ export default function AnimatedEdge({
         style={{ cursor: "pointer" }}
       />
 
-      {/* Solid edge */}
+      {/* Base edge (thin, lower opacity when idle to reduce clutter) */}
       <path
         id={id}
         d={edgePath}
         fill="none"
         stroke={strokeColor}
-        strokeWidth={strokeWidth}
+        strokeWidth={hovered || selected ? 3.5 : 2.2}
         markerEnd={markerEnd}
-        className={sourceExecuting ? "edge-executing" : ""}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          transition: "stroke 0.2s, stroke-width 0.1s",
+          transition: "stroke 0.2s, stroke-width 0.15s, opacity 0.2s",
+          opacity: hovered || selected ? 1 : 0.45,
           pointerEvents: "none",
         }}
       />
+
+      {/* Dynamic energy conduit overlay (glowing flowing pulses when executing) */}
+      {sourceExecuting && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke={activeColor}
+          strokeWidth={hovered || selected ? 4.5 : 3.2}
+          strokeDasharray="8, 16"
+          className="edge-executing"
+          style={{
+            pointerEvents: "none",
+            filter: `drop-shadow(0 0 5px ${activeColor})`,
+          }}
+        />
+      )}
 
       {/* Delete button on hover — suppressed in preview mode */}
       {(hovered || selected) && !isPreviewMode && (
@@ -95,7 +111,7 @@ export default function AnimatedEdge({
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               pointerEvents: "all",
             }}
-            className="nodrag nopan w-5 h-5 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow text-gray-500 hover:text-red-500 hover:border-red-200 transition-colors text-[10px] font-bold z-10"
+            className="nodrag nopan w-5 h-5 bg-[#0A0A0C] border border-white/10 text-zinc-400 hover:text-red-400 hover:border-red-500/30 rounded-full flex items-center justify-center shadow-lg transition-colors text-[11px] font-bold z-10 cursor-pointer"
             onClick={() => deleteElements({ edges: [{ id }] })}
           >
             ×
