@@ -8,8 +8,8 @@ import {
 import { promoteInputToRequest, resolveRequestFieldType } from "@/lib/promote-to-request";
 
 describe("resolveRequestFieldType", () => {
-  it("maps slider params to number_field even when handle type is text", () => {
-    expect(resolveRequestFieldType("slider", "text")).toBe("number_field");
+  it("maps slider params to slider_field even when handle type is text", () => {
+    expect(resolveRequestFieldType("slider", "text")).toBe("slider_field");
   });
 
   it("maps select params to select_field", () => {

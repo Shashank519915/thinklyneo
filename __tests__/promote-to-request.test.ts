@@ -147,8 +147,8 @@ describe("isRequestPromoted vs manual request wire", () => {
 });
 
 describe("resolveRequestFieldType", () => {
-  it("promotes audio_volume as number_field", () => {
-    expect(resolveRequestFieldType("slider", "text")).toBe("number_field");
+  it("promotes audio_volume as slider_field", () => {
+    expect(resolveRequestFieldType("slider", "text")).toBe("slider_field");
   });
 });
 

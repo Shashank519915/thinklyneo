@@ -24,6 +24,8 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useWorkflowStore } from "@/store/workflow-store";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
+import { getTargetParamType } from "@/lib/execution";
+import { syncLinkedTargetInputFromField } from "@/lib/promoted-input-value";
 import { cn, generateEdgeId, getSourceHandleColor } from "@/lib/utils";
 import {
   cropImageDefinition,
@@ -223,8 +225,108 @@ function CanvasInner({
     setSelectModeActive,
     setReadOnly,
     isHistoryPanelOpen,
+    activeSettingsNodeId,
+    setActiveSettingsNodeId,
   } = useWorkflowStore();
   const workflowIdStore = useWorkflowStore((s) => s.workflowId);
+
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Spotlight position tracking for circular backdrop blur
+  useEffect(() => {
+    if (!activeSettingsNodeId) {
+      return;
+    }
+
+    const updateSpotlight = () => {
+      const nodeEl = document.querySelector(`[data-id="${activeSettingsNodeId}"]`);
+      if (!nodeEl) return;
+
+      const nodeRect = nodeEl.getBoundingClientRect();
+      const settingsPanel = document.querySelector('.wf-settings-panel-overlay');
+
+      let spotlightX = nodeRect.left + nodeRect.width / 2;
+      let spotlightY = nodeRect.top + nodeRect.height / 2;
+      let radius = Math.max(nodeRect.width, nodeRect.height) * 0.75;
+
+      if (settingsPanel) {
+        const panelRect = settingsPanel.getBoundingClientRect();
+        const top = Math.min(nodeRect.top, panelRect.top);
+        const bottom = Math.max(nodeRect.bottom, panelRect.bottom);
+        const left = Math.min(nodeRect.left, panelRect.left);
+        const right = Math.max(nodeRect.right, panelRect.right);
+
+        spotlightX = (left + right) / 2;
+        spotlightY = (top + bottom) / 2;
+
+        const width = right - left;
+        const height = bottom - top;
+        // Optimal radius to circumscribe the bounding box of both elements
+        radius = Math.sqrt(width * width + height * height) / 2 + 12;
+      }
+
+      if (overlayRef.current) {
+        const mask = `radial-gradient(circle ${radius}px at ${spotlightX}px ${spotlightY}px, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.2) 30%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0.35) 60%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.75) 88%, rgba(0,0,0,0.9) 95%, rgba(0,0,0,1) 100%)`;
+        overlayRef.current.style.maskImage = mask;
+        overlayRef.current.style.webkitMaskImage = mask;
+      }
+    };
+
+    // Run initial update
+    updateSpotlight();
+
+    // Listen to resize and scroll
+    window.addEventListener("resize", updateSpotlight);
+
+    // Dynamic animation frame loop for smooth zoom/pan tracking
+    let frameId = requestAnimationFrame(function tick() {
+      updateSpotlight();
+      frameId = requestAnimationFrame(tick);
+    });
+
+    return () => {
+      window.removeEventListener("resize", updateSpotlight);
+      cancelAnimationFrame(frameId);
+    };
+  }, [activeSettingsNodeId]);
+
+  // Click outside to close active settings panel
+  useEffect(() => {
+    if (!activeSettingsNodeId) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      const nodeEl = document.querySelector(`[data-id="${activeSettingsNodeId}"]`);
+      const panelEl = document.querySelector('.wf-settings-panel-overlay');
+
+      if (nodeEl?.contains(target) || panelEl?.contains(target)) {
+        return;
+      }
+
+      if (
+        target.closest('.upload-popup-container') ||
+        target.closest('.custom-select-container') ||
+        target.closest('.text-expand-modal') ||
+        target.closest('.wf-node-picker') ||
+        target.closest('.wf-left-sidebar') ||
+        target.closest('.wf-history-panel')
+      ) {
+        return;
+      }
+
+      setActiveSettingsNodeId(null);
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", handleClickOutside);
+    }, 150);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [activeSettingsNodeId, setActiveSettingsNodeId]);
 
   // Synchronize readOnly prop to Zustand store
   useEffect(() => {
@@ -322,6 +424,56 @@ function CanvasInner({
       const targetNode = nodes.find((n) => n.id === connection.target);
 
       let finalTargetHandle = connection.targetHandle;
+      let nextNodes = nodes;
+
+      if (sourceNode?.type === "requestInputs" && connection.sourceHandle && targetNode) {
+        const fields = (sourceNode.data as any).fields || [];
+        const field = fields.find((f: any) => f.id === connection.sourceHandle);
+        if (field) {
+          const paramType = getTargetParamType(targetNode?.type, connection.targetHandle);
+          let updatedField = { ...field };
+          let fieldModified = false;
+
+          if (paramType === "slider" && field.type === "number_field") {
+            const def = NODE_DEFINITIONS[targetNode?.type || ""];
+            const paramKey = connection.targetHandle?.slice(3);
+            const param = def?.inputs.find((p: any) => p.key === paramKey);
+            updatedField = {
+              ...field,
+              type: "slider_field",
+              numberMin: param?.min ?? 0,
+              numberMax: param?.max ?? 100,
+              numberStep: param?.step ?? 1,
+              linkedTarget: { nodeId: targetNode.id, handle: connection.targetHandle },
+            };
+            fieldModified = true;
+          } else if (paramType === "select" && field.type === "text_field") {
+            const def = NODE_DEFINITIONS[targetNode?.type || ""];
+            const paramKey = connection.targetHandle?.slice(3);
+            const param = def?.inputs.find((p: any) => p.key === paramKey);
+            updatedField = {
+              ...field,
+              type: "select_field",
+              selectOptions: param?.options || [],
+              linkedTarget: { nodeId: targetNode.id, handle: connection.targetHandle },
+            };
+            fieldModified = true;
+          }
+
+          if (fieldModified) {
+            const updatedFields = fields.map((f: any) =>
+              f.id === field.id ? updatedField : f
+            );
+            nextNodes = nodes.map((n) =>
+              n.id === sourceNode.id
+                ? { ...n, data: { ...n.data, fields: updatedFields } }
+                : n
+            );
+            nextNodes = syncLinkedTargetInputFromField(nextNodes, updatedField);
+            setNodes(nextNodes);
+          }
+        }
+      }
 
       if (targetNode?.type === "response") {
         const defaultLabel = resolveResultLabel(sourceNode?.type as string | undefined, connection.sourceHandle);
@@ -357,9 +509,42 @@ function CanvasInner({
         targetHandle: finalTargetHandle,
       };
       setEdges(addEdge(newEdge, edges));
+      useWorkflowStore.getState().setConnectionCompletedThisDrag(true);
     },
-    [nodes, edges, pushHistory, setEdges]
+    [nodes, edges, pushHistory, setEdges, setNodes]
   );
+
+  const onConnectStart = useCallback(
+    (event: any, { nodeId }: any) => {
+      const { activeSettingsNodeId, setConnectingSourceNodeId, setSettingsNodeIdBeforeDrag, setConnectionCompletedThisDrag } =
+        useWorkflowStore.getState();
+      setConnectingSourceNodeId(nodeId);
+      setSettingsNodeIdBeforeDrag(activeSettingsNodeId);
+      setConnectionCompletedThisDrag(false);
+    },
+    []
+  );
+
+  const onConnectEnd = useCallback(() => {
+    setTimeout(() => {
+      const {
+        settingsNodeIdBeforeDrag,
+        connectionCompletedThisDrag,
+        setActiveSettingsNodeId,
+        setConnectingSourceNodeId,
+        setSettingsNodeIdBeforeDrag,
+        setConnectionCompletedThisDrag,
+      } = useWorkflowStore.getState();
+
+      if (!connectionCompletedThisDrag) {
+        setActiveSettingsNodeId(settingsNodeIdBeforeDrag);
+      }
+
+      setConnectingSourceNodeId(null);
+      setSettingsNodeIdBeforeDrag(null);
+      setConnectionCompletedThisDrag(false);
+    }, 50);
+  }, []);
 
   const onSelectionChange = useCallback(
     ({ nodes: selectedNodes }: { nodes: Node[] }) => {
@@ -599,6 +784,8 @@ function CanvasInner({
         }}
         onEdgesChange={readOnly ? undefined : onEdgesChange}
         onConnect={readOnly ? undefined : onConnect}
+        onConnectStart={readOnly ? undefined : onConnectStart}
+        onConnectEnd={readOnly ? undefined : onConnectEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
@@ -610,6 +797,16 @@ function CanvasInner({
         panOnDrag={readOnly ? true : (selectModeActive ? false : true)}
         selectionOnDrag={readOnly ? false : selectModeActive}
         selectionMode={SelectionMode.Partial}
+        onNodeClick={(event, clickedNode) => {
+          if (activeSettingsNodeId && clickedNode.id !== activeSettingsNodeId) {
+            setActiveSettingsNodeId(null);
+          }
+        }}
+        onPaneClick={() => {
+          if (activeSettingsNodeId) {
+            setActiveSettingsNodeId(null);
+          }
+        }}
         onMoveEnd={updateViewportCenter}
         onNodeDragStart={readOnly ? undefined : () => pushHistory()}
         onSelectionChange={readOnly ? undefined : onSelectionChange}
@@ -713,6 +910,17 @@ function CanvasInner({
           selectionFinalized={selectionFinalized}
         />
       )}
+
+      {/* Spotlight Backdrop circular blur overlay for active settings node */}
+      <div
+        ref={overlayRef}
+        className={`fixed inset-0 pointer-events-none transition-opacity duration-300 ease-out z-[900] ${
+          activeSettingsNodeId ? "opacity-100" : "opacity-0"
+        }`}
+        style={{
+          backgroundColor: "rgba(0, 0, 0, 0.45)",
+        }}
+      />
 
       {/* Preview mode banner and info button are rendered in page.tsx (above the Canvas) */}
     </div>

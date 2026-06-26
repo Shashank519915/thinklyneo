@@ -31,7 +31,7 @@ export default function AnimatedEdge({
 }: EdgeProps) {
   const [hovered, setHovered] = useState(false);
   const { deleteElements } = useReactFlow();
-  const { executingNodeIds, previewRunId, previewRunNodeIds, isRunning, activeRunNodeIds } =
+  const { executingNodeIds, previewRunId, previewRunNodeIds, isRunning, activeRunNodeIds, activeSettingsNodeId } =
     useWorkflowStore();
 
   const [edgePath, labelX, labelY] = getBezierPath({
@@ -49,6 +49,10 @@ export default function AnimatedEdge({
     : isRunning &&
       (!activeRunNodeIds.has(source) || !activeRunNodeIds.has(target));
 
+  const isSettingsOpen = activeSettingsNodeId !== null;
+  const isConnectedToActiveSettings = source === activeSettingsNodeId || target === activeSettingsNodeId;
+  const isSettingsDimmed = isSettingsOpen && !isConnectedToActiveSettings;
+
   // Source node currently executing → pulse purple to match glow
   const sourceExecuting = isPreviewMode ? false : executingNodeIds.includes(source);
   const baseColor = (data?.color as string | undefined) ?? "#7C3AED";
@@ -56,8 +60,11 @@ export default function AnimatedEdge({
   const strokeColor = hovered || selected ? shadeDown(activeColor) : activeColor;
   const strokeWidth = hovered || selected ? 3.5 : 2.5;
 
+  const finalOpacity = isSettingsDimmed ? 0.15 : (isDimmed ? 0.2 : 1);
+  const filterStyle = isSettingsDimmed ? "blur(2px)" : undefined;
+
   return (
-    <g style={{ opacity: isDimmed ? 0.2 : 1, transition: "opacity 0.2s" }}>
+    <g style={{ transition: "opacity 0.2s, filter 0.2s" }}>
       {/* Invisible wider path for easier hover/click */}
       <path
         d={edgePath}
@@ -69,7 +76,7 @@ export default function AnimatedEdge({
         style={{ cursor: "pointer" }}
       />
 
-      {/* Base edge (thin, lower opacity when idle to reduce clutter) */}
+      {/* Base edge (flowing dashes) */}
       <path
         id={id}
         d={edgePath}
@@ -77,11 +84,14 @@ export default function AnimatedEdge({
         stroke={strokeColor}
         strokeWidth={hovered || selected ? 3.5 : 2.2}
         markerEnd={markerEnd}
+        strokeDasharray="6, 6"
+        className={isSettingsDimmed ? "" : "edge-animated"}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
         style={{
-          transition: "stroke 0.2s, stroke-width 0.15s, opacity 0.2s",
-          opacity: hovered || selected ? 1 : 0.45,
+          transition: "stroke 0.2s, stroke-width 0.15s, opacity 0.2s, filter 0.2s",
+          opacity: (hovered || selected ? 1 : 0.45) * finalOpacity,
+          filter: filterStyle,
           pointerEvents: "none",
         }}
       />
@@ -94,10 +104,12 @@ export default function AnimatedEdge({
           stroke={activeColor}
           strokeWidth={hovered || selected ? 4.5 : 3.2}
           strokeDasharray="8, 16"
-          className="edge-executing"
+          className={isSettingsDimmed ? "" : "edge-executing"}
           style={{
+            transition: "opacity 0.2s, filter 0.2s",
             pointerEvents: "none",
-            filter: `drop-shadow(0 0 5px ${activeColor})`,
+            filter: `drop-shadow(0 0 5px ${activeColor})` + (filterStyle ? ` ${filterStyle}` : ""),
+            opacity: finalOpacity,
           }}
         />
       )}

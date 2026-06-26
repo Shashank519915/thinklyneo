@@ -8,6 +8,8 @@ allowBuilds:
   "sharp": true
   unrs-resolver: false
 
+minimumReleaseAge: 0
+
 minimumReleaseAgeExclude:
   - '@shashank519915/shared@1.0.0'
   - '@shashank519915/shared@1.0.2'

@@ -44,6 +44,8 @@ export function useGenericNodeState(id: string, definition: NodeDefinition) {
     previewRunId,
     previewNodeOutputs,
     readOnly,
+    activeSettingsNodeId,
+    setActiveSettingsNodeId,
   } = useWorkflowStore();
   const {
     isPreviewMode,
@@ -61,7 +63,10 @@ export function useGenericNodeState(id: string, definition: NodeDefinition) {
   const isLocked = !!nodeData?.locked;
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const showSettings = activeSettingsNodeId === id;
+  const setShowSettings = (open: boolean) => {
+    setActiveSettingsNodeId(open ? id : null);
+  };
   const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [activeUploadPopup, setActiveUploadPopup] = useState<string | null>(null);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);

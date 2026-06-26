@@ -2,14 +2,14 @@
  * @fileoverview Promote a node input handle to a Request-Inputs field + edge (frontend-only).
  */
 
-import type { Edge, Node } from "@xyflow/react";
+import { MarkerType, type Edge, type Node } from "@xyflow/react";
 import type { NodeParameter } from "@shashank519915/shared";
 import { evaluateCanvasConnection } from "@/lib/canvas-connection";
 import {
   syncLinkedTargetInputFromField,
   syncTargetFromRequestField,
 } from "@/lib/promoted-input-value";
-import { generateEdgeId } from "@/lib/utils";
+import { generateEdgeId, getSourceHandleColor } from "@/lib/utils";
 import type {
   RequestInputsData,
   SelectFieldOption,
@@ -76,7 +76,8 @@ export function resolveRequestFieldType(
   handleType: NodeParameter["handle"] extends infer H ? (H extends { type: infer T } ? T : never) : never
 ): WorkflowField["type"] {
   if (paramType === "select") return "select_field";
-  if (paramType === "number" || paramType === "slider") return "number_field";
+  if (paramType === "slider") return "slider_field";
+  if (paramType === "number") return "number_field";
   if (paramType === "boolean") return "boolean_field";
   const ht = handleType as string | undefined;
   if (ht === "image") return "image_field";
@@ -264,14 +265,23 @@ export function promoteInputToRequest(opts: PromoteInputOptions): PromoteInputRe
       e.targetHandle === connection.targetHandle
   );
   if (!edgeExists) {
+    const edgeColor = getSourceHandleColor(connection.sourceHandle);
     nextEdges = [
       ...nextEdges,
       {
         id: generateEdgeId(),
+        type: "animatedEdge",
         source: connection.source,
         target: connection.target,
         sourceHandle: connection.sourceHandle,
         targetHandle: connection.targetHandle,
+        data: { color: edgeColor },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: edgeColor,
+          width: 16,
+          height: 16,
+        },
       } as Edge,
     ];
   }

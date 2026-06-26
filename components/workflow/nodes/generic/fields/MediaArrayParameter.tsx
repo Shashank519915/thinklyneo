@@ -27,6 +27,7 @@ interface MediaArrayParameterProps {
   definition: any;
   edgeResolveOpts: any;
   handleId: string;
+  parentInputs?: any;
 }
 
 function getMediaArrayMax(
@@ -62,6 +63,7 @@ export function MediaArrayParameter({
   definition,
   edgeResolveOpts,
   handleId,
+  parentInputs,
 }: MediaArrayParameterProps) {
 
   // --- Kling-style Image Upload ---
@@ -176,9 +178,50 @@ export function MediaArrayParameter({
             const v = resolvePropagatedEdgeValue(edge, nodes ?? [], edgeResolveOpts);
             return typeof v === "string" && v.length > 0 ? v : null;
           })()
-        : (value as string | null)) ?? null;
+        : (Array.isArray(value) && value.length > 0 ? String(value[0]) : typeof value === "string" ? value : null)) ?? null;
 
-    if (!imgUrl) return null;
+    if (!imgUrl) {
+      return isWired ? (
+        <div className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-[#7C3AED]/30 bg-[#0A0A0C]/60 px-2.5 py-1.5 text-[10px] text-zinc-500 font-mono">
+          <LucideIcons.Link2 className="w-3 h-3 text-[#7C3AED] shrink-0" />
+          <span className="truncate">Wired Upstream (Awaiting Image)</span>
+        </div>
+      ) : (
+        <div className="relative">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
+            className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-white/[0.12] bg-[#0C0C0E]/60 px-3 py-1.5 text-xs text-zinc-400 hover:border-[#7C3AED]/40 hover:text-zinc-200 hover:bg-white/[0.02] transition-colors disabled:opacity-50 nodrag font-semibold"
+          >
+            {uploadingField === param.key ? (
+              <LucideIcons.Loader2 className="w-3 h-3 animate-spin shrink-0" />
+            ) : (
+              <LucideIcons.Upload className="w-3 h-3 text-zinc-500 shrink-0" />
+            )}
+            <span className="capitalize">
+              {uploadingField === param.key ? "Uploading..." : `Upload image`}
+            </span>
+          </button>
+          <input
+            id={`file-input-${id}-${param.key}`}
+            type="file"
+            disabled={disabled}
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => void handleFileUpload(param.key, e.target.files)}
+          />
+          <UploadPopup
+            open={activeUploadPopup === param.key}
+            onClose={() => setActiveUploadPopup(null)}
+            onUpload={() => {
+              const input = document.getElementById(`file-input-${id}-${param.key}`);
+              if (input) (input as HTMLInputElement).click();
+            }}
+          />
+        </div>
+      );
+    }
 
     const clampPct = (n: number, min = 0, max = 100) =>
       Math.min(
@@ -186,26 +229,26 @@ export function MediaArrayParameter({
         Math.max(min, Number.isFinite(n) ? Math.round(n) : min)
       );
 
-    // Look up parent node inputs for coordinates
-    const parentInputs = nodes.find(n => n.id === id)?.data?.inputs || {};
-    const xv = clampPct(Number(parentInputs.x ?? 0));
-    const yv = clampPct(Number(parentInputs.y ?? 0));
-    const wv = clampPct(Number(parentInputs.w ?? 100), 1, 100);
-    const hv = clampPct(Number(parentInputs.h ?? 100), 1, 100);
+    // Look up parent node inputs for coordinates (from prop)
+    const activeInputs = parentInputs || {};
+    const xv = clampPct(Number(activeInputs.x ?? 0));
+    const yv = clampPct(Number(activeInputs.y ?? 0));
+    const wv = clampPct(Number(activeInputs.w ?? 100), 1, 100);
+    const hv = clampPct(Number(activeInputs.h ?? 100), 1, 100);
     const rightPct = Math.min(100, xv + wv);
     const bottomPct = Math.min(100, yv + hv);
 
     return (
       <div className="mt-2 flex justify-end">
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-1.5 w-full max-w-[240px]">
           <div
-            className="relative overflow-hidden rounded-md"
+            className="relative overflow-hidden rounded-md w-full"
             style={{ border: "2px solid rgba(59,130,246,0.3)" }}
           >
             <img
               alt=""
               src={imgUrl}
-              className="block rounded-sm"
+              className="block rounded-sm w-full"
               style={{ maxWidth: 240, maxHeight: 160 }}
             />
             {/* Dimmed overlay regions */}
@@ -252,13 +295,46 @@ export function MediaArrayParameter({
               <button
                 type="button"
                 onClick={() => removeFileValue(param.key)}
-                className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500 border-0"
+                className="nodrag absolute right-1 top-1 z-10 rounded bg-black/60 p-0.5 text-white hover:bg-red-500 border-0 cursor-pointer"
                 title="Remove image"
               >
                 <LucideIcons.X className="h-2.5 w-2.5" aria-hidden="true" />
               </button>
             )}
           </div>
+          {/* Change Image Button — only when image is local (not wired) */}
+          {!isWired && !isLocked && !readOnly && (
+            <div className="relative w-full">
+              <button
+                type="button"
+                onClick={() => setActiveUploadPopup(activeUploadPopup === param.key ? null : param.key)}
+                className="nodrag flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/5 bg-[#0C0C0E]/60 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02] hover:border-[#7C3AED]/20 transition-all cursor-pointer font-semibold"
+              >
+                {uploadingField === param.key ? (
+                  <LucideIcons.Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <LucideIcons.RefreshCw className="w-3 h-3 text-zinc-500" />
+                )}
+                <span>Change Image</span>
+              </button>
+              <input
+                id={`file-input-${id}-${param.key}`}
+                type="file"
+                disabled={disabled}
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => void handleFileUpload(param.key, e.target.files)}
+              />
+              <UploadPopup
+                open={activeUploadPopup === param.key}
+                onClose={() => setActiveUploadPopup(null)}
+                onUpload={() => {
+                  const input = document.getElementById(`file-input-${id}-${param.key}`);
+                  if (input) (input as HTMLInputElement).click();
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
     );

@@ -8,7 +8,7 @@
  */
 
 import React from "react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, useUpdateNodeInternals } from "@xyflow/react";
 import BorderGlow from "@/components/ui/BorderGlow";
 import * as LucideIcons from "lucide-react";
 import { sanitizeError } from "@/lib/utils";
@@ -20,6 +20,7 @@ import {
 import { getNodeRunBorderClass, getNodeRunButtonState } from "@/lib/node-run-chrome";
 import NodeHeaderActions from "./NodeHeaderActions";
 import TextExpandModal from "../../TextExpandModal";
+import { SettingsPanelOverlay } from "./SettingsPanelOverlay";
 
 export interface GenericNodeShellProps {
   // Node identity
@@ -38,6 +39,7 @@ export interface GenericNodeShellProps {
   nodeData: any;
   // Run/preview state
   isDimmed: boolean;
+  isSettingsDimmed?: boolean;
   isExecuting: boolean;
   isRunPending: boolean;
   isRunCompleted: boolean;
@@ -76,6 +78,7 @@ export interface GenericNodeShellProps {
   onDuplicate: () => void;
   onDuplicateWithEdges: () => void;
   onDelete: () => void;
+  onDragHover?: () => void;
 }
 
 export function GenericNodeShell({
@@ -84,6 +87,7 @@ export function GenericNodeShell({
   definition,
   nodeData,
   isDimmed,
+  isSettingsDimmed = false,
   isExecuting,
   isRunPending,
   isRunCompleted,
@@ -115,7 +119,16 @@ export function GenericNodeShell({
   onDuplicate,
   onDuplicateWithEdges,
   onDelete,
+  onDragHover,
 }: GenericNodeShellProps) {
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  // Force React Flow to recalculate handles when settings panel opens or closes
+  React.useEffect(() => {
+    // Delay slightly to allow DOM to update before measuring
+    const timeout = setTimeout(() => updateNodeInternals(id), 50);
+    return () => clearTimeout(timeout);
+  }, [showSettings, id, updateNodeInternals]);
   return (
     <BorderGlow
       selected={selected}
@@ -126,7 +139,8 @@ export function GenericNodeShell({
     >
       <div
         data-locked={isLocked ? "true" : undefined}
-        className={`wf-node-card w-[380px] max-w-[380px] rounded-[1.25rem] bg-white/[0.03] border border-white/5 p-[5px] backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-white/10 overflow-visible ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+        onMouseEnter={onDragHover}
+        className={`wf-node-card w-[380px] max-w-[380px] rounded-[1.25rem] bg-white/[0.03] border border-white/5 p-[5px] backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-white/10 overflow-visible ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""} ${isSettingsDimmed ? "wf-node-dimmed-blur" : ""}`}
         style={{ overflow: "visible", width: "380px" }}
       >
       <div
@@ -207,33 +221,93 @@ export function GenericNodeShell({
         <div className="mx-4 mt-3 px-3.5 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-[12px] text-red-400 font-mono">
           {sanitizeError(nodeError)}
         </div>
-      )}
-
-      {/* Primary Parameters */}
-      <div className="px-4 py-4" style={{ overflow: "visible" }}>
-        <div className="space-y-4">
-          {/* Text-to-video / standard primary params — hidden when in image tab for nodes that have image-mode params */}
-          {modeTab === "text" || imageModeParams.length === 0
-            ? primaryParams.map(renderParameterInput)
-            : null}
-
-          {/* Image tab — for nodes like gptImage2 that interleave primary+image-mode in definition order.
-              For klingV3-style nodes, image-mode params replace primary entirely. */}
-          {imageModeParams.length > 0 && modeTab === "image" && (() => {
-            // If the node has primary params alongside image-mode params (e.g. gptImage2),
-            // render all primary+image-mode in their definition order so fields interleave correctly.
-            // For nodes where primary params are hidden in image tab (klingV3), imageModeParams only.
-            const hasPrimaryInImageTab = definition.type === "gptImage2";
-            if (hasPrimaryInImageTab) {
-              return definition.inputs
-                .filter((p: any) => p.group === "primary" || p.group === "image-mode")
-                .map(renderParameterInput);
+      )}      {/* Media Display Area (Inputs or Output) */}
+      <div className="px-4 py-3">
+        {/* If there is an output image/video, show it here. Else if there's an input image, show that. */}
+        {(() => {
+          const outDef = definition.outputs.find((o) => o.type === "image" || o.type === "video");
+          const inDef = definition.inputs.find((i) => i.type === "image-array" || i.type === "file-upload" || i.handle?.type === "image");
+          
+          let mediaUrl: string | null = null;
+          let isOutput = false;
+          
+          if (outDef && output) {
+            const currentOutput = isPreviewMode ? output : (output ?? nodeData.output);
+            if (currentOutput && typeof currentOutput === "object" && outDef.key in currentOutput) {
+              mediaUrl = String((currentOutput as any)[outDef.key]);
+              isOutput = true;
+            } else if (typeof currentOutput === "string") {
+              mediaUrl = currentOutput;
+              isOutput = true;
             }
-            return imageModeParams.map(renderParameterInput);
-          })()}
+          }
+          
+          if (!mediaUrl && inDef && inDef.uiVariant !== "crop-overlay-preview") {
+            const inVal = nodeData?.inputs?.[inDef.key];
+            if (Array.isArray(inVal) && inVal.length > 0) mediaUrl = String(inVal[0]);
+            else if (inVal && typeof inVal === "string") mediaUrl = inVal;
+          }
 
-          {/* Ghost handles for hidden/collapsed parameters — always mounted so React Flow can draw edges even when the UI is hidden/collapsed */}
-          {(() => {
+          if (mediaUrl) {
+            const isVideo = mediaUrl.endsWith(".mp4") || mediaUrl.endsWith(".webm") || outDef?.type === "video";
+            return (
+              <div className="relative w-full rounded-xl overflow-hidden bg-black/40 border border-white/5 aspect-video flex items-center justify-center">
+                {isVideo ? (
+                  <video src={mediaUrl} className="w-full h-full object-cover" autoPlay muted loop playsInline />
+                ) : (
+                  <img src={mediaUrl} className="w-full h-full object-cover" alt="Media preview" />
+                )}
+                {isOutput && (
+                  <div className="absolute top-2 right-2 bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded font-mono uppercase border border-green-500/20 backdrop-blur-md">
+                    Generated
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return null;
+        })()}
+      </div>
+
+      {/* Inputs configured to show ON the node */}
+      {(() => {
+        const onNodeParams = definition.inputs.filter(
+          (p: any) => p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url", "uploadedImages"].includes(p.key)
+        );
+
+        const visibleOnNodeParams = hasModeTab
+          ? onNodeParams.filter((p: any) => p.group !== "image-mode" || modeTab === "image")
+          : onNodeParams;
+
+        if (visibleOnNodeParams.length === 0) return null;
+
+        if (visibleOnNodeParams.length === 0) return null;
+
+        return (
+          <div className="px-4 pb-4 space-y-4">
+            {visibleOnNodeParams.map(renderParameterInput)}
+          </div>
+        );
+      })()}
+
+      {/* Settings Button & Panel */}
+      <div className="px-4 pb-4">
+        <div className="relative">
+          <button
+            type="button"
+            className={`w-full flex items-center justify-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-all ${
+              showSettings 
+                ? "bg-white/10 border-white/10 text-white" 
+                : "bg-white/[0.03] border-white/5 text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200"
+            }`}
+            onClick={() => onShowSettingsChange(!showSettings)}
+          >
+            <LucideIcons.Settings2 className="w-4 h-4" />
+            Configure Node
+          </button>
+          
+          {/* Dummy Handles: When settings panel is CLOSED, all incoming parameter edges route directly to a single dummy dot on this button! */}
+          {!showSettings && (() => {
             const visibleParamKeys = new Set<string>();
             if (modeTab === "text" || imageModeParams.length === 0) {
               primaryParams.forEach((p) => visibleParamKeys.add(p.key));
@@ -248,103 +322,101 @@ export function GenericNodeShell({
                 imageModeParams.forEach((p) => visibleParamKeys.add(p.key));
               }
             }
-            if (showAdvanced) {
-              advancedParams.forEach((p) => visibleParamKeys.add(p.key));
-            }
-            if (showSettings && (imageModeParams.length === 0 || modeTab === "image")) {
-              settingsParams.forEach((p) => visibleParamKeys.add(p.key));
-              if (imageModeParams.length > 0 && modeTab === "image") {
-                primaryParams
-                  .filter((p) => p.key === "generate_audio")
-                  .forEach((p) => visibleParamKeys.add(p.key));
-              }
+            advancedParams.forEach((p) => visibleParamKeys.add(p.key));
+            settingsParams.forEach((p) => visibleParamKeys.add(p.key));
+            if (imageModeParams.length > 0 && modeTab === "image") {
+              primaryParams
+                .filter((p) => p.key === "generate_audio")
+                .forEach((p) => visibleParamKeys.add(p.key));
             }
 
-            return definition.inputs
-              .filter((p: any) => p.handle && !visibleParamKeys.has(p.key))
-              .map((p: any) => (
+            const handles = definition.inputs
+              .filter((p: any) => p.handle && visibleParamKeys.has(p.key))
+              .map((p: any) => {
+                const isOnNode = p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key);
+                if (isOnNode) return null;
+                return (
                 <Handle
-                  key={`ghost-${p.key}`}
+                  key={`dummy-${p.key}`}
                   type="target"
                   position={Position.Left}
                   id={`in:${p.key}`}
-                  style={{ opacity: 0, width: 0, height: 0, minWidth: 0, minHeight: 0, border: "none", background: "transparent", position: "absolute", left: 0, top: 0 }}
+                  className="target connectable"
+                  style={{ 
+                    width: 20, 
+                    height: 20, 
+                    position: "absolute", 
+                    left: -14,
+                    top: "50%", 
+                    transform: "translate(-50%, -50%)",
+                    opacity: 0, 
+                    zIndex: 50
+                  }}
                 />
-              ));
-          })()}
+              )});
+              
+            if (handles.every(h => h === null)) return null;
 
-          {/* Collapsible Advanced Parameters (generic nodes) */}
-          {advancedParams.length > 0 && (
-            <>
-              <div className="relative" style={{ overflow: "visible" }}>
-                <button
-                  type="button"
-                  className="nodrag group mt-5 flex cursor-pointer items-center gap-2 bg-transparent border-0 p-0 outline-none active:scale-[0.98]"
-                  onClick={() => onShowAdvancedChange(!showAdvanced)}
-                >
-                  <LucideIcons.ChevronDown
-                    className={`h-4 w-4 text-zinc-500 group-hover:text-zinc-300 transition-all duration-200 ${
-                      showAdvanced ? "" : "-rotate-90"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="text-xs text-zinc-400 group-hover:text-zinc-200 font-semibold uppercase tracking-wide font-mono transition-colors">
-                    Advanced Settings
-                  </span>
-                </button>
-              </div>
-
-              {showAdvanced && (
-                <div className="space-y-4 pt-2">
-                  {advancedParams.map(renderParameterInput)}
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Collapsible Settings section (Kling v3 style — group: "settings").
-              Only shown on image tab (for nodes with image-mode params).
-              For standard nodes with no image-mode, shown always.
-              In image tab, also includes generate_audio from primary params. */}
-          {settingsParams.length > 0 && (imageModeParams.length === 0 || modeTab === "image") && (() => {
-            // In image tab, pull generate_audio from primaryParams into this section too
-            const extraInSettings = imageModeParams.length > 0 && modeTab === "image"
-              ? primaryParams.filter((p) => p.key === "generate_audio")
-              : [];
-            const allSettingsItems = [...settingsParams, ...extraInSettings];
-            if (allSettingsItems.length === 0) return null;
             return (
               <>
-                <div className="relative" style={{ overflow: "visible" }}>
-                  <button
-                    type="button"
-                    className="nodrag group mt-5 flex cursor-pointer items-center gap-2 bg-transparent border-0 p-0 outline-none active:scale-[0.98]"
-                    onClick={() => onShowSettingsChange(!showSettings)}
-                  >
-                    <LucideIcons.ChevronDown
-                      className={`h-4 w-4 text-zinc-500 group-hover:text-zinc-300 transition-all duration-200 ${
-                        showSettings ? "" : "-rotate-90"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <span
-                      data-handle-anchor="label"
-                      className="text-xs text-zinc-400 group-hover:text-zinc-200 font-semibold uppercase tracking-wide font-mono transition-colors"
-                    >
-                      Settings
-                    </span>
-                  </button>
-                </div>
-
-                {showSettings && (
-                  <div className="mt-4 space-y-4">
-                    {allSettingsItems.map(renderParameterInput)}
-                  </div>
-                )}
+                <div
+                   className="absolute pointer-events-none rounded-full bg-white z-[51] border-2 border-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                   style={{ left: -14, top: "50%", transform: "translateY(-50%)", width: 14, height: 14 }}
+                />
+                {handles}
               </>
             );
           })()}
         </div>
+
+        {/* Global Settings Panel Overlay */}
+        <SettingsPanelOverlay
+          isOpen={showSettings}
+          nodeId={id}
+          nodeName={definition.name}
+          onClose={() => onShowSettingsChange(false)}
+        >
+          <div className="pt-2 space-y-4">
+            {/* Standard Primary Params */}
+            {modeTab === "text" || imageModeParams.length === 0
+              ? primaryParams.filter((p: any) => !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key))).map(renderParameterInput)
+              : null}
+
+            {/* Image Tab Params */}
+            {imageModeParams.length > 0 && modeTab === "image" && (() => {
+              const hasPrimaryInImageTab = definition.type === "gptImage2";
+              if (hasPrimaryInImageTab) {
+                return definition.inputs
+                  .filter((p: any) => (p.group === "primary" || p.group === "image-mode") && !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key)))
+                  .map(renderParameterInput);
+              }
+              return imageModeParams.filter((p: any) => !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key))).map(renderParameterInput);
+            })()}
+
+            {/* Advanced Params */}
+            {advancedParams.filter((p: any) => !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key))).length > 0 && (
+              <div className="pt-4 border-t border-white/10 space-y-4">
+                <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2">Advanced</div>
+                {advancedParams.filter((p: any) => !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key))).map(renderParameterInput)}
+              </div>
+            )}
+
+            {/* Settings Params */}
+            {settingsParams.length > 0 && (imageModeParams.length === 0 || modeTab === "image") && (() => {
+              const extraInSettings = imageModeParams.length > 0 && modeTab === "image"
+                ? primaryParams.filter((p) => p.key === "generate_audio")
+                : [];
+              const allSettingsItems = [...settingsParams, ...extraInSettings].filter((p: any) => !(p.showOnNode === true || ["inputImage", "inputVideo", "prompt", "video_url", "image_url"].includes(p.key)));
+              if (allSettingsItems.length === 0) return null;
+              return (
+                <div className="pt-4 border-t border-white/10 space-y-4">
+                  <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2">Configuration</div>
+                  {allSettingsItems.map(renderParameterInput)}
+                </div>
+              );
+            })()}
+          </div>
+        </SettingsPanelOverlay>
       </div>
 
       {/* Outputs */}
@@ -402,74 +474,43 @@ export function GenericNodeShell({
                     {out.label}
                   </div>
 
-                  {displayValue ? (
-                    <div className="nodrag nowheel rounded-lg border border-white/5 bg-[#050507] p-3 min-h-[120px] max-h-[220px] overflow-y-auto nowheel">
-                      {out.type === "image" && (
-                        <div className="flex flex-col gap-2">
-                          <img
-                             src={String(displayValue)}
-                             alt="Output"
-                             className="mx-auto block w-full max-h-[160px] object-contain rounded bg-white/[0.01]"
-                             onError={(e) => {
-                               e.currentTarget.style.display = "none";
-                               const link = e.currentTarget
-                                 .nextElementSibling as HTMLElement;
-                               if (link) link.style.display = "block";
-                             }}
+                  {/* If image/video, it's rendered in the hero section. For text/file, render it here. */}
+                  {out.type !== "image" && out.type !== "video" && (
+                    displayValue ? (
+                      <div className="nodrag nowheel rounded-lg border border-white/5 bg-[#050507] p-3 min-h-[120px] max-h-[220px] overflow-y-auto nowheel">
+                        {out.type === "audio" && (
+                          <audio
+                            src={String(displayValue)}
+                            controls
+                            className="w-full h-9 rounded"
                           />
-                          <div style={{ display: "none" }}>
-                            <a
-                              href={String(displayValue)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[12px] text-indigo-400 hover:text-indigo-300 hover:underline break-all transition-colors font-mono"
-                            >
-                              {String(displayValue)}
-                            </a>
-                          </div>
-                        </div>
-                      )}
+                        )}
 
-                      {out.type === "video" && (
-                        <video
-                          src={String(displayValue)}
-                          controls
-                          className="w-full max-h-[160px] rounded"
-                        />
-                      )}
+                        {out.type === "text" && (
+                          <p className="select-text text-[13px] text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                            {String(displayValue)}
+                          </p>
+                        )}
 
-                      {out.type === "audio" && (
-                        <audio
-                          src={String(displayValue)}
-                          controls
-                          className="w-full h-9 rounded"
-                        />
-                      )}
-
-                      {out.type === "text" && (
-                        <p className="select-text text-[13px] text-zinc-200 leading-relaxed whitespace-pre-wrap">
-                          {String(displayValue)}
-                        </p>
-                      )}
-
-                      {out.type === "file" && (
-                        <a
-                          href={String(displayValue)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[12px] text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-1.5 transition-colors font-mono"
-                        >
-                          <LucideIcons.ExternalLink className="w-3.5 h-3.5" />
-                          View Output File
-                        </a>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="nodrag nowheel min-h-[84px] rounded-lg border border-white/5 bg-[#050507]/40 p-3">
-                      <div className="py-6 text-center text-xs text-zinc-500 font-mono uppercase tracking-wider">
-                        No output yet
+                        {out.type === "file" && (
+                          <a
+                            href={String(displayValue)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[12px] text-indigo-400 hover:text-indigo-300 hover:underline flex items-center gap-1.5 transition-colors font-mono"
+                          >
+                            <LucideIcons.ExternalLink className="w-3.5 h-3.5" />
+                            View Output File
+                          </a>
+                        )}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="nodrag nowheel min-h-[84px] rounded-lg border border-white/5 bg-[#050507]/40 p-3">
+                        <div className="py-6 text-center text-xs text-zinc-500 font-mono uppercase tracking-wider">
+                          No output yet
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
               </div>
