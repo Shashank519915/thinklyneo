@@ -73,6 +73,81 @@ function RedirectToDocs() {
 
 
 
+const TEMPLATES_LIST = [
+  {
+    id: "advertisement",
+    name: "Product Marketing Post Generator",
+    description: "AI-powered marketing copywriter, crop, & ad publisher pipeline.",
+    image: "/marketing_post.png",
+    color: "from-purple-500/10 to-pink-500/10 hover:border-purple-500/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.08)]",
+    badgeColor: "bg-purple-500/10 border-purple-500/15 text-purple-400",
+  },
+  {
+    id: "youtubeShorts",
+    name: "YouTube Shorts Creator",
+    description: "Generate video scripts, Kling B-rolls, and extract and merge audio/video.",
+    image: "/ai_racing_car.png",
+    color: "from-red-500/10 to-orange-500/10 hover:border-red-500/30 hover:shadow-[0_0_20px_rgba(239,68,68,0.08)]",
+    badgeColor: "bg-red-500/10 border-red-500/15 text-red-400",
+  },
+  {
+    id: "audioDubbing",
+    name: "Audio Dubbing Pipeline",
+    description: "Extract audio, translate spoken languages, and summarize the content.",
+    image: "/marketing_post.png",
+    color: "from-blue-500/10 to-cyan-500/10 hover:border-blue-500/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.08)]",
+    badgeColor: "bg-blue-500/10 border-blue-500/15 text-blue-400",
+  },
+  {
+    id: "podcastTeaser",
+    name: "Podcast Teaser Creator",
+    description: "Crop watermarks, extract audio, and write engaging social media promo teasers.",
+    image: "/ai_racing_car.png",
+    color: "from-amber-500/10 to-yellow-500/10 hover:border-amber-500/30 hover:shadow-[0_0_20px_rgba(245,158,11,0.08)]",
+    badgeColor: "bg-amber-500/10 border-amber-500/15 text-amber-400",
+  },
+  {
+    id: "newsSummarizer",
+    name: "News Summarizer & Illustrator",
+    description: "Crop news banners, summarize articles, and generate editorial illustrations.",
+    image: "/marketing_post.png",
+    color: "from-emerald-500/10 to-teal-500/10 hover:border-emerald-500/30 hover:shadow-[0_0_20px_rgba(16,185,129,0.08)]",
+    badgeColor: "bg-emerald-500/10 border-emerald-500/15 text-emerald-400",
+  },
+  {
+    id: "cinematicTeaser",
+    name: "Cinematic Teaser Creator",
+    description: "Write cinematic scripts, moodboard keyframes, and video loops.",
+    image: "/ai_racing_car.png",
+    color: "from-violet-500/10 to-indigo-500/10 hover:border-violet-500/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.08)]",
+    badgeColor: "bg-violet-500/10 border-violet-500/15 text-violet-400",
+  },
+  {
+    id: "socialMediaCampaign",
+    name: "Social Media Campaign Kit",
+    description: "Ad copywriting + square/landscape watermark logo crops for multi-platforms.",
+    image: "/marketing_post.png",
+    color: "from-rose-500/10 to-pink-500/10 hover:border-rose-500/30 hover:shadow-[0_0_20px_rgba(244,63,94,0.08)]",
+    badgeColor: "bg-rose-500/10 border-rose-500/15 text-rose-400",
+  },
+  {
+    id: "voiceoverVideo",
+    name: "Voiceover Video Creator",
+    description: "Synchronize spoken audio track to custom AI illustration B-roll loop.",
+    image: "/ai_racing_car.png",
+    color: "from-fuchsia-500/10 to-purple-500/10 hover:border-fuchsia-500/30 hover:shadow-[0_0_20px_rgba(217,70,239,0.08)]",
+    badgeColor: "bg-fuchsia-500/10 border-fuchsia-500/15 text-fuchsia-400",
+  },
+  {
+    id: "videoLocalizer",
+    name: "Video Language Localizer",
+    description: "Extract talking-head audio, translate language, and generate title cards.",
+    image: "/marketing_post.png",
+    color: "from-sky-500/10 to-blue-500/10 hover:border-sky-500/30 hover:shadow-[0_0_20px_rgba(14,165,233,0.08)]",
+    badgeColor: "bg-sky-500/10 border-sky-500/15 text-sky-400",
+  },
+];
+
 // ─── Main Dashboard Page ─────────────────────────────────────────────────────
 function DashboardContent() {
   const router = useRouter();
@@ -172,7 +247,7 @@ function DashboardContent() {
     }
   };
 
-  const createCustomWorkflow = async (name: string) => {
+  const createCustomWorkflow = async (name: string, template?: string) => {
     if (creating) return;
     setCreating(true);
     let navigated = false;
@@ -180,7 +255,7 @@ function DashboardContent() {
       const resp = await fetch("/api/workflows", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, template }),
       });
       const data = await resp.json();
       if (data.data?.id) {
@@ -375,64 +450,50 @@ function DashboardContent() {
                     <div className="flex items-center gap-3 mb-4">
                       <span className="text-[9px] font-mono font-semibold uppercase tracking-[0.2em] text-zinc-600">Templates</span>
                       <div className="flex-1 h-px bg-white/5" />
-                      <span className="text-[9px] font-mono text-zinc-700">2 available</span>
+                      <span className="text-[9px] font-mono text-zinc-700">{TEMPLATES_LIST.length} available</span>
                     </div>
 
-                    {/* Template cards — 2-col grid, no horizontal scroll */}
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {/* Template 1 */}
-                      <button
-                        type="button"
-                        onClick={createSampleWorkflow}
-                        className="group relative flex items-center gap-4 rounded-2xl border border-white/8 bg-white/[0.015] p-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-purple-500/25 hover:bg-white/[0.03] hover:shadow-[0_0_20px_rgba(139,92,246,0.08)] active:scale-[0.985] cursor-pointer shimmer-hover"
-                      >
-                        {/* Thumbnail */}
-                        <div className="relative w-20 h-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/5 bg-zinc-950">
-                          <img
-                            alt="Product Marketing Post Generator"
-                            loading="lazy"
-                            src="/marketing_post.png"
-                            className="object-cover absolute h-full w-full inset-0 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                    {/* Template cards — Horizontal scroll with snap */}
+                    <div className="mt-4 flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden -mx-1 px-1">
+                      {TEMPLATES_LIST.map((tpl) => (
+                        <div
+                          key={tpl.id}
+                          className="snap-start flex-shrink-0 w-[300px] sm:w-[320px]"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (tpl.id === "advertisement") {
+                                createSampleWorkflow();
+                              } else {
+                                createCustomWorkflow(tpl.name, tpl.id);
+                              }
+                            }}
+                            className={`group relative flex items-center gap-4 rounded-2xl border border-white/8 bg-gradient-to-br ${tpl.color} p-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-white/[0.03] active:scale-[0.985] cursor-pointer shimmer-hover w-full h-[100px]`}
+                          >
+                            {/* Thumbnail */}
+                            <div className="relative w-20 h-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/5 bg-zinc-950">
+                              <img
+                                alt={tpl.name}
+                                loading="lazy"
+                                src={tpl.image}
+                                className="object-cover absolute h-full w-full inset-0 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-110 opacity-70"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                            </div>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs font-semibold text-zinc-200 truncate transition-colors duration-200 group-hover:text-white">
+                                {tpl.name}
+                              </div>
+                              <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-1">{tpl.description}</p>
+                              <div className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 border ${tpl.badgeColor}`}>
+                                <span className="text-[8px] font-bold uppercase tracking-[0.15em]">Use Template</span>
+                              </div>
+                            </div>
+                          </button>
                         </div>
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-zinc-200 truncate transition-colors duration-200 group-hover:text-purple-300">
-                            Product Marketing Post Generator
-                          </div>
-                          <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-1">AI-powered marketing pipeline</p>
-                          <div className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-purple-500/10 border border-purple-500/15">
-                            <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-purple-400">Use Template</span>
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Template 2 */}
-                      <button
-                        type="button"
-                        onClick={() => createCustomWorkflow("Autonomous AI Video Pipeline")}
-                        className="group relative flex items-center gap-4 rounded-2xl border border-white/8 bg-white/[0.015] p-3.5 text-left transition-[transform,border-color,background-color,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:border-emerald-500/25 hover:bg-white/[0.03] hover:shadow-[0_0_20px_rgba(16,185,129,0.06)] active:scale-[0.985] cursor-pointer shimmer-hover"
-                      >
-                        <div className="relative w-20 h-14 flex-shrink-0 overflow-hidden rounded-xl border border-white/5 bg-zinc-950">
-                          <img
-                            alt="Autonomous AI Video Pipeline"
-                            loading="lazy"
-                            src="/ai_racing_car.png"
-                            className="object-cover absolute h-full w-full inset-0 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:scale-110"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-zinc-200 truncate transition-colors duration-200 group-hover:text-emerald-300">
-                            Autonomous AI Video Pipeline
-                          </div>
-                          <p className="mt-0.5 text-[10px] text-zinc-500 line-clamp-1">Heavy GPU automated video render</p>
-                          <div className="mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/15">
-                            <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-emerald-400">Use Template</span>
-                          </div>
-                        </div>
-                      </button>
+                      ))}
                     </div>
                   </div>
 
