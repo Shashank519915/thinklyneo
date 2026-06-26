@@ -48,6 +48,8 @@ const storeState = {
   previewRunId: null as string | null,
   previewNodeOutputs: {} as Record<string, unknown>,
   readOnly: false,
+  activeSettingsNodeId: null as string | null,
+  setActiveSettingsNodeId: vi.fn(),
 };
 
 vi.mock("@/store/workflow-store", () => ({
@@ -100,6 +102,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   storeState.edges = [];
   storeState.readOnly = false;
+  storeState.activeSettingsNodeId = null;
 });
 
 afterEach(() => {
@@ -175,6 +178,7 @@ describe("GenericNode wired image-array", () => {
   it("renders separate previews when one field has comma-separated image URLs", () => {
     storeState.nodes = geminiNodes;
     storeState.edges = imageEdges;
+    storeState.activeSettingsNodeId = "gem";
     render(
       <ReactFlowTestWrapper>
         <GenericNode

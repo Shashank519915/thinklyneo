@@ -39,7 +39,7 @@ export function parseWorkflowFieldValue(
 ): unknown {
   const v = field.value;
   if (field.type === "boolean_field") return v === "true";
-  if (field.type === "number_field") {
+  if (field.type === "number_field" || field.type === "slider_field") {
     if (v === null || v === undefined || v === "") return undefined;
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;

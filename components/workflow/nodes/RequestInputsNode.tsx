@@ -18,6 +18,8 @@ import {
   Music,
   Video,
   FileText,
+  Sliders,
+  List,
 } from "lucide-react";
 import { useWorkflowStore, type WorkflowField, useNodePreview } from "@/store/workflow-store";
 import TextExpandModal from "../TextExpandModal";
@@ -41,7 +43,7 @@ export default function RequestInputsNode({
   selected = false,
 }: NodeProps) {
   const nodeData = data as unknown as RequestInputsData;
-  const { updateNodeData, readOnly, nodes, edges, setNodes, setEdges } = useWorkflowStore();
+  const { updateNodeData, readOnly, nodes, edges, setNodes, setEdges, activeSettingsNodeId } = useWorkflowStore();
   const { isPreviewMode, isDimmed, isExecuting, isRunPending, error, runFieldIds, output } =
     useNodePreview(id);
   const nodeError = error as string | null;
@@ -93,6 +95,9 @@ export default function RequestInputsNode({
       case "number_field":
         label = "number_field";
         break;
+      case "slider_field":
+        label = "slider_field";
+        break;
       case "boolean_field":
         label = "boolean_field";
         break;
@@ -111,12 +116,19 @@ export default function RequestInputsNode({
       case "file_field":
         label = "file_field";
         break;
+      case "select_field":
+        label = "select_field";
+        break;
     }
     const newField: WorkflowField = {
       id: `field_${type.replace("_field", "")}_${Date.now()}`,
       type,
       label,
       value: type === "boolean_field" ? "false" : null,
+      // Default slider configuration
+      ...(type === "slider_field" ? { numberMin: 0, numberMax: 100, numberStep: 1 } : {}),
+      // Default select options
+      ...(type === "select_field" ? { selectOptions: [] } : {}),
     };
     updateNodeData(id, { fields: [...fields, newField] } as Partial<RequestInputsData>);
   };
@@ -237,6 +249,8 @@ export default function RequestInputsNode({
       case "text_field":
       case "select_field":
         return "#f59e0b"; // Amber
+      case "slider_field":
+        return "#f43f5e"; // Rose
       case "video_field":
         return "#22c55e"; // Green
       case "audio_field":
@@ -253,6 +267,17 @@ export default function RequestInputsNode({
     }
   };
 
+  const isSettingsOpen = activeSettingsNodeId !== null && activeSettingsNodeId !== id;
+  const hasConnectedFields = fields.some((field) =>
+    edges?.some(
+      (edge) =>
+        edge.source === id &&
+        edge.sourceHandle === field.id &&
+        edge.target === activeSettingsNodeId
+    )
+  );
+  const isSettingsDimmed = isSettingsOpen && !hasConnectedFields;
+
   return (
     <BorderGlow
       selected={selected}
@@ -262,7 +287,7 @@ export default function RequestInputsNode({
       fillOpacity={0.15}
     >
       <div
-        className={`wf-node-card w-[380px] rounded-[1.25rem] bg-white/[0.03] border border-white/5 p-[5px] backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-white/10 overflow-visible ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""}`}
+        className={`wf-node-card w-[380px] rounded-[1.25rem] bg-white/[0.03] border border-white/5 p-[5px] backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-white/10 overflow-visible ${isDimmed ? "opacity-40 grayscale pointer-events-none" : ""} ${isSettingsDimmed ? "wf-node-dimmed-blur" : ""}`}
         style={{ minWidth: 380, overflow: "visible" }}
       >
       <div
@@ -312,6 +337,20 @@ export default function RequestInputsNode({
                   >
                     <Hash className="w-3.5 h-3.5 text-zinc-500" />
                     <span>Number</span>
+                  </button>
+                  <button
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
+                    onMouseDown={() => addField("slider_field")}
+                  >
+                    <Sliders className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Slider</span>
+                  </button>
+                  <button
+                    className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
+                    onMouseDown={() => addField("select_field")}
+                  >
+                    <List className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Select</span>
                   </button>
                   <button
                     className="nodrag w-full text-left px-3 py-2 text-[13px] text-zinc-300 hover:bg-white/5 hover:text-zinc-100 flex items-center gap-2 transition-colors"
@@ -379,6 +418,14 @@ export default function RequestInputsNode({
 
         {fields.map((field) => {
           const displayValue = getFieldDisplayValue(field) ?? "";
+          const isFieldConnected = edges?.some(
+            (edge) =>
+              edge.source === id &&
+              edge.sourceHandle === field.id &&
+              edge.target === activeSettingsNodeId
+          );
+          const isFieldDimmed = isSettingsOpen && !isFieldConnected;
+
           return (
             <RequestInputFieldItem
               key={field.id}
@@ -386,6 +433,7 @@ export default function RequestInputsNode({
               readOnly={readOnly}
               isPreviewMode={isPreviewMode}
               isNewField={isFieldNew(field.id)}
+              isSettingsDimmed={isFieldDimmed}
               displayValue={displayValue}
               activeSelectFieldId={activeSelectFieldId}
               setActiveSelectFieldId={setActiveSelectFieldId}

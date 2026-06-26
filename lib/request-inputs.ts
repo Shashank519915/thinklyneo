@@ -34,6 +34,7 @@ export function getRequestFieldKind(field: Pick<WorkflowField, "id" | "type">): 
     case "select_field":
       return "select";
     case "number_field":
+    case "slider_field":
       return "number";
     case "boolean_field":
       return "boolean";

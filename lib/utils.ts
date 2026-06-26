@@ -169,14 +169,13 @@ export type HandleType = keyof typeof HANDLE_COLORS;
  */
 export function getSourceHandleColor(handleId: string | null | undefined): string {
   if (!handleId) return "#7C3AED";
+  if (handleId.startsWith("field_")) {
+    // Promoted request inputs are styled as white
+    return "#FFFFFF";
+  }
   if (handleId.includes("image") || handleId === "out:outputImage") return "#F97316"; // orange
   if (handleId === "out:response") return "#3B82F6"; // blue (Gemini response)
   if (handleId === "out:result") return "#3B82F6"; // blue (GPT Image 2 result)
-  if (handleId.startsWith("field_")) {
-    // Request-Inputs fields: image fields are orange, text fields are amber
-    if (handleId.includes("image")) return "#F97316";
-    return "#F59E0B";
-  }
   return "#7C3AED"; // default purple fallback
 }
 

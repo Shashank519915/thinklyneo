@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Handle, Position } from "@xyflow/react";
 import {
   Info,
@@ -19,6 +19,9 @@ import {
   FileText,
   AlignLeft,
   ChevronDown,
+  Sliders,
+  List,
+  Plus,
 } from "lucide-react";
 import { type WorkflowField } from "@/store/workflow-store";
 import ElasticSlider from "@/components/ui/ElasticSlider";
@@ -30,6 +33,7 @@ interface RequestInputFieldItemProps {
   readOnly: boolean;
   isPreviewMode: boolean;
   isNewField: boolean;
+  isSettingsDimmed?: boolean;
   displayValue: string;
   activeSelectFieldId: string | null;
   setActiveSelectFieldId: (id: string | null) => void;
@@ -52,6 +56,7 @@ export function RequestInputFieldItem({
   readOnly,
   isPreviewMode,
   isNewField,
+  isSettingsDimmed = false,
   displayValue,
   activeSelectFieldId,
   setActiveSelectFieldId,
@@ -85,6 +90,10 @@ export function RequestInputFieldItem({
         return <AlignLeft className="w-3.5 h-3.5 text-zinc-500" />;
       case "number_field":
         return <Hash className="w-3.5 h-3.5 text-zinc-500" />;
+      case "slider_field":
+        return <Sliders className="w-3.5 h-3.5 text-zinc-500" />;
+      case "select_field":
+        return <List className="w-3.5 h-3.5 text-zinc-500" />;
       case "image_field":
         return <Image className="w-3.5 h-3.5 text-zinc-500" />;
       case "audio_field":
@@ -101,8 +110,11 @@ export function RequestInputFieldItem({
       case "image_field":
         return "#3b82f6"; // Blue
       case "text_field":
+        return "#f59e0b"; // Amber
       case "select_field":
         return "#f59e0b"; // Amber
+      case "slider_field":
+        return "#f43f5e"; // Rose
       case "video_field":
         return "#22c55e"; // Green
       case "audio_field":
@@ -120,11 +132,14 @@ export function RequestInputFieldItem({
   };
   const handleColorVal = getHandleColor(field.type);
 
+  // For select_field: local state to manage new option input
+  const [newOptionLabel, setNewOptionLabel] = useState("");
+
   return (
     <div
       className={`relative p-3 bg-white/[0.015] border border-white/5 rounded-xl hover:border-white/10 transition-all duration-300 ${
         isNewField ? "opacity-35 select-none pointer-events-none" : ""
-      }`}
+      } ${isSettingsDimmed ? "wf-node-dimmed-blur" : ""}`}
     >
       {/* Downstream wiring target handle (flows OUT of RequestInputs into workfow nodes) */}
       <div
@@ -226,54 +241,200 @@ export function RequestInputFieldItem({
         </div>
 
         {/* Field input */}
-        {field.type === "select_field" && (field.selectOptions?.length ?? 0) > 0 && (
-          <div className="relative custom-select-container">
-            <button
-              type="button"
-              disabled={isPreviewMode || readOnly}
-              onClick={() =>
-                setActiveSelectFieldId(
-                  activeSelectFieldId === field.id ? null : field.id
-                )
-              }
-              className="nodrag flex h-9 w-full items-center justify-between rounded-lg border border-white/5 bg-[#050507] px-3 py-2 text-xs text-zinc-100 disabled:opacity-50 outline-none focus:border-white/15 focus:ring-1 focus:ring-white/10 cursor-pointer transition-all active:scale-[0.98] duration-150 ease-out"
-            >
-              <span className="truncate">
-                {field.selectOptions?.find((o) => o.value === displayValue)?.label ||
-                  displayValue ||
-                  "Select option..."}
-              </span>
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400 opacity-50" />
-            </button>
-            {activeSelectFieldId === field.id && !isPreviewMode && !readOnly && (
-              <div className="absolute left-0 top-full z-[100] mt-1.5 flex min-w-full flex-col rounded-xl border border-white/10 bg-[#0A0A0C]/95 p-1.5 text-left shadow-2xl backdrop-blur-md">
-                <div className="nowheel flex max-h-[260px] flex-col gap-0.5 overflow-y-auto">
-                  {field.selectOptions?.map((opt) => {
-                    const isSelected = opt.value === displayValue;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => {
-                          updateField(field.id, { value: opt.value });
-                          setActiveSelectFieldId(null);
-                        }}
-                        className={`flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors active:scale-[0.98] duration-150 ease-out ${
-                          isSelected
-                            ? "bg-white/10 text-zinc-100"
-                            : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
-                        }`}
-                      >
-                        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-                          {isSelected && (
-                            <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                          )}
-                        </span>
-                        <span className="truncate">{opt.label}</span>
-                      </button>
-                    );
-                  })}
+        {/* slider_field rendering */}
+        {field.type === "slider_field" && (
+          <div className="space-y-2">
+            {isEditing && !readOnly ? (
+              // Edit mode: configure Min, Max, Step
+              <div className="space-y-2">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Slider Configuration</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500">Min</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={field.numberMin ?? 0}
+                      onChange={(e) => updateField(field.id, { numberMin: Number(e.target.value) })}
+                      className="nodrag nowheel w-full rounded-lg border border-white/5 bg-[#050507] px-2 py-1 text-xs font-mono text-zinc-100 outline-none focus:border-white/15 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500">Max</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={field.numberMax ?? 100}
+                      onChange={(e) => updateField(field.id, { numberMax: Number(e.target.value) })}
+                      className="nodrag nowheel w-full rounded-lg border border-white/5 bg-[#050507] px-2 py-1 text-xs font-mono text-zinc-100 outline-none focus:border-white/15 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-zinc-500">Step</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min={0}
+                      value={field.numberStep ?? 1}
+                      onChange={(e) => updateField(field.id, { numberStep: Number(e.target.value) })}
+                      className="nodrag nowheel w-full rounded-lg border border-white/5 bg-[#050507] px-2 py-1 text-xs font-mono text-zinc-100 outline-none focus:border-white/15 transition-all"
+                    />
+                  </div>
                 </div>
+              </div>
+            ) : (
+              // Normal mode: show slider
+              <div className="flex min-w-0 items-center gap-3">
+                <ElasticSlider
+                  value={displayValue !== "" ? Number(displayValue) : (field.numberMin ?? 0)}
+                  onChange={(val) =>
+                    !isPreviewMode && !readOnly && updateField(field.id, { value: String(val) })
+                  }
+                  disabled={isPreviewMode || readOnly}
+                  startingValue={field.numberMin ?? 0}
+                  maxValue={field.numberMax ?? 100}
+                  stepSize={field.numberStep ?? 1}
+                  isStepped={true}
+                  className="flex-1 min-w-[60px]"
+                  activeColor="#f43f5e"
+                />
+                <input
+                  type="number"
+                  min={field.numberMin ?? 0}
+                  max={field.numberMax ?? 100}
+                  step={field.numberStep ?? 1}
+                  value={displayValue}
+                  disabled={isPreviewMode || readOnly}
+                  onChange={(e) =>
+                    !isPreviewMode && !readOnly && updateField(field.id, { value: e.target.value })
+                  }
+                  className="nodrag w-14 shrink-0 rounded-lg border border-white/5 bg-[#050507] px-2 py-1 text-center font-mono text-xs text-zinc-100 outline-none disabled:opacity-50 focus:border-white/15 focus:ring-1 focus:ring-white/10 transition-colors"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* select_field rendering */}
+        {field.type === "select_field" && (
+          <div className="space-y-2">
+            {isEditing && !readOnly ? (
+              // Edit mode: manage options
+              <div className="space-y-2">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-1">Options</div>
+                {(field.selectOptions ?? []).map((opt, idx) => (
+                  <div key={opt.value} className="flex items-center gap-2">
+                    <span className="flex-1 truncate text-xs text-zinc-300 font-mono bg-[#050507] border border-white/5 rounded-lg px-2 py-1">
+                      {opt.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = (field.selectOptions ?? []).filter((_, i) => i !== idx);
+                        updateField(field.id, { selectOptions: next });
+                      }}
+                      className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors border-0"
+                      title="Remove option"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                {/* Add new option */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newOptionLabel}
+                    onChange={(e) => setNewOptionLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newOptionLabel.trim()) {
+                        const label = newOptionLabel.trim();
+                        const value = label.toLowerCase().replace(/\s+/g, "_");
+                        const next = [...(field.selectOptions ?? []), { label, value }];
+                        updateField(field.id, { selectOptions: next });
+                        setNewOptionLabel("");
+                      }
+                    }}
+                    placeholder="Add option..."
+                    className="nodrag flex-1 bg-[#050507] border border-white/5 rounded-lg px-2 py-1 text-xs text-zinc-100 outline-none focus:border-white/15 placeholder:text-zinc-600 transition-all"
+                  />
+                  <button
+                    type="button"
+                    disabled={!newOptionLabel.trim()}
+                    onClick={() => {
+                      const label = newOptionLabel.trim();
+                      if (!label) return;
+                      const value = label.toLowerCase().replace(/\s+/g, "_");
+                      const next = [...(field.selectOptions ?? []), { label, value }];
+                      updateField(field.id, { selectOptions: next });
+                      setNewOptionLabel("");
+                    }}
+                    className="nodrag flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white/5 bg-white/5 text-zinc-400 hover:text-zinc-100 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Add option"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              // Normal mode: show select dropdown (even if no options configured)
+              <div className="relative custom-select-container">
+                {(field.selectOptions ?? []).length === 0 ? (
+                  <div className="flex h-9 w-full items-center rounded-lg border border-dashed border-white/10 px-3 text-xs text-zinc-500 italic">
+                    No options — click edit to configure
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isPreviewMode || readOnly}
+                      onClick={() =>
+                        setActiveSelectFieldId(
+                          activeSelectFieldId === field.id ? null : field.id
+                        )
+                      }
+                      className="nodrag flex h-9 w-full items-center justify-between rounded-lg border border-white/5 bg-[#050507] px-3 py-2 text-xs text-zinc-100 disabled:opacity-50 outline-none focus:border-white/15 focus:ring-1 focus:ring-white/10 cursor-pointer transition-all active:scale-[0.98] duration-150 ease-out"
+                    >
+                      <span className="truncate">
+                        {field.selectOptions?.find((o) => o.value === displayValue)?.label ||
+                          displayValue ||
+                          "Select option..."}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-zinc-400 opacity-50" />
+                    </button>
+                    {activeSelectFieldId === field.id && !isPreviewMode && !readOnly && (
+                      <div className="absolute left-0 top-full z-[100] mt-1.5 flex min-w-full flex-col rounded-xl border border-white/10 bg-[#0A0A0C]/95 p-1.5 text-left shadow-2xl backdrop-blur-md">
+                        <div className="nowheel flex max-h-[260px] flex-col gap-0.5 overflow-y-auto">
+                          {field.selectOptions?.map((opt) => {
+                            const isSelected = opt.value === displayValue;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => {
+                                  updateField(field.id, { value: opt.value });
+                                  setActiveSelectFieldId(null);
+                                }}
+                                className={`flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-left text-[13px] font-medium transition-colors active:scale-[0.98] duration-150 ease-out ${
+                                  isSelected
+                                    ? "bg-white/10 text-zinc-100"
+                                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                                }`}
+                              >
+                                <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+                                  {isSelected && (
+                                    <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                                  )}
+                                </span>
+                                <span className="truncate">{opt.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

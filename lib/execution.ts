@@ -4,6 +4,44 @@
  */
 
 import { type Node, type Edge } from "@xyflow/react";
+import {
+  cropImageDefinition,
+  openrouterLlmDefinition,
+  geminiDefinition,
+  gptImage2Definition,
+  klingV3Definition,
+  mergeVideoDefinition,
+  mergeAVDefinition,
+  extractAudioDefinition,
+  type NodeDefinition,
+} from "@shashank519915/shared";
+
+// Map React Flow node type strings to shared definitions
+export const DEFINITIONS: Record<string, NodeDefinition> = {
+  cropImage: cropImageDefinition,
+  gemini: geminiDefinition,
+  openRouter: openrouterLlmDefinition,
+  gptImage2: gptImage2Definition,
+  klingV3: klingV3Definition,
+  mergeVideo: mergeVideoDefinition,
+  mergeAV: mergeAVDefinition,
+  extractAudio: extractAudioDefinition,
+};
+
+export function getTargetParamType(
+  nodeType: string | undefined,
+  handleId: string | null | undefined
+): string | undefined {
+  if (!nodeType || !handleId || !handleId.startsWith("in:")) return undefined;
+  const def = DEFINITIONS[nodeType];
+  if (def) {
+    const paramKey = handleId.slice(3); // strip "in:"
+    const param = def.inputs.find((p: any) => p.key === paramKey);
+    return param?.type;
+  }
+  return undefined;
+}
+
 
 /**
  * DFS cycle detection treating the workflow graph as directed from source → target.
@@ -76,11 +114,26 @@ function getHandleDataType(
     if (handleId.includes("audio")) return "audio";
     if (handleId.includes("media")) return "media";
     if (handleId.includes("file")) return "file";
+    if (handleId.includes("slider")) return "slider";
     if (handleId.includes("number")) return "number";
     if (handleId.includes("boolean")) return "boolean";
-    if (handleId.includes("select")) return "text";
+    if (handleId.includes("select")) return "select";
     if (handleId.includes("text")) return "text";
     return "generic";
+  }
+
+  // For target handles (in:paramKey), look up the node definition to determine
+  // if the parameter is a slider or select — allows strict type-matching.
+  if (handleId.startsWith("in:") && nodeType) {
+    const def = DEFINITIONS[nodeType];
+    if (def) {
+      const paramKey = handleId.slice(3); // strip "in:"
+      const param = def.inputs.find((p: any) => p.key === paramKey);
+      if (param) {
+        if (param.type === "slider") return "slider";
+        if (param.type === "select") return "select";
+      }
+    }
   }
 
   if (
@@ -126,7 +179,7 @@ function getHandleDataType(
   if (handleId.includes("prompt") || handleId === "in:prompt" || handleId === "in:systemPrompt") return "text";
   if (handleId === "out:response") return "text";
   if (handleId === "in:x" || handleId === "in:y" || handleId === "in:w" || handleId === "in:h")
-    return "number";
+    return "slider";
 
   if (nodeType === "cropImage") return "image";
   if (nodeType === "gemini") return "text";
@@ -162,5 +215,12 @@ export function isValidConnection(
   if (targetHandle === "in:video_urls" && sourceType === "video") return true;
   if (targetHandle === "in:audio_urls" && sourceType === "audio") return true;
 
+  const isNumeric = (t: string) => t === "number" || t === "slider";
+  const isTextual = (t: string) => t === "text" || t === "select";
+
+  if (isNumeric(sourceType) && isNumeric(targetType)) return true;
+  if (isTextual(sourceType) && isTextual(targetType)) return true;
+
   return sourceType === targetType;
 }
+

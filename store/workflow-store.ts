@@ -11,8 +11,10 @@ import {
   applyEdgeChanges,
   type NodeChange,
   type EdgeChange,
+  MarkerType,
 } from "@xyflow/react";
 import { isOutOfScopeSkippedNodeRun } from "@/lib/run-scope";
+import { getSourceHandleColor } from "@/lib/utils";
 
 /** When set, field was auto-created via “Add to request” on a target node handle. */
 export interface RequestFieldLink {
@@ -30,6 +32,7 @@ export interface WorkflowField {
   type:
     | "text_field"
     | "select_field"
+    | "slider_field"
     | "number_field"
     | "boolean_field"
     | "image_field"
@@ -207,6 +210,14 @@ interface WorkflowStore {
   setSelectedNodeIds: (ids: string[]) => void;
   setViewportCenter: (center: { x: number; y: number }) => void;
   setSelectModeActive: (active: boolean) => void;
+  activeSettingsNodeId: string | null;
+  setActiveSettingsNodeId: (id: string | null) => void;
+  connectingSourceNodeId: string | null;
+  settingsNodeIdBeforeDrag: string | null;
+  connectionCompletedThisDrag: boolean;
+  setConnectingSourceNodeId: (nodeId: string | null) => void;
+  setSettingsNodeIdBeforeDrag: (nodeId: string | null) => void;
+  setConnectionCompletedThisDrag: (completed: boolean) => void;
 }
 
 const MAX_HISTORY = 50;
@@ -310,7 +321,25 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   setReadOnly: (ro) => set({ readOnly: ro }),
 
   setNodes: (nodes) => set({ nodes }),
-  setEdges: (edges) => set({ edges }),
+  setEdges: (edges) => set({
+    edges: edges.map((e) => {
+      if (e.type !== "animatedEdge") {
+        const edgeColor = getSourceHandleColor(e.sourceHandle);
+        return {
+          ...e,
+          type: "animatedEdge",
+          data: { ...e.data, color: edgeColor },
+          markerEnd: e.markerEnd || {
+            type: MarkerType.ArrowClosed,
+            color: edgeColor,
+            width: 16,
+            height: 16,
+          },
+        };
+      }
+      return e;
+    }),
+  }),
 
   onNodesChange: (changes) => {
     set((state) => {
@@ -641,4 +670,12 @@ export const useWorkflowStore = create<WorkflowStore>((set, get) => ({
   setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids }),
   setViewportCenter: (center) => set({ viewportCenter: center }),
   setSelectModeActive: (active) => set({ selectModeActive: active }),
+  activeSettingsNodeId: null,
+  setActiveSettingsNodeId: (id) => set({ activeSettingsNodeId: id }),
+  connectingSourceNodeId: null,
+  settingsNodeIdBeforeDrag: null,
+  connectionCompletedThisDrag: false,
+  setConnectingSourceNodeId: (nodeId) => set({ connectingSourceNodeId: nodeId }),
+  setSettingsNodeIdBeforeDrag: (nodeId) => set({ settingsNodeIdBeforeDrag: nodeId }),
+  setConnectionCompletedThisDrag: (completed) => set({ connectionCompletedThisDrag: completed }),
 }));

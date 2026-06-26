@@ -169,10 +169,12 @@ export default function GenericNode({ id, data, type, selected = false, customRe
     DEFINITIONS[data.model as string] ||
     cropImageDefinition;
   const theme = getColorTheme(definition.color);
-
-  const { edges, nodes, deleteNode } = useWorkflowStore();
+  const { edges, nodes, deleteNode, activeSettingsNodeId, connectingSourceNodeId, setActiveSettingsNodeId } = useWorkflowStore();
+  const isSettingsDimmed = activeSettingsNodeId !== null && activeSettingsNodeId !== id;
 
   const state = useGenericNodeState(id, definition);
+  if (!state.nodeData) return null;
+
   const {
     nodeData,
     isPreviewMode,
@@ -233,11 +235,14 @@ export default function GenericNode({ id, data, type, selected = false, customRe
       id,
       handleId,
     );
+    const disabled = readOnly || isLocked || requestPromoted;
     // boolean parameters stay in their own layout even when wired — no upstream panel
     const showUpstreamPanel =
       isWired &&
       !requestPromoted &&
-      param.type !== "boolean";
+      param.type !== "boolean" &&
+      param.uiVariant !== "crop-overlay-preview";
+
     const showAddToRequestBtn = shouldShowAddToRequest({
       hasHandle: !!param.handle,
       readOnly,
@@ -273,6 +278,107 @@ export default function GenericNode({ id, data, type, selected = false, customRe
       modeTab === "text"
     )
       return null;
+
+    // Resolve imgUrl for crop overlay preview to determine layout early
+    const imgUrl: string | null =
+      param.uiVariant === "crop-overlay-preview"
+        ? (isWired
+          ? (() => {
+              const edge = (edges ?? []).find(
+                (e) => e.target === id && e.targetHandle === handleId
+              );
+              if (!edge) return null;
+              const v = resolvePropagatedEdgeValue(edge, nodes ?? [], edgeResolveOpts);
+              return typeof v === "string" && v.length > 0 ? v : null;
+            })()
+          : (Array.isArray(value) && value.length > 0 ? String(value[0]) : typeof value === "string" ? value : null))
+        : null;
+
+    const isCropOverlayEmpty = param.uiVariant === "crop-overlay-preview" && !imgUrl;
+
+    if (isCropOverlayEmpty) {
+      return (
+        <div
+          key={param.key}
+          className={`relative overflow-visible transition-opacity ${
+            requestPromoted && !isLocked
+              ? "opacity-60 bg-white/[0.02] rounded-lg p-1"
+              : ""
+          }`}
+        >
+          {param.handle && (
+            <div
+              className="absolute flex items-center"
+              style={{
+                left: "-22px",
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 50,
+              }}
+            >
+              <Handle
+                type="target"
+                position={Position.Left}
+                id={handleId}
+                className="!relative !transform-none target connectable connectablestart connectableend connectionindicator"
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: "50%",
+                  background: param.handle.color,
+                  border: `2px solid ${param.handle.color}80`,
+                  cursor: "crosshair",
+                  ["--handle-color" as any]: param.handle.color,
+                }}
+              />
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex items-center text-xs text-zinc-400 font-semibold shrink-0">
+              <span>{param.label}</span>
+              {param.required && <span className="text-red-400 ml-0.5">*</span>}
+              {param.tooltip && <FieldInfoTooltip text={param.tooltip} />}
+            </div>
+
+            <div className="flex-1 flex justify-end min-w-0">
+              <MediaArrayParameter
+                param={param}
+                value={value}
+                disabled={disabled}
+                updateInput={updateInput}
+                showAddToRequestBtn={false}
+                isLocked={isLocked}
+                handlePromoteInput={handlePromoteInput}
+                removeFileValue={removeFileValue}
+                activeUploadPopup={activeUploadPopup}
+                setActiveUploadPopup={setActiveUploadPopup}
+                uploadingField={uploadingField}
+                handleFileUpload={handleFileUpload}
+                id={id}
+                readOnly={readOnly}
+                isWired={isWired}
+                edges={edges ?? []}
+                nodes={nodes ?? []}
+                definition={definition}
+                edgeResolveOpts={edgeResolveOpts}
+                handleId={handleId}
+                parentInputs={nodeData.inputs}
+              />
+            </div>
+
+            {showAddToRequestBtn && (
+              <div className="shrink-0">
+                <AddToRequestToggle
+                  disabled={isLocked}
+                  onPromote={() => handlePromoteInput(param)}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
 
     // Resolve upstream wire value dynamically
     let wiredValue: any = null;
@@ -312,8 +418,6 @@ export default function GenericNode({ id, data, type, selected = false, customRe
         }
       }
     }
-
-    const disabled = readOnly || isLocked || requestPromoted;
 
     return (
       <div
@@ -513,6 +617,7 @@ export default function GenericNode({ id, data, type, selected = false, customRe
                 definition={definition}
                 edgeResolveOpts={edgeResolveOpts}
                 handleId={handleId}
+                parentInputs={nodeData.inputs}
               />
             )}
           </div>
@@ -529,6 +634,7 @@ export default function GenericNode({ id, data, type, selected = false, customRe
       theme={theme}
       nodeData={nodeData}
       isDimmed={isDimmed}
+      isSettingsDimmed={isSettingsDimmed}
       isExecuting={isExecuting}
       isRunPending={isRunPending}
       isRunCompleted={isRunCompleted}
@@ -560,6 +666,11 @@ export default function GenericNode({ id, data, type, selected = false, customRe
       onDuplicate={handleDuplicate}
       onDuplicateWithEdges={handleDuplicateWithEdges}
       onDelete={() => deleteNode(id)}
+      onDragHover={() => {
+        if (connectingSourceNodeId && connectingSourceNodeId !== id) {
+          setActiveSettingsNodeId(id);
+        }
+      }}
     />
   );
 }

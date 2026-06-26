@@ -956,3 +956,66 @@ body::after {
   }
 }
 
+/* Depth of Field Backdrop blur for sibling nodes */
+.wf-node-dimmed-blur {
+  filter: blur(4px) opacity(0.35);
+  pointer-events: none;
+}
+
+/* Clerk custom theme overrides to force white/light text and hide badges */
+.cl-card, 
+.cl-rootBox, 
+.cl-signIn-start, 
+.cl-signUp-start {
+  background-color: #0A0A0A !important;
+  color: #ffffff !important;
+}
+
+.cl-rootBox button,
+.cl-rootBox span,
+.cl-rootBox p,
+.cl-rootBox a,
+.cl-rootBox label,
+.cl-rootBox h1 {
+  color: #ffffff !important;
+}
+
+/* Dimmer zinc styles for subtitles, dividers, action texts and labels */
+.cl-rootBox .cl-headerSubtitle,
+.cl-rootBox .cl-dividerText,
+.cl-rootBox .cl-footerActionText,
+.cl-rootBox .cl-formFieldLabel {
+  color: #a1a1aa !important; /* zinc-400 */
+}
+
+.cl-socialButtonsBlockButton {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background-color: #111111 !important;
+}
+
+.cl-socialButtonsBlockButton:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.cl-formFieldInput {
+  background-color: #111111 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.cl-formFieldInput:focus {
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Hide powered by Clerk and development badges using classes and data attributes */
+.cl-rootBox .cl-footerItem,
+.cl-rootBox p[data-clerk-dev-mode-notice],
+.cl-rootBox div[data-clerk-dev-mode-overlay],
+.cl-internal-powered-by-clerk,
+.cl-poweredByButton,
+.cl-internal-development-badge,
+.cl-developmentBadge {
+  display: none !important;
+}
+
+
