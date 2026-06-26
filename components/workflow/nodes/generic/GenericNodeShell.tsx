@@ -231,14 +231,16 @@ export function GenericNodeShell({
           let mediaUrl: string | null = null;
           let isOutput = false;
           
-          if (outDef && output) {
+          if (outDef) {
             const currentOutput = isPreviewMode ? output : (output ?? nodeData.output);
-            if (currentOutput && typeof currentOutput === "object" && outDef.key in currentOutput) {
-              mediaUrl = String((currentOutput as any)[outDef.key]);
-              isOutput = true;
-            } else if (typeof currentOutput === "string") {
-              mediaUrl = currentOutput;
-              isOutput = true;
+            if (currentOutput) {
+              if (typeof currentOutput === "object" && outDef.key in currentOutput) {
+                mediaUrl = String((currentOutput as any)[outDef.key]);
+                isOutput = true;
+              } else if (typeof currentOutput === "string") {
+                mediaUrl = currentOutput;
+                isOutput = true;
+              }
             }
           }
           
