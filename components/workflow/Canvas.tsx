@@ -266,7 +266,7 @@ function CanvasInner({
       }
 
       if (overlayRef.current) {
-        const mask = `radial-gradient(circle ${radius}px at ${spotlightX}px ${spotlightY}px, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.2) 30%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0.35) 60%, rgba(0,0,0,0.55) 75%, rgba(0,0,0,0.75) 88%, rgba(0,0,0,0.9) 95%, rgba(0,0,0,1) 100%)`;
+        const mask = `radial-gradient(circle ${radius}px at ${spotlightX}px ${spotlightY}px, rgba(0,0,0,0) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.15) 65%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.7) 92%, rgba(0,0,0,1) 100%)`;
         overlayRef.current.style.maskImage = mask;
         overlayRef.current.style.webkitMaskImage = mask;
       }
@@ -918,7 +918,7 @@ function CanvasInner({
           activeSettingsNodeId ? "opacity-100" : "opacity-0"
         }`}
         style={{
-          backgroundColor: "rgba(0, 0, 0, 0.45)",
+          backgroundColor: "rgba(0, 0, 0, 0.55)",
         }}
       />
 
